@@ -1,6 +1,6 @@
 {
   "name": "@buildinternet/releases-skills",
-  "version": "0.13.1",
+  "version": "0.13.2",
   "description": "Agent skills bundled with the Releases CLI. Markdown playbooks for changelog ingest, discovery, and analysis.",
   "type": "module",
   "license": "MIT",
