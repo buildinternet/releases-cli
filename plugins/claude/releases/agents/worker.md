@@ -17,7 +17,7 @@ Connected via the Releases MCP server:
 - **get_organization** — Detailed view of a single org
 
 ### CLI commands (writes)
-Run via Bash using `bun src/index.ts` (dev) or `released` (compiled binary). Use `--json` for structured output.
+Run via Bash using `bun src/index.ts` (dev) or `releases` (compiled binary). Use `--json` for structured output.
 
 Key commands:
 - `releases admin source fetch <slug> [--max <n>]` — Fetch releases from a source

@@ -22,7 +22,7 @@ Connected via the Releases MCP server. Use for all read/search operations:
 - **compare_products** — AI comparison between two products
 
 ### CLI commands (writes + utilities)
-Run via Bash using `bun src/index.ts` (dev) or `released` (compiled binary). Use `--json` for structured output.
+Run via Bash using `bun src/index.ts` (dev) or `releases` (compiled binary). Use `--json` for structured output.
 
 Key commands:
 - `releases admin discovery evaluate <url> --json` — Evaluate a changelog URL for best ingestion method
