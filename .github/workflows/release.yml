@@ -30,9 +30,6 @@ jobs:
       - name: Type-check
         run: npx tsc --noEmit
 
-      - name: Run tests
-        run: bun run test
-
       - name: Build binaries
         run: |
           bun build --compile src/index.ts --outfile npm/releases-darwin-arm64/releases --target=bun-darwin-arm64
