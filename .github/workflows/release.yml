@@ -12,71 +12,8 @@ permissions:
   pull-requests: write
 
 jobs:
-  build-darwin:
-    name: Build darwin binaries
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - run: bun install --frozen-lockfile
-
-      - name: Install rcodesign
-        # Apple's codesign rejects `bun build --compile` output with
-        # "invalid or unsupported format for signature" because bun appends
-        # runtime asset data after the Mach-O __LINKEDIT segment. rcodesign
-        # (apple-codesign crate) handles the extended layout. Without an
-        # ad-hoc signature, Apple Silicon SIGKILLs the binary on exec.
-        run: brew install rcodesign
-
-      - name: Build + ad-hoc sign darwin binaries
-        run: |
-          bun build --compile src/index.ts --outfile npm/releases-darwin-arm64/releases --target=bun-darwin-arm64
-          bun build --compile src/index.ts --outfile npm/releases-darwin-x64/releases --target=bun-darwin-x64
-          rcodesign sign npm/releases-darwin-arm64/releases
-          rcodesign sign npm/releases-darwin-x64/releases
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: darwin-binaries
-          path: |
-            npm/releases-darwin-arm64/releases
-            npm/releases-darwin-x64/releases
-          retention-days: 1
-          if-no-files-found: error
-
-  build-linux:
-    name: Build linux binaries
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - run: bun install --frozen-lockfile
-
-      - name: Build linux binaries
-        run: |
-          bun build --compile src/index.ts --outfile npm/releases-linux-x64/releases --target=bun-linux-x64
-          bun build --compile src/index.ts --outfile npm/releases-linux-arm64/releases --target=bun-linux-arm64
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: linux-binaries
-          path: |
-            npm/releases-linux-x64/releases
-            npm/releases-linux-arm64/releases
-          retention-days: 1
-          if-no-files-found: error
-
   release:
     name: Version or Publish
-    needs: [build-darwin, build-linux]
     runs-on: ubuntu-latest
 
     steps:
@@ -86,30 +23,23 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          # Pinned to canary to pick up oven-sh/bun#29272, which fixes
+          # `bun build --compile` producing Mach-O binaries that macOS
+          # SIGKILLs on Apple Silicon due to a broken LC_CODE_SIGNATURE
+          # size in bun 1.3.12. Swap to `1.3.13` (or newer) once released.
+          bun-version: canary
 
       - run: bun install --frozen-lockfile
 
       - name: Type-check
         run: npx tsc --noEmit
 
-      - uses: actions/download-artifact@v4
-        with:
-          name: darwin-binaries
-          path: .
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: linux-binaries
-          path: .
-
-      - name: Restore executable bit on binaries
-        # actions/upload-artifact does not preserve the executable mode.
+      - name: Build binaries
         run: |
-          chmod +x npm/releases-darwin-arm64/releases
-          chmod +x npm/releases-darwin-x64/releases
-          chmod +x npm/releases-linux-x64/releases
-          chmod +x npm/releases-linux-arm64/releases
+          bun build --compile src/index.ts --outfile npm/releases-darwin-arm64/releases --target=bun-darwin-arm64
+          bun build --compile src/index.ts --outfile npm/releases-darwin-x64/releases --target=bun-darwin-x64
+          bun build --compile src/index.ts --outfile npm/releases-linux-x64/releases --target=bun-linux-x64
+          bun build --compile src/index.ts --outfile npm/releases-linux-arm64/releases --target=bun-linux-arm64
 
       - name: Configure npm auth
         env:
