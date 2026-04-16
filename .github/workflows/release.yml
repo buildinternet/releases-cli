@@ -12,8 +12,66 @@ permissions:
   pull-requests: write
 
 jobs:
+  build-darwin:
+    name: Build darwin binaries
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      - name: Build + ad-hoc sign darwin binaries
+        # bun compiled on macOS emits a proper Mach-O; ad-hoc codesign is
+        # required for Apple Silicon Gatekeeper to allow exec. Cross-compiling
+        # from Linux produces unsignable binaries that macOS SIGKILLs on exec.
+        run: |
+          bun build --compile src/index.ts --outfile npm/releases-darwin-arm64/releases --target=bun-darwin-arm64
+          bun build --compile src/index.ts --outfile npm/releases-darwin-x64/releases --target=bun-darwin-x64
+          codesign --force --sign - npm/releases-darwin-arm64/releases
+          codesign --force --sign - npm/releases-darwin-x64/releases
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: darwin-binaries
+          path: |
+            npm/releases-darwin-arm64/releases
+            npm/releases-darwin-x64/releases
+          retention-days: 1
+          if-no-files-found: error
+
+  build-linux:
+    name: Build linux binaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      - name: Build linux binaries
+        run: |
+          bun build --compile src/index.ts --outfile npm/releases-linux-x64/releases --target=bun-linux-x64
+          bun build --compile src/index.ts --outfile npm/releases-linux-arm64/releases --target=bun-linux-arm64
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-binaries
+          path: |
+            npm/releases-linux-x64/releases
+            npm/releases-linux-arm64/releases
+          retention-days: 1
+          if-no-files-found: error
+
   release:
     name: Version or Publish
+    needs: [build-darwin, build-linux]
     runs-on: ubuntu-latest
 
     steps:
@@ -30,12 +88,23 @@ jobs:
       - name: Type-check
         run: npx tsc --noEmit
 
-      - name: Build binaries
+      - uses: actions/download-artifact@v4
+        with:
+          name: darwin-binaries
+          path: .
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-binaries
+          path: .
+
+      - name: Restore executable bit on binaries
+        # actions/upload-artifact does not preserve the executable mode.
         run: |
-          bun build --compile src/index.ts --outfile npm/releases-darwin-arm64/releases --target=bun-darwin-arm64
-          bun build --compile src/index.ts --outfile npm/releases-darwin-x64/releases --target=bun-darwin-x64
-          bun build --compile src/index.ts --outfile npm/releases-linux-x64/releases --target=bun-linux-x64
-          bun build --compile src/index.ts --outfile npm/releases-linux-arm64/releases --target=bun-linux-arm64
+          chmod +x npm/releases-darwin-arm64/releases
+          chmod +x npm/releases-darwin-x64/releases
+          chmod +x npm/releases-linux-x64/releases
+          chmod +x npm/releases-linux-arm64/releases
 
       - name: Configure npm auth
         env:
@@ -131,7 +200,10 @@ jobs:
             end
 
             def install
-              bin.install "releases"
+              # Single-binary .gz decompresses to a platform-suffixed filename
+              # (e.g. releases-darwin-arm64). Rename to "releases" on install.
+              binary = Dir["releases-*"].find { |f| File.file?(f) }
+              bin.install binary => "releases"
             end
 
             test do
