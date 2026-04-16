@@ -1,0 +1,139 @@
+import { Command } from "commander";
+import chalk from "chalk";
+import Table from "cli-table3";
+import { listSourcesWithOrg, findSource } from "../../api/client.js";
+import { sourceNotFound } from "../suggest.js";
+import { stripAnsi } from "../../lib/sanitize.js";
+
+function getFetchMethod(type: string, metadata: string | null): string {
+  if (type === "github") return "github";
+  if (type === "feed") return "feed";
+  if (metadata) {
+    try {
+      const meta = JSON.parse(metadata);
+      if (meta.feedUrl) return "feed";
+      if (meta.noFeedFound) return "ai";
+    } catch { /* malformed */ }
+  }
+  return "-";
+}
+
+export function registerListCommand(program: Command) {
+  program
+    .command("list")
+    .description("List all configured changelog sources, or show details for a single source")
+    .argument("[slug]", "Show details for a specific source by slug")
+    .option("--json", "Output as JSON")
+    .option("--org <org>", "Filter by organization slug")
+    .option("--product <product>", "Filter by product slug")
+    .option("--has-feed", "Only show sources that have a discovered feed URL")
+    .option("--query <text>", "Filter by name, slug, or URL")
+    .option("--category <category>", "Filter by organization or product category")
+    .option("--include-disabled", "Include disabled sources in the list")
+    .option("--compact", "Return lightweight fields only")
+    .option("--limit <n>", "Limit the number of results")
+    .option("--page <n>", "Page number for paginated results")
+    .action(async (slug: string | undefined, opts: { json?: boolean; org?: string; product?: string; category?: string; hasFeed?: boolean; query?: string; includeDisabled?: boolean; compact?: boolean; limit?: string; page?: string }) => {
+      if (slug) {
+        const source = await findSource(slug);
+        if (!source) return sourceNotFound(slug);
+        if (opts.json) {
+          const method = getFetchMethod(source.type, source.metadata ?? null);
+          const parsed: Record<string, unknown> = { ...source, method };
+          if (typeof parsed.metadata === "string") {
+            try { parsed.metadata = JSON.parse(parsed.metadata as string); } catch {}
+          }
+          console.log(JSON.stringify(parsed, null, 2));
+          return;
+        }
+        const label = (key: string, val: string | null | undefined) =>
+          `  ${chalk.bold(key.padEnd(16))} ${val ?? chalk.dim("—")}`;
+        const method = getFetchMethod(source.type, source.metadata ?? null);
+        console.log(chalk.bold(`\n${stripAnsi(source.name)}\n`));
+        console.log(label("Slug", source.slug));
+        console.log(label("Type", source.type));
+        console.log(label("Method", method === "-" ? null : method));
+        console.log(label("URL", source.url));
+        console.log(label("Org", source.orgId ?? null));
+        console.log(label("Last Fetched", source.lastFetchedAt));
+        console.log(label("Primary", source.isPrimary ? "yes" : null));
+        console.log(label("Status", source.isHidden ? "disabled" : "active"));
+        console.log(label("Fetch Priority", source.fetchPriority));
+        console.log("");
+        return;
+      }
+
+      const allSources = await listSourcesWithOrg({
+        orgSlug: opts.org,
+        productSlug: opts.product,
+        category: opts.category,
+        hasFeed: opts.hasFeed,
+        query: opts.query,
+        includeHidden: opts.includeDisabled,
+      });
+
+      if (allSources.length === 0) {
+        if (opts.json) console.log(JSON.stringify([], null, 2));
+        else console.log("No sources configured.");
+        return;
+      }
+
+      if (opts.json) {
+        let items: Record<string, unknown>[];
+        if (opts.compact) {
+          items = allSources.map((row) => ({
+            id: row.id,
+            slug: row.slug,
+            name: row.name,
+            type: row.type,
+            method: getFetchMethod(row.type, row.metadata),
+            orgName: row.orgName ?? null,
+            productName: row.productName ?? null,
+            releaseCount: row.releaseCount,
+            latestDate: row.latestDate ?? null,
+            lastFetchedAt: row.lastFetchedAt ?? null,
+          }));
+        } else {
+          items = allSources.map((row) => ({
+            ...row,
+            method: getFetchMethod(row.type, row.metadata),
+          }));
+        }
+        const limit = opts.limit ? parseInt(opts.limit, 10) : undefined;
+        if (limit && limit > 0) {
+          const page = opts.page ? parseInt(opts.page, 10) : 1;
+          const start = (page - 1) * limit;
+          const slice = items.slice(start, start + limit);
+          const totalPages = Math.ceil(items.length / limit);
+          console.log(JSON.stringify({
+            items: slice,
+            pagination: { page, pageSize: limit, totalPages, totalItems: items.length },
+          }, null, 2));
+        } else {
+          console.log(JSON.stringify(items, null, 2));
+        }
+        return;
+      }
+
+      const table = new Table({
+        head: ["Name", "Slug", "Type", "Method", "URL", "Org", "Product", "Last Fetched"],
+      });
+
+      for (const row of allSources) {
+        const method = getFetchMethod(row.type, row.metadata);
+        const name = stripAnsi(row.name);
+        table.push([
+          row.isPrimary ? `${name} ${chalk.yellow("\u2605")}` : name,
+          row.slug,
+          row.type,
+          method,
+          row.url,
+          row.orgName ? stripAnsi(row.orgName) : chalk.dim("\u2014"),
+          row.productName ?? chalk.dim("\u2014"),
+          row.lastFetchedAt ?? chalk.dim("never"),
+        ]);
+      }
+
+      console.log(table.toString());
+    });
+}

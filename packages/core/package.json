@@ -1,0 +1,32 @@
+{
+  "name": "@buildinternet/releases-core",
+  "version": "0.0.0",
+  "description": "Pure helpers shared by the Releases CLI — schema, categories, slicing, IDs, slugs, tokens.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zachdunn/releases-cli.git",
+    "directory": "packages/core"
+  },
+  "exports": {
+    "./schema": "./src/schema.ts",
+    "./categories": "./src/categories.ts",
+    "./dates": "./src/dates.ts",
+    "./changelog-slice": "./src/changelog-slice.ts",
+    "./id": "./src/id.ts",
+    "./slug": "./src/slug.ts"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.2",
+    "js-tiktoken": "^1.0.21",
+    "nanoid": "^5.1.7"
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "name": "releases-cli",
+  "version": "0.0.0",
+  "private": true,
+  "description": "CLI and shared packages for Releases — the changelog registry for AI agents and developers.",
+  "type": "module",
+  "bin": {
+    "releases": "./src/index.ts"
+  },
+  "scripts": {
+    "prebuild": "rm -f .*.bun-build",
+    "build": "bun build --compile src/index.ts --outfile dist/releases",
+    "build:linux": "bun build --compile src/index.ts --outfile dist/releases --target=bun-linux-x64",
+    "build:linux-arm64": "bun build --compile src/index.ts --outfile dist/releases --target=bun-linux-arm64",
+    "build:darwin-x64": "bun build --compile src/index.ts --outfile dist/releases --target=bun-darwin-x64",
+    "dev": "bun --watch src/index.ts",
+    "sync:plugin-skills": "bun scripts/sync-plugin-skills.ts",
+    "sync:version": "bun scripts/sync-version.ts",
+    "changeset": "changeset",
+    "changeset:version": "changeset version && bun scripts/sync-version.ts && bun install",
+    "changeset:publish": "changeset publish",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "workspaces": [
+    "npm/*",
+    "packages/*"
+  ],
+  "keywords": [
+    "cli",
+    "changelog",
+    "releases",
+    "mcp",
+    "ai-agents"
+  ],
+  "author": "Build Internet",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zachdunn/releases-cli.git"
+  },
+  "homepage": "https://releases.sh",
+  "dependencies": {
+    "@buildinternet/releases-core": "workspace:*",
+    "@buildinternet/releases-lib": "workspace:*",
+    "@buildinternet/releases-skills": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "chalk": "^5.6.2",
+    "cli-table3": "^0.6.5",
+    "commander": "^14.0.3",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.27.10",
+    "@types/bun": "latest",
+    "typescript": "^5.6.3"
+  }
+}

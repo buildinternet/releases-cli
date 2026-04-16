@@ -1,0 +1,23 @@
+{
+  "name": "@buildinternet/releases-lib",
+  "version": "0.0.0",
+  "description": "Runtime-neutral helpers for the Releases CLI — logger, errors, config.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zachdunn/releases-cli.git",
+    "directory": "packages/lib"
+  },
+  "exports": {
+    "./config": "./src/config.ts",
+    "./logger": "./src/logger.ts"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

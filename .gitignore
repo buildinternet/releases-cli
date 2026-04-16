@@ -1,0 +1,30 @@
+# dependencies
+node_modules
+
+# output
+dist
+*.tgz
+*.bun-build
+.*.bun-build
+
+# logs
+*.log
+
+# dotenv
+.env
+.env.local
+
+# caches
+*.tsbuildinfo
+.cache
+
+# IDEs
+.idea
+.vscode
+
+# macOS
+.DS_Store
+
+# scratch / local work
+.context
+.superpowers
