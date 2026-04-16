@@ -6,6 +6,7 @@ dist
 *.tgz
 *.bun-build
 .*.bun-build
+npm/*/releases
 
 # logs
 *.log
