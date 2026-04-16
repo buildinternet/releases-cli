@@ -24,15 +24,20 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
+      - name: Install rcodesign
+        # Apple's codesign rejects `bun build --compile` output with
+        # "invalid or unsupported format for signature" because bun appends
+        # runtime asset data after the Mach-O __LINKEDIT segment. rcodesign
+        # (apple-codesign crate) handles the extended layout. Without an
+        # ad-hoc signature, Apple Silicon SIGKILLs the binary on exec.
+        run: brew install rcodesign
+
       - name: Build + ad-hoc sign darwin binaries
-        # bun compiled on macOS emits a proper Mach-O; ad-hoc codesign is
-        # required for Apple Silicon Gatekeeper to allow exec. Cross-compiling
-        # from Linux produces unsignable binaries that macOS SIGKILLs on exec.
         run: |
           bun build --compile src/index.ts --outfile npm/releases-darwin-arm64/releases --target=bun-darwin-arm64
           bun build --compile src/index.ts --outfile npm/releases-darwin-x64/releases --target=bun-darwin-x64
-          codesign --force --sign - npm/releases-darwin-arm64/releases
-          codesign --force --sign - npm/releases-darwin-x64/releases
+          rcodesign sign npm/releases-darwin-arm64/releases
+          rcodesign sign npm/releases-darwin-x64/releases
 
       - uses: actions/upload-artifact@v4
         with:
