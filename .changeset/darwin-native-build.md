@@ -9,4 +9,4 @@
 "@buildinternet/releases-skills": patch
 ---
 
-Build darwin binaries on a macOS runner and ad-hoc sign them. Cross-compiling from Linux produced Mach-O binaries without a code signature, which Apple Silicon SIGKILLs on exec — breaking `brew install buildinternet/tap/releases`. Also fixes the Homebrew formula install block to handle the platform-suffixed binary name.
+Pin CI to bun canary to pick up oven-sh/bun#29272 — fixes `bun build --compile` producing Mach-O binaries that Apple Silicon SIGKILLs on exec due to a broken LC_CODE_SIGNATURE size in bun 1.3.12. Also leapfrogs the npm version timeline past the orphaned `@buildinternet/releases@0.13.0` left behind during the monorepo → OSS repo extraction.
