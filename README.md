@@ -46,10 +46,11 @@ releases search "authentication"
 releases latest next-js
 releases list --category ai
 releases show vercel            # org, product, or source
+releases org overview vercel    # full AI-generated overview for an org
 releases stats
 ```
 
-Every reader command supports `--json` for machine-readable output.
+Every reader command supports `--json` for machine-readable output. `org show` includes a short overview preview (with a stale warning when more than 30 days old); `org overview <slug>` prints the full body.
 
 ### MCP
 

@@ -43,6 +43,7 @@ bun test                      # bun test
 - IDs over slugs everywhere. Every `<identifier>` arg accepts `org_…`, `src_…`, `prod_…`, `rel_…`, or a slug.
 - `--json` supported on every reader command. Admin commands support it where it makes sense.
 - `daysAgoIso()` from `@releases/core/dates` for cutoff math. Don't roll your own.
+- Org overviews: `releases org show <slug>` includes a short overview preview; `releases org overview <slug>` is the unauthenticated public reader for the full body. Both surfaces add a `⚠ older than 30 days` warning past `OVERVIEW_STALE_DAYS` (from `@buildinternet/releases-core/overview`).
 
 ## Telemetry
 
