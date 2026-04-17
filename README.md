@@ -6,6 +6,12 @@ The CLI talks to the hosted registry at `api.releases.sh`. Reader commands work 
 
 ## Install
 
+### Homebrew (macOS / Linux)
+
+```bash
+brew install buildinternet/tap/releases
+```
+
 ### npm
 
 ```bash
@@ -24,7 +30,7 @@ npx @buildinternet/releases search "react"
 curl -fsSL https://releases.sh/install | bash
 ```
 
-Installs a self-contained binary for your platform into `$HOME/.local/bin`.
+Downloads the matching platform binary from npm. Respects `RELEASED_INSTALL_DIR` (default: `/usr/local/bin`).
 
 ## Usage
 
@@ -80,7 +86,7 @@ bun run typecheck                         # tsc --noEmit
 bun test                                  # unit tests
 ```
 
-The project is a Bun workspace. The three shared packages (`@buildinternet/releases-core`, `-lib`, `-skills`) are published from this repo and consumed by the private ingest backend.
+The project is a Bun workspace. The three shared packages (`@buildinternet/releases-core`, `-lib`, `-skills`) are published from this repo alongside the CLI.
 
 ### Releasing
 

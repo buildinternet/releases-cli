@@ -38,7 +38,7 @@ bun test                      # bun test
 ## Conventions
 
 - All logging to **stderr** via `@releases/lib/logger`. stdout is reserved for MCP JSON-RPC in `admin mcp serve` mode and for `--json` command output.
-- Reader commands (top-level `search`, `latest`, `list`, `show`, `stats`, `summary`, `compare`, `categories`) are unauthenticated GETs — safe to run without credentials.
+- Reader commands (top-level `search`, `latest`, `list`, `show`, `stats`, `categories`) are unauthenticated GETs — safe to run without credentials. `summary` and `compare` are intentionally not in this CLI; they require AI provider calls and live in the private monorepo.
 - Admin commands under `releases admin` are gated at CLI startup: missing `RELEASED_API_KEY` errors out before Commander dispatch.
 - IDs over slugs everywhere. Every `<identifier>` arg accepts `org_…`, `src_…`, `prod_…`, `rel_…`, or a slug.
 - `--json` supported on every reader command. Admin commands support it where it makes sense.
