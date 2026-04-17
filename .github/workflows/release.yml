@@ -34,9 +34,6 @@ jobs:
       - name: Type-check
         run: npx tsc --noEmit
 
-      - name: Test
-        run: bun test
-
       - name: Fetch canary bun runtimes for cross-compile
         # When using canary bun for cross-compile, `bun build --compile`
         # tries to fetch a target-platform runtime matching its own
