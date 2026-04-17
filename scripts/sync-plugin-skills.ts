@@ -11,7 +11,7 @@
  *   bun scripts/sync-plugin-skills.ts --dry-run  # preview without changes
  */
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, rmSync } from "fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, rmSync, cpSync } from "fs";
 import { resolve, join } from "path";
 
 const PROJECT_ROOT = resolve(import.meta.dir, "..");
@@ -51,7 +51,15 @@ function main() {
       ? sourceContent.slice(0, fmEnd + 3) + "\n\n" + AUTO_GEN_COMMENT + "\n" + sourceContent.slice(fmEnd + 3)
       : AUTO_GEN_COMMENT + "\n\n" + sourceContent;
 
-    if (existsSync(destPath) && readFileSync(destPath, "utf8") === destContent) {
+    const sourceRefs = join(SOURCE_SKILLS_DIR, dirName, "references");
+    const destRefs = join(destDir, "references");
+    const refsInSync = refsEqual(sourceRefs, destRefs);
+
+    if (
+      existsSync(destPath) &&
+      readFileSync(destPath, "utf8") === destContent &&
+      refsInSync
+    ) {
       console.log(`  ✓ ${dirName} — up to date`);
       unchanged++;
       continue;
@@ -63,6 +71,10 @@ function main() {
     if (!dryRun) {
       mkdirSync(destDir, { recursive: true });
       writeFileSync(destPath, destContent);
+
+      // Mirror the skill's `references/` subdirectory (context7-cli-style layout).
+      if (existsSync(destRefs)) rmSync(destRefs, { recursive: true, force: true });
+      if (existsSync(sourceRefs)) cpSync(sourceRefs, destRefs, { recursive: true });
     }
   }
 
@@ -84,6 +96,25 @@ function main() {
   }
 
   console.log(`\nDone: ${synced} synced, ${unchanged} unchanged, ${removed} removed`);
+}
+
+function refsEqual(sourceDir: string, destDir: string): boolean {
+  const hasSource = existsSync(sourceDir);
+  const hasDest = existsSync(destDir);
+  if (!hasSource && !hasDest) return true;
+  if (hasSource !== hasDest) return false;
+
+  const sourceFiles = readdirSync(sourceDir).sort();
+  const destFiles = readdirSync(destDir).sort();
+  if (sourceFiles.length !== destFiles.length) return false;
+
+  for (let i = 0; i < sourceFiles.length; i++) {
+    if (sourceFiles[i] !== destFiles[i]) return false;
+    const a = readFileSync(join(sourceDir, sourceFiles[i]), "utf8");
+    const b = readFileSync(join(destDir, destFiles[i]), "utf8");
+    if (a !== b) return false;
+  }
+  return true;
 }
 
 main();

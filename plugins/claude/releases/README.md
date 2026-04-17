@@ -5,14 +5,23 @@ Search changelogs, track releases, and manage changelog sources with the [Releas
 ## What's Included
 
 - **MCP Server** — Connects Claude Code to the Releases.sh changelog registry
-- **Skills** — Auto-triggers changelog lookups when you ask about releases or what's new
+- **Skills** — Auto-triggers that cover reader lookups (`releases-mcp`), terminal usage (`releases-cli`), and a suite of operator skills (`finding-changelogs`, `managing-sources`, `parsing-changelogs`, etc.) for anyone onboarding or managing sources
 - **Agents** — `discovery` (finds and onboards sources) and `worker` (executes fetch operations)
 - **Commands** — `/releases` for manual changelog queries
 
 ## Installation
 
+Install via the marketplace manifest in the [releases-cli](https://github.com/buildinternet/releases-cli) repo:
+
 ```bash
-claude plugin add /path/to/releases-cli/plugins/claude/releases
+/plugin marketplace add buildinternet/releases-cli
+/plugin install releases@releases
+```
+
+For local development, point Claude Code at a cloned copy instead:
+
+```bash
+claude --plugin-dir plugins/claude/releases
 ```
 
 ## Available MCP Tools
@@ -66,9 +75,22 @@ Use the discovery agent to onboard Stripe as a changelog source
 Use the worker agent to fetch all Vercel sources
 ```
 
+## Bundled Skills
+
+| Skill | Trigger |
+|---|---|
+| `releases-mcp` | User asks about recent releases, changelogs, breaking changes, or version updates ("what's new in Next.js 15?") |
+| `releases-cli` | User mentions the `releases` CLI, runs a `releases` command, or asks about installing or using the CLI |
+| `finding-changelogs` | Adding a new source or evaluating a URL as a candidate |
+| `managing-sources` | Add/remove/edit/validate operations on indexed sources |
+| `parsing-changelogs` | Questions about how ingest works or debugging fetched content |
+| `analyzing-releases` | Cross-company trend or competitive-intel questions |
+| `classify-media-relevance` | Deciding which images to keep on a release |
+| `seeding-playbooks` | Bootstrapping ingestion notes for a new source |
+
 ## Skill Sync
 
-Operational skills (finding-changelogs, managing-sources, etc.) are synced from the top-level `skills/` directory — do not edit them directly in the plugin directory. Run the sync:
+Skills are synced from the top-level `skills/` directory — do not edit them directly in the plugin directory. Run the sync:
 
 ```bash
 bun scripts/sync-plugin-skills.ts

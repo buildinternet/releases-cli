@@ -1,0 +1,14 @@
+{
+  "name": "releases",
+  "owner": {
+    "name": "Build Internet"
+  },
+  "plugins": [
+    {
+      "name": "releases",
+      "source": "./plugins/claude/releases",
+      "description": "Search changelogs, track releases, and use the releases CLI against the Releases.sh registry. Bundles the hosted MCP connection plus skills for reader lookups and CLI usage.",
+      "version": "0.1.0"
+    }
+  ]
+}
