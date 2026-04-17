@@ -14,6 +14,7 @@
     "./categories": "./src/categories.ts",
     "./dates": "./src/dates.ts",
     "./changelog-slice": "./src/changelog-slice.ts",
+    "./overview": "./src/overview.ts",
     "./id": "./src/id.ts",
     "./slug": "./src/slug.ts",
     "./tokens": "./src/tokens.ts"

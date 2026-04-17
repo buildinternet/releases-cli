@@ -13,6 +13,13 @@ import { logger } from "@releases/lib/logger";
 import { orgNotFound } from "../suggest.js";
 import { toSlug } from "@releases/core/slug";
 import { isValidCategory, CATEGORIES } from "@releases/core/categories";
+import { timeAgo } from "@releases/core/dates";
+import {
+  OVERVIEW_STALE_DAYS,
+  overviewAgeDays,
+  isOverviewStale,
+  overviewPreview,
+} from "@releases/core/overview";
 
 export function registerOrgCommand(program: Command) {
   const org = program
@@ -166,10 +173,74 @@ export function registerOrgCommand(program: Command) {
       }
 
       if (overview?.content) {
+        const preview = overviewPreview(stripAnsi(overview.content));
+        const stale = overview.generatedAt ? isOverviewStale(overview.generatedAt) : false;
+        const generatedHint = overview.generatedAt
+          ? chalk.dim(`generated ${timeAgo(overview.generatedAt) ?? "?"}`)
+          : "";
+
         console.log();
-        console.log(chalk.bold("Overview:"));
-        console.log(stripAnsi(overview.content));
+        console.log(`${chalk.bold("Overview")}  ${generatedHint}`);
+        if (stale) {
+          console.log(chalk.yellow(`  ⚠ Overview is older than ${OVERVIEW_STALE_DAYS} days — may not reflect recent releases.`));
+        }
+        console.log(preview);
+        console.log(chalk.dim(`\n  Full overview: releases org overview ${found.slug}`));
       }
+    });
+
+  // ── org overview ──
+  org
+    .command("overview")
+    .description("Print the full AI-generated overview for an organization")
+    .argument("<identifier>", "Org slug, domain, name, or account handle")
+    .option("--json", "Output as JSON")
+    .addHelpText("after", `
+Examples:
+  releases org overview acme
+  releases org overview acme --json`)
+    .action(async (identifier: string, opts: { json?: boolean }) => {
+      const found = await findOrg(identifier);
+      if (!found) return orgNotFound(identifier);
+
+      const overview = await getOverview("org", found.slug).catch(() => null);
+
+      if (!overview?.content) {
+        if (opts.json) {
+          console.log(JSON.stringify({ org: found.slug, overview: null }, null, 2));
+        } else {
+          console.log(chalk.yellow(`No overview available for ${found.name}.`));
+        }
+        return;
+      }
+
+      const stale = overview.generatedAt ? isOverviewStale(overview.generatedAt) : false;
+      const ageDays = overview.generatedAt ? overviewAgeDays(overview.generatedAt) : null;
+
+      if (opts.json) {
+        console.log(JSON.stringify({
+          org: found.slug,
+          name: found.name,
+          generatedAt: overview.generatedAt,
+          updatedAt: overview.updatedAt,
+          lastContributingReleaseAt: overview.lastContributingReleaseAt,
+          releaseCount: overview.releaseCount,
+          stale,
+          ageDays,
+          content: overview.content,
+        }, null, 2));
+        return;
+      }
+
+      console.log(chalk.bold(`${found.name} — overview`));
+      if (overview.generatedAt) {
+        console.log(chalk.dim(`  generated ${timeAgo(overview.generatedAt) ?? "?"} · ${overview.releaseCount} releases`));
+      }
+      if (stale) {
+        console.log(chalk.yellow(`  ⚠ Overview is older than ${OVERVIEW_STALE_DAYS} days — may not reflect recent releases.`));
+      }
+      console.log();
+      console.log(stripAnsi(overview.content));
     });
 
   // ── org edit ──

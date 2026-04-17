@@ -104,7 +104,8 @@ releases admin source check next-js     # one source
 ```bash
 releases admin org add "Vercel" --category developer-tools --tags typescript,edge
 releases admin org list                                   # summary view
-releases admin org show vercel                            # full details (accounts, tags, sources, products, aliases)
+releases admin org show vercel                            # full details (overview shown as ~80-word preview)
+releases org overview vercel                              # full AI-generated overview (public read)
 releases admin org edit vercel --category developer-tools
 releases admin org link vercel --platform github --handle vercel
 releases admin org tag add vercel react serverless
