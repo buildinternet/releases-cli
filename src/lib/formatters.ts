@@ -8,11 +8,22 @@
 import type {
   ReleaseDetail,
   SourceDetail,
+  SourceListItem,
   OrgDetail,
   OrgReleaseItem,
+  ReleaseItem,
+  ReleaseSummaryItem,
   UnifiedSearchResponse,
   OverviewPageItem,
 } from "../api/types.js";
+
+// Re-exports under legacy/monorepo-compatible names so ported test suites and
+// external callers can import either name.
+export type FormatRelease = ReleaseItem;
+export type FormatReleaseSummary = ReleaseSummaryItem;
+export type FormatSourceDetail = SourceDetail;
+export type FormatSourceListItem = SourceListItem;
+export type FormatOrgDetail = OrgDetail;
 
 export interface FormatOptions {
   /** Base URL for canonical links (e.g. "https://releases.sh") */
@@ -426,3 +437,6 @@ export function overviewToMarkdown(
 
   return lines.join("\n");
 }
+
+/** Legacy alias — `OverviewPageItem` was previously called `KnowledgePageItem`. */
+export const knowledgeToMarkdown = overviewToMarkdown;
