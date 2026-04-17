@@ -1,5 +1,10 @@
 # Releases CLI
 
+[![npm](https://img.shields.io/npm/v/@buildinternet/releases?color=cb3837&label=npm&logo=npm)](https://www.npmjs.com/package/@buildinternet/releases)
+[![Release](https://github.com/buildinternet/releases-cli/actions/workflows/release.yml/badge.svg)](https://github.com/buildinternet/releases-cli/actions/workflows/release.yml)
+[![Test](https://github.com/buildinternet/releases-cli/actions/workflows/test.yml/badge.svg)](https://github.com/buildinternet/releases-cli/actions/workflows/test.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+
 Changelog registry for AI agents and developers. A lean HTTP client for [releases.sh](https://releases.sh) — search and browse release notes from GitHub, RSS/Atom/JSON feeds, and product changelog pages without any local infrastructure.
 
 The CLI talks to the hosted registry at `api.releases.sh`. Reader commands work out of the box with no configuration.
@@ -89,27 +94,13 @@ The plugin bundles:
 
 ### Standalone skills (any agent)
 
-The bundled skills can be installed directly into any Claude Code / Codex / Cursor / OpenCode / etc. workspace using the [`skills`](https://github.com/vercel-labs/skills) CLI, which reads the top-level `skills/` directory of this repo:
+The bundled skills are also available as a standalone package. Install them into any Claude Code / Codex / Cursor / OpenCode workspace using the [`skills`](https://github.com/vercel-labs/skills) CLI, which reads the top-level `skills/` directory of this repo:
 
 ```bash
-# Browse the skills in this repo and pick interactively
 npx skills add buildinternet/releases-cli
-
-# Install a specific skill
-npx skills add buildinternet/releases-cli --skill releases-cli
-npx skills add buildinternet/releases-cli --skill releases-mcp
-
-# Install all skills, globally, to Claude Code, no prompts
-npx skills add buildinternet/releases-cli --skill '*' -g -a claude-code -y
-
-# Update skills later (bare command updates everything installed)
-npx skills update
-
-# List installed skills
-npx skills list
 ```
 
-This path is useful when you only want the skill behavior (auto-triggering on release/CLI questions) without also registering the hosted MCP connection, agents, and `/releases` command that the plugin provides.
+Use this when you only want the skill behavior (auto-triggering on release/CLI questions) without also registering the hosted MCP connection, agents, and `/releases` command that the plugin provides.
 
 ## Environment
 

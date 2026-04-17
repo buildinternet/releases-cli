@@ -5,8 +5,12 @@
   "bin": {
     "releases": "bin/releases"
   },
+  "scripts": {
+    "prepack": "cp ../../README.md ./README.md"
+  },
   "files": [
-    "bin/releases"
+    "bin/releases",
+    "README.md"
   ],
   "optionalDependencies": {
     "@buildinternet/releases-darwin-arm64": "0.13.2",

@@ -7,6 +7,7 @@ dist
 *.bun-build
 .*.bun-build
 npm/*/releases
+npm/releases/README.md
 .bun-runtimes
 
 # logs
