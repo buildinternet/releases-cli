@@ -1,0 +1,30 @@
+name: Test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Type-check and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          # Matches the release workflow pin; see release.yml for context.
+          bun-version: canary
+
+      - run: bun install --frozen-lockfile
+
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      - name: Test
+        run: bun test
