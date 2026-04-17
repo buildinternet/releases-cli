@@ -15,7 +15,8 @@
     "./dates": "./src/dates.ts",
     "./changelog-slice": "./src/changelog-slice.ts",
     "./id": "./src/id.ts",
-    "./slug": "./src/slug.ts"
+    "./slug": "./src/slug.ts",
+    "./tokens": "./src/tokens.ts"
   },
   "files": [
     "src",

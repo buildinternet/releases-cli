@@ -404,6 +404,9 @@ export interface OverviewPageItem {
   updatedAt: string;
 }
 
+/** @deprecated Use OverviewPageItem */
+export type KnowledgePageItem = OverviewPageItem;
+
 // ── Activity ──
 
 export interface WeeklyBucket {
