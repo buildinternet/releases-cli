@@ -56,20 +56,30 @@ export function computePagination(opts: ComputePaginationOpts): Pagination {
   return { page, pageSize, returned, hasMore: returned === pageSize };
 }
 
-export type MetadataValue = string | Record<string, unknown> | null | undefined;
+type MetadataInput = string | Record<string, unknown> | null | undefined;
 
 /**
  * Parse a metadata field that may be a JSON-encoded string into its nested
  * object form. No-ops for objects, null, or invalid JSON (preserves the
  * original value so we never lose data on a malformed row).
  */
-export function parseMetadataField(value: MetadataValue): MetadataValue {
+export function parseMetadataField(value: MetadataInput): MetadataInput {
   if (typeof value !== "string") return value;
   try {
     return JSON.parse(value);
   } catch {
     return value;
   }
+}
+
+/**
+ * Narrow variant of `parseMetadataField` for callers that only care about the
+ * object shape (e.g. checking whether a key exists). Returns null for strings
+ * that fail to parse, for primitives, and for null/undefined inputs.
+ */
+export function parseMetadataObject(value: MetadataInput): Record<string, unknown> | null {
+  const parsed = parseMetadataField(value);
+  return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
 }
 
 /**

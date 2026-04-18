@@ -7,20 +7,16 @@ import { stripAnsi } from "../../lib/sanitize.js";
 import {
   DEFAULT_PAGE_SIZE,
   computePagination,
-  parseMetadataField,
+  parseMetadataObject,
   formatTruncationWarning,
   type ListResponse,
 } from "@buildinternet/releases-core/cli-contracts";
 
-function getFetchMethod(type: string, metadata: string | null): string {
+function getFetchMethod(type: string, meta: Record<string, unknown> | null): string {
   if (type === "github") return "github";
   if (type === "feed") return "feed";
-  const meta = parseMetadataField(metadata);
-  if (meta && typeof meta === "object") {
-    const m = meta as Record<string, unknown>;
-    if (m.feedUrl) return "feed";
-    if (m.noFeedFound) return "ai";
-  }
+  if (meta?.feedUrl) return "feed";
+  if (meta?.noFeedFound) return "ai";
   return "-";
 }
 
@@ -48,15 +44,15 @@ export function registerListCommand(program: Command) {
       if (slug) {
         const source = await findSource(slug);
         if (!source) return sourceNotFound(slug);
+        const parsedMeta = parseMetadataObject(source.metadata);
+        const method = getFetchMethod(source.type, parsedMeta);
         if (opts.json) {
-          const method = getFetchMethod(source.type, source.metadata ?? null);
-          const parsed: Record<string, unknown> = { ...source, method, metadata: parseMetadataField(source.metadata) };
+          const parsed: Record<string, unknown> = { ...source, method, metadata: parsedMeta ?? source.metadata };
           console.log(JSON.stringify(parsed, null, 2));
           return;
         }
         const label = (key: string, val: string | null | undefined) =>
           `  ${chalk.bold(key.padEnd(16))} ${val ?? chalk.dim("—")}`;
-        const method = getFetchMethod(source.type, source.metadata ?? null);
         console.log(chalk.bold(`\n${stripAnsi(source.name)}\n`));
         console.log(label("Slug", source.slug));
         console.log(label("Type", source.type));
@@ -87,8 +83,7 @@ export function registerListCommand(program: Command) {
         page,
       });
 
-      // Total is only knowable when the returned count falls short of a full
-      // page. Drop once the API returns pagination envelopes.
+      // Drop once the API returns pagination envelopes with totals.
       const knownTotalOnTail = pageItems.length < pageSize
         ? (page - 1) * pageSize + pageItems.length
         : undefined;
@@ -100,13 +95,15 @@ export function registerListCommand(program: Command) {
 
       if (opts.json) {
         const items: Record<string, unknown>[] = pageItems.map((row) => {
+          const parsedMeta = parseMetadataObject(row.metadata);
+          const method = getFetchMethod(row.type, parsedMeta);
           if (opts.compact) {
             return {
               id: row.id,
               slug: row.slug,
               name: row.name,
               type: row.type,
-              method: getFetchMethod(row.type, row.metadata),
+              method,
               orgName: row.orgName ?? null,
               productName: row.productName ?? null,
               releaseCount: row.releaseCount,
@@ -116,8 +113,8 @@ export function registerListCommand(program: Command) {
           }
           return {
             ...row,
-            method: getFetchMethod(row.type, row.metadata),
-            metadata: parseMetadataField(row.metadata),
+            method,
+            metadata: parsedMeta ?? row.metadata,
           };
         });
 
@@ -152,7 +149,7 @@ export function registerListCommand(program: Command) {
       });
 
       for (const row of pageItems) {
-        const method = getFetchMethod(row.type, row.metadata);
+        const method = getFetchMethod(row.type, parseMetadataObject(row.metadata));
         const name = stripAnsi(row.name);
         table.push([
           row.isPrimary ? `${name} ${chalk.yellow("\u2605")}` : name,

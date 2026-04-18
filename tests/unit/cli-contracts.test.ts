@@ -3,6 +3,7 @@ import {
   DEFAULT_PAGE_SIZE,
   computePagination,
   parseMetadataField,
+  parseMetadataObject,
   formatTruncationWarning,
 } from "@buildinternet/releases-core/cli-contracts";
 
@@ -57,6 +58,32 @@ describe("cli-contracts: parseMetadataField", () => {
     expect(parseMetadataField({ foo: "bar" })).toEqual({ foo: "bar" });
     expect(parseMetadataField(null)).toBeNull();
     expect(parseMetadataField(undefined)).toBeUndefined();
+  });
+});
+
+describe("cli-contracts: parseMetadataObject", () => {
+  it("returns the parsed object for a valid JSON string", () => {
+    const result = parseMetadataObject('{"fetchUrl":"https://example.com"}');
+    expect(result).toEqual({ fetchUrl: "https://example.com" });
+  });
+
+  it("returns null for malformed JSON", () => {
+    expect(parseMetadataObject("not json")).toBeNull();
+  });
+
+  it("returns null for a JSON string that parses to a non-object", () => {
+    expect(parseMetadataObject('"a string"')).toBeNull();
+    expect(parseMetadataObject("42")).toBeNull();
+  });
+
+  it("returns null for null/undefined input", () => {
+    expect(parseMetadataObject(null)).toBeNull();
+    expect(parseMetadataObject(undefined)).toBeNull();
+  });
+
+  it("returns the same object for already-parsed input", () => {
+    const obj = { fetchUrl: "x" };
+    expect(parseMetadataObject(obj)).toBe(obj);
   });
 });
 
