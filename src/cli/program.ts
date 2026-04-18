@@ -6,7 +6,7 @@ import { registerRemoveCommand } from "./commands/remove.js";
 import { registerListCommand } from "./commands/list.js";
 import { registerFetchCommand } from "./commands/fetch.js";
 import { registerSearchCommand } from "./commands/search.js";
-import { registerLatestCommand } from "./commands/latest.js";
+import { registerTailCommand } from "./commands/tail.js";
 import { registerUsageCommand } from "./commands/usage.js";
 import { registerOrgCommand } from "./commands/org.js";
 import { registerProductCommand } from "./commands/product.js";
@@ -82,7 +82,7 @@ function printStyledHelp(): string {
   lines.push("The most common commands are:");
   lines.push("");
   lines.push(`  - releases search     : ${chalk.dim("Full-text search across releases")}`);
-  lines.push(`  - releases latest     : ${chalk.dim("Show the most recent releases")}`);
+  lines.push(`  - releases tail       : ${chalk.dim("Show the most recent releases (add -f to follow)")}`);
   lines.push(`  - releases list       : ${chalk.dim("List and inspect sources")}`);
   lines.push("");
 
@@ -138,7 +138,7 @@ export const program = new Command()
 
 // Public commands — available to all users
 registerSearchCommand(program);
-registerLatestCommand(program);
+registerTailCommand(program);
 registerStatsCommand(program);
 registerListCommand(program);
 registerShowCommand(program);

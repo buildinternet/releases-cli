@@ -32,8 +32,8 @@ The CLI talks to `api.releases.sh` by default — no configuration needed for re
 ```bash
 # Reader (no auth required)
 releases search "breaking change"            # hybrid FTS + semantic search
-releases latest next-js                      # latest releases from one source
-releases latest --org vercel --count 20      # latest from a whole org
+releases tail next-js                      # latest releases from one source
+releases tail --org vercel --count 20      # latest from a whole org
 releases list --category ai                  # browse sources
 releases show vercel                         # dispatch by id or slug
 releases stats                               # registry overview
