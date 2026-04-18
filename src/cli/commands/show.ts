@@ -1,9 +1,8 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import Table from "cli-table3";
 import { findSource, findOrg, findProduct, getRelease, getLatestReleases } from "../../api/client.js";
-import type { LatestRelease } from "../../api/types.js";
 import { stripAnsi } from "../../lib/sanitize.js";
+import { renderLatestReleasesTable } from "../render/releases-table.js";
 import { getEntityType, normalizeReleaseId, isLikelyBareId } from "@releases/core/id";
 
 export function registerShowCommand(program: Command) {
@@ -126,32 +125,6 @@ async function renderOrg(
     console.log(chalk.dim(`Latest ${releases.length} release${releases.length === 1 ? "" : "s"}:`));
     console.log(renderLatestReleasesTable(releases));
   }
-}
-
-function renderLatestReleasesTable(rows: LatestRelease[]): string {
-  const table = new Table({
-    head: [
-      chalk.cyan("ID"),
-      chalk.cyan("Source"),
-      chalk.cyan("Title"),
-      chalk.cyan("Version"),
-      chalk.cyan("Published"),
-    ],
-  });
-  for (const row of rows) {
-    table.push([
-      chalk.dim(row.id.slice(0, 12)),
-      `${stripAnsi(row.sourceName)} ${chalk.dim(`(${row.sourceSlug})`)}`,
-      truncate(stripAnsi(row.title), 50),
-      row.version ? stripAnsi(row.version) : chalk.dim("—"),
-      row.publishedAt?.slice(0, 10) ?? chalk.dim("—"),
-    ]);
-  }
-  return table.toString();
-}
-
-function truncate(s: string, max: number): string {
-  return s.length > max ? s.slice(0, max - 1) + "…" : s;
 }
 
 async function renderProduct(product: { id: string; name: string; slug: string; orgId: string; url: string | null; category: string | null }, opts: { json?: boolean }) {

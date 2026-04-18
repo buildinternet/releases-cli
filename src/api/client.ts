@@ -356,87 +356,48 @@ export async function getFetchLogs(opts: {
 
 // ── Latest releases ──
 
-type SourceReleaseResponse = {
-  name: string;
-  releases: Array<{
-    id: string;
-    version: string | null;
-    title: string;
-    summary?: string;
-    media?: Array<{ type: string; url: string; alt?: string; r2Url?: string }>;
-    publishedAt: string | null;
-  }>;
-};
-
 function toMediaItems(raw: Array<{ type: string; url: string; alt?: string; r2Url?: string }> | undefined): MediaItem[] {
   return (raw ?? []).map((m) => ({ type: m.type as MediaItem["type"], url: m.url, alt: m.alt, r2Url: m.r2Url }));
 }
 
-function byPublishedAtDesc(a: LatestRelease, b: LatestRelease): number {
-  if (!a.publishedAt && !b.publishedAt) return 0;
-  if (!a.publishedAt) return 1;
-  if (!b.publishedAt) return -1;
-  return b.publishedAt.localeCompare(a.publishedAt);
-}
-
-async function collectReleasesFromSources(
-  slugs: string[],
-  pageSize: number,
-): Promise<LatestRelease[]> {
-  const results = await Promise.all(
-    slugs.map(async (slug) => ({ slug, data: await apiFetch<SourceReleaseResponse>(`/v1/sources/${slug}?pageSize=${pageSize}`) })),
-  );
-  const all: LatestRelease[] = [];
-  for (const { slug, data: srcData } of results) {
-    if (!srcData) continue;
-    for (const r of srcData.releases) {
-      all.push({
-        id: r.id,
-        title: r.title,
-        version: r.version,
-        publishedAt: r.publishedAt,
-        sourceName: srcData.name,
-        sourceSlug: slug,
-        contentSummary: r.summary ?? null,
-        media: toMediaItems(r.media),
-      });
-    }
-  }
-  return all;
-}
+type LatestReleasesResponse = {
+  releases: Array<{
+    id: string;
+    version: string | null;
+    type: string;
+    title: string;
+    summary: string | null;
+    publishedAt: string | null;
+    url: string | null;
+    media: Array<{ type: string; url: string; alt?: string; r2Url?: string }>;
+    source: { slug: string; name: string; type: string };
+  }>;
+};
 
 export async function getLatestReleases(opts: {
   slug?: string;
   orgSlug?: string;
   count: number;
+  includeCoverage?: boolean;
 }): Promise<LatestRelease[]> {
-  if (opts.slug) {
-    const data = await apiFetch<SourceReleaseResponse>(`/v1/sources/${opts.slug}?pageSize=${opts.count}`);
-    if (!data) return [];
-    return data.releases.map((r) => ({
-      id: r.id,
-      title: r.title,
-      version: r.version,
-      publishedAt: r.publishedAt,
-      sourceName: data.name,
-      sourceSlug: opts.slug!,
-      contentSummary: r.summary ?? null,
-      media: toMediaItems(r.media),
-    }));
-  }
+  const qs = new URLSearchParams();
+  qs.set("count", String(opts.count));
+  if (opts.slug) qs.set("source", opts.slug);
+  if (opts.orgSlug) qs.set("org", opts.orgSlug);
+  if (opts.includeCoverage) qs.set("include_coverage", "true");
 
-  if (opts.orgSlug) {
-    const data = await apiFetch<{
-      sources: Array<{ slug: string; name: string }>;
-    }>(`/v1/orgs/${opts.orgSlug}`);
-    if (!data) return [];
-    const all = await collectReleasesFromSources(data.sources.map((s) => s.slug), opts.count);
-    return all.sort(byPublishedAtDesc).slice(0, opts.count);
-  }
-
-  const sourcesData = await apiFetch<Array<{ slug: string; name: string }>>("/v1/sources");
-  const all = await collectReleasesFromSources(sourcesData.slice(0, 10).map((s) => s.slug), opts.count);
-  return all.sort(byPublishedAtDesc).slice(0, opts.count);
+  const data = await apiFetch<LatestReleasesResponse>(`/v1/releases/latest?${qs.toString()}`);
+  if (!data) return [];
+  return data.releases.map((r) => ({
+    id: r.id,
+    title: r.title,
+    version: r.version,
+    publishedAt: r.publishedAt,
+    sourceName: r.source.name,
+    sourceSlug: r.source.slug,
+    contentSummary: r.summary ?? null,
+    media: toMediaItems(r.media),
+  }));
 }
 
 // ── Known releases for incremental parsing ──

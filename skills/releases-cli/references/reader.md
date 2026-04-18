@@ -27,12 +27,12 @@ Chunk hits carry `sourceSlug`, `chunkOffset`, and `chunkLength` so you can chain
 ## Latest releases
 
 ```bash
-releases latest                          # across all sources
-releases latest next-js                  # one source (by slug)
-releases latest --org vercel --count 20  # whole org
-releases latest --product nextjs         # one product
-releases latest --type feature           # filter by release type
-releases latest --json
+releases tail                          # across all sources
+releases tail next-js                  # one source (by slug)
+releases tail --org vercel --count 20  # whole org
+releases tail --product nextjs         # one product
+releases tail --type feature           # filter by release type
+releases tail --json
 ```
 
 ## List sources

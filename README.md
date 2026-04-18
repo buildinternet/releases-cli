@@ -43,7 +43,7 @@ Downloads the matching platform binary from npm. Respects `RELEASED_INSTALL_DIR`
 
 ```bash
 releases search "authentication"
-releases latest next-js
+releases tail next-js            # or `releases tail -f` to follow new releases
 releases list --category ai
 releases show vercel            # org, product, or source
 releases org overview vercel    # full AI-generated overview for an org
