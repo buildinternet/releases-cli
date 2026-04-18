@@ -6,7 +6,6 @@ import { sourceNotFound } from "../suggest.js";
 import { stripAnsi } from "../../lib/sanitize.js";
 import {
   DEFAULT_PAGE_SIZE,
-  computePagination,
   parseMetadataObject,
   formatTruncationWarning,
   type ListResponse,
@@ -72,7 +71,7 @@ export function registerListCommand(program: Command) {
       const pageSize = explicitLimit ? limitOpt : DEFAULT_PAGE_SIZE;
       const page = opts.page ? Math.max(1, parseInt(opts.page, 10)) : 1;
 
-      const pageItems = await listSourcesWithOrg({
+      const { items: pageItems, pagination: apiPagination } = await listSourcesWithOrg({
         orgSlug: opts.org,
         productSlug: opts.product,
         category: opts.category,
@@ -81,12 +80,8 @@ export function registerListCommand(program: Command) {
         includeHidden: opts.includeDisabled,
         limit: pageSize,
         page,
+        envelope: true,
       });
-
-      // Drop once the API returns pagination envelopes with totals.
-      const knownTotalOnTail = pageItems.length < pageSize
-        ? (page - 1) * pageSize + pageItems.length
-        : undefined;
 
       if (pageItems.length === 0 && page === 1 && !opts.json) {
         console.log("No sources configured.");
@@ -118,19 +113,12 @@ export function registerListCommand(program: Command) {
           };
         });
 
-        const pagination = computePagination({
-          page,
-          pageSize,
-          returned: items.length,
-          totalItems: knownTotalOnTail,
-        });
-
-        const warnTruncated = !explicitLimit && pagination.hasMore;
+        const warnTruncated = !explicitLimit && apiPagination.hasMore;
 
         if (opts.flat) {
           console.log(JSON.stringify(items, null, 2));
         } else {
-          const response: ListResponse<Record<string, unknown>> = { items, pagination };
+          const response: ListResponse<Record<string, unknown>> = { items, pagination: apiPagination };
           console.log(JSON.stringify(response, null, 2));
         }
 
@@ -164,7 +152,7 @@ export function registerListCommand(program: Command) {
       }
 
       console.log(table.toString());
-      if (!explicitLimit && pageItems.length === pageSize) {
+      if (!explicitLimit && apiPagination.hasMore) {
         console.error(formatTruncationWarning({
           returned: pageItems.length,
           pageSize,

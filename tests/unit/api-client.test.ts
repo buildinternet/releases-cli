@@ -144,4 +144,27 @@ describe("listSourcesWithOrg", () => {
     expect(capturedUrl).toContain("has_feed=true");
     expect(capturedUrl).toContain("category=ai");
   });
+
+  it("returns envelope with pagination totals when envelope=true", async () => {
+    let capturedUrl = "";
+    globalThis.fetch = (async (url: string) => {
+      capturedUrl = url;
+      return new Response(
+        JSON.stringify({
+          items: [apiRow],
+          pagination: {
+            page: 2, pageSize: 50, returned: 1,
+            totalItems: 233, totalPages: 5, hasMore: true,
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }) as any;
+
+    const res = await client.listSourcesWithOrg({ envelope: true, limit: 50, page: 2 });
+    expect(capturedUrl).toContain("envelope=true");
+    expect(res.items).toHaveLength(1);
+    expect(res.pagination.totalItems).toBe(233);
+    expect(res.pagination.hasMore).toBe(true);
+  });
 });

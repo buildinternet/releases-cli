@@ -12,6 +12,7 @@ import type {
   UsageStatsResponse, Session,
   EmbedBackfillResponse, EmbedStatusResponse, MediaItem,
 } from "./types.js";
+import type { ListResponse } from "@releases/core/cli-contracts";
 export type {
   SourceWithOrg, SourcePatchInput, ReleaseWithSource, StatsSummary,
   FetchLogEntry, LatestRelease, UsageBreakdownRow, UsageStatsResponse,
@@ -212,7 +213,7 @@ export async function unifiedSearch(
 
 // ── List sources with org ──
 
-export async function listSourcesWithOrg(opts?: {
+type ListSourcesOpts = {
   orgSlug?: string;
   productSlug?: string;
   hasFeed?: boolean;
@@ -221,7 +222,15 @@ export async function listSourcesWithOrg(opts?: {
   category?: string;
   limit?: number;
   page?: number;
-}): Promise<SourceWithOrg[]> {
+};
+
+export async function listSourcesWithOrg(opts?: ListSourcesOpts): Promise<SourceWithOrg[]>;
+export async function listSourcesWithOrg(
+  opts: ListSourcesOpts & { envelope: true },
+): Promise<ListResponse<SourceWithOrg>>;
+export async function listSourcesWithOrg(
+  opts?: ListSourcesOpts & { envelope?: boolean },
+): Promise<SourceWithOrg[] | ListResponse<SourceWithOrg>> {
   const params = new URLSearchParams();
   if (opts?.orgSlug) params.set("orgSlug", opts.orgSlug);
   if (opts?.productSlug) params.set("productSlug", opts.productSlug);
@@ -231,9 +240,10 @@ export async function listSourcesWithOrg(opts?: {
   if (opts?.category) params.set("category", opts.category);
   if (opts?.limit != null) params.set("limit", String(opts.limit));
   if (opts?.page != null) params.set("page", String(opts.page));
+  if (opts?.envelope) params.set("envelope", "true");
   const qs = params.toString();
 
-  return apiFetch<SourceWithOrg[]>(`/v1/sources${qs ? `?${qs}` : ""}`);
+  return apiFetch<SourceWithOrg[] | ListResponse<SourceWithOrg>>(`/v1/sources${qs ? `?${qs}` : ""}`);
 }
 
 // ── Stats ──
