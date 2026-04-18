@@ -4,18 +4,28 @@ import Table from "cli-table3";
 import { listSourcesWithOrg, findSource } from "../../api/client.js";
 import { sourceNotFound } from "../suggest.js";
 import { stripAnsi } from "../../lib/sanitize.js";
+import {
+  DEFAULT_PAGE_SIZE,
+  computePagination,
+  parseMetadataField,
+  formatTruncationWarning,
+  type ListResponse,
+} from "@buildinternet/releases-core/cli-contracts";
 
 function getFetchMethod(type: string, metadata: string | null): string {
   if (type === "github") return "github";
   if (type === "feed") return "feed";
-  if (metadata) {
-    try {
-      const meta = JSON.parse(metadata);
-      if (meta.feedUrl) return "feed";
-      if (meta.noFeedFound) return "ai";
-    } catch { /* malformed */ }
+  const meta = parseMetadataField(metadata);
+  if (meta && typeof meta === "object") {
+    const m = meta as Record<string, unknown>;
+    if (m.feedUrl) return "feed";
+    if (m.noFeedFound) return "ai";
   }
   return "-";
+}
+
+function paginateExample(json: boolean): string {
+  return `releases list${json ? " --json" : ""} --limit <n> --page <p>`;
 }
 
 export function registerListCommand(program: Command) {
@@ -31,18 +41,16 @@ export function registerListCommand(program: Command) {
     .option("--category <category>", "Filter by organization or product category")
     .option("--include-disabled", "Include disabled sources in the list")
     .option("--compact", "Return lightweight fields only")
-    .option("--limit <n>", "Limit the number of results")
+    .option("--limit <n>", `Limit the number of results (default ${DEFAULT_PAGE_SIZE})`)
     .option("--page <n>", "Page number for paginated results")
-    .action(async (slug: string | undefined, opts: { json?: boolean; org?: string; product?: string; category?: string; hasFeed?: boolean; query?: string; includeDisabled?: boolean; compact?: boolean; limit?: string; page?: string }) => {
+    .option("--flat", "Legacy: return a bare array instead of the paginated envelope (--json only)")
+    .action(async (slug: string | undefined, opts: { json?: boolean; org?: string; product?: string; category?: string; hasFeed?: boolean; query?: string; includeDisabled?: boolean; compact?: boolean; limit?: string; page?: string; flat?: boolean }) => {
       if (slug) {
         const source = await findSource(slug);
         if (!source) return sourceNotFound(slug);
         if (opts.json) {
           const method = getFetchMethod(source.type, source.metadata ?? null);
-          const parsed: Record<string, unknown> = { ...source, method };
-          if (typeof parsed.metadata === "string") {
-            try { parsed.metadata = JSON.parse(parsed.metadata as string); } catch {}
-          }
+          const parsed: Record<string, unknown> = { ...source, method, metadata: parseMetadataField(source.metadata) };
           console.log(JSON.stringify(parsed, null, 2));
           return;
         }
@@ -63,54 +71,78 @@ export function registerListCommand(program: Command) {
         return;
       }
 
-      const allSources = await listSourcesWithOrg({
+      const limitOpt = opts.limit ? parseInt(opts.limit, 10) : undefined;
+      const explicitLimit = limitOpt != null && limitOpt > 0;
+      const pageSize = explicitLimit ? limitOpt : DEFAULT_PAGE_SIZE;
+      const page = opts.page ? Math.max(1, parseInt(opts.page, 10)) : 1;
+
+      const pageItems = await listSourcesWithOrg({
         orgSlug: opts.org,
         productSlug: opts.product,
         category: opts.category,
         hasFeed: opts.hasFeed,
         query: opts.query,
         includeHidden: opts.includeDisabled,
+        limit: pageSize,
+        page,
       });
 
-      if (allSources.length === 0) {
-        if (opts.json) console.log(JSON.stringify([], null, 2));
-        else console.log("No sources configured.");
+      // Total is only knowable when the returned count falls short of a full
+      // page. Drop once the API returns pagination envelopes.
+      const knownTotalOnTail = pageItems.length < pageSize
+        ? (page - 1) * pageSize + pageItems.length
+        : undefined;
+
+      if (pageItems.length === 0 && page === 1 && !opts.json) {
+        console.log("No sources configured.");
         return;
       }
 
       if (opts.json) {
-        let items: Record<string, unknown>[];
-        if (opts.compact) {
-          items = allSources.map((row) => ({
-            id: row.id,
-            slug: row.slug,
-            name: row.name,
-            type: row.type,
-            method: getFetchMethod(row.type, row.metadata),
-            orgName: row.orgName ?? null,
-            productName: row.productName ?? null,
-            releaseCount: row.releaseCount,
-            latestDate: row.latestDate ?? null,
-            lastFetchedAt: row.lastFetchedAt ?? null,
-          }));
-        } else {
-          items = allSources.map((row) => ({
+        const items: Record<string, unknown>[] = pageItems.map((row) => {
+          if (opts.compact) {
+            return {
+              id: row.id,
+              slug: row.slug,
+              name: row.name,
+              type: row.type,
+              method: getFetchMethod(row.type, row.metadata),
+              orgName: row.orgName ?? null,
+              productName: row.productName ?? null,
+              releaseCount: row.releaseCount,
+              latestDate: row.latestDate ?? null,
+              lastFetchedAt: row.lastFetchedAt ?? null,
+            };
+          }
+          return {
             ...row,
             method: getFetchMethod(row.type, row.metadata),
-          }));
-        }
-        const limit = opts.limit ? parseInt(opts.limit, 10) : undefined;
-        if (limit && limit > 0) {
-          const page = opts.page ? parseInt(opts.page, 10) : 1;
-          const start = (page - 1) * limit;
-          const slice = items.slice(start, start + limit);
-          const totalPages = Math.ceil(items.length / limit);
-          console.log(JSON.stringify({
-            items: slice,
-            pagination: { page, pageSize: limit, totalPages, totalItems: items.length },
-          }, null, 2));
-        } else {
+            metadata: parseMetadataField(row.metadata),
+          };
+        });
+
+        const pagination = computePagination({
+          page,
+          pageSize,
+          returned: items.length,
+          totalItems: knownTotalOnTail,
+        });
+
+        const warnTruncated = !explicitLimit && pagination.hasMore;
+
+        if (opts.flat) {
           console.log(JSON.stringify(items, null, 2));
+        } else {
+          const response: ListResponse<Record<string, unknown>> = { items, pagination };
+          console.log(JSON.stringify(response, null, 2));
+        }
+
+        if (warnTruncated) {
+          console.error(formatTruncationWarning({
+            returned: items.length,
+            pageSize,
+            commandExample: paginateExample(true),
+          }));
         }
         return;
       }
@@ -119,7 +151,7 @@ export function registerListCommand(program: Command) {
         head: ["Name", "Slug", "Type", "Method", "URL", "Org", "Product", "Last Fetched"],
       });
 
-      for (const row of allSources) {
+      for (const row of pageItems) {
         const method = getFetchMethod(row.type, row.metadata);
         const name = stripAnsi(row.name);
         table.push([
@@ -135,5 +167,12 @@ export function registerListCommand(program: Command) {
       }
 
       console.log(table.toString());
+      if (!explicitLimit && pageItems.length === pageSize) {
+        console.error(formatTruncationWarning({
+          returned: pageItems.length,
+          pageSize,
+          commandExample: paginateExample(false),
+        }));
+      }
     });
 }
