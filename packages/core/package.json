@@ -17,7 +17,8 @@
     "./overview": "./src/overview.ts",
     "./id": "./src/id.ts",
     "./slug": "./src/slug.ts",
-    "./tokens": "./src/tokens.ts"
+    "./tokens": "./src/tokens.ts",
+    "./cli-contracts": "./src/cli-contracts.ts"
   },
   "files": [
     "src",

@@ -219,6 +219,8 @@ export async function listSourcesWithOrg(opts?: {
   query?: string;
   includeHidden?: boolean;
   category?: string;
+  limit?: number;
+  page?: number;
 }): Promise<SourceWithOrg[]> {
   const params = new URLSearchParams();
   if (opts?.orgSlug) params.set("orgSlug", opts.orgSlug);
@@ -227,6 +229,8 @@ export async function listSourcesWithOrg(opts?: {
   if (opts?.query) params.set("query", opts.query);
   if (opts?.includeHidden) params.set("include_hidden", "true");
   if (opts?.category) params.set("category", opts.category);
+  if (opts?.limit != null) params.set("limit", String(opts.limit));
+  if (opts?.page != null) params.set("page", String(opts.page));
   const qs = params.toString();
 
   return apiFetch<SourceWithOrg[]>(`/v1/sources${qs ? `?${qs}` : ""}`);
