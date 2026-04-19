@@ -2,10 +2,22 @@ import { Command } from "commander";
 import chalk from "chalk";
 import Table from "cli-table3";
 import {
-  findOrg, getSourcesByOrg, listOrgs, createOrg, removeOrg,
-  getOrgAccountsBySlug, linkOrgAccount, unlinkOrgAccount,
-  getProductsByOrg, addTagsToOrg, removeTagsFromOrg, getTagsForOrg, updateOrg,
-  listDomainAliases, addDomainAlias, removeDomainAlias,
+  findOrg,
+  getSourcesByOrg,
+  listOrgs,
+  createOrg,
+  removeOrg,
+  getOrgAccountsBySlug,
+  linkOrgAccount,
+  unlinkOrgAccount,
+  getProductsByOrg,
+  addTagsToOrg,
+  removeTagsFromOrg,
+  getTagsForOrg,
+  updateOrg,
+  listDomainAliases,
+  addDomainAlias,
+  removeDomainAlias,
   getOverview,
 } from "../../api/client.js";
 import { stripAnsi } from "../../lib/sanitize.js";
@@ -22,9 +34,7 @@ import {
 } from "@releases/core/overview";
 
 export function registerOrgCommand(program: Command) {
-  const org = program
-    .command("org")
-    .description("Manage organizations");
+  const org = program.command("org").description("Manage organizations");
 
   // ── org add ──
   org
@@ -37,32 +47,54 @@ export function registerOrgCommand(program: Command) {
     .option("--category <category>", "Category")
     .option("--tags <tags>", "Comma-separated tags")
     .option("--json", "Output as JSON")
-    .action(async (name: string, opts: { domain?: string; slug?: string; description?: string; category?: string; tags?: string; json?: boolean }) => {
-      const slug = opts.slug ?? toSlug(name);
+    .action(
+      async (
+        name: string,
+        opts: {
+          domain?: string;
+          slug?: string;
+          description?: string;
+          category?: string;
+          tags?: string;
+          json?: boolean;
+        },
+      ) => {
+        const slug = opts.slug ?? toSlug(name);
 
-      const existing = await findOrg(slug);
-      if (existing) {
-        console.error(chalk.red(`Organization with slug "${slug}" already exists.`));
-        process.exit(1);
-      }
-
-      if (opts.category && !isValidCategory(opts.category)) {
-        console.error(chalk.red(`Invalid category: "${opts.category}". Valid: ${CATEGORIES.join(", ")}`));
-        process.exit(1);
-      }
-
-      const created = await createOrg(name, { slug, domain: opts.domain, description: opts.description, category: opts.category });
-
-      if (opts.tags) {
-        const tagList = opts.tags.split(",").map((t: string) => t.trim()).filter(Boolean);
-        if (tagList.length > 0) {
-          await addTagsToOrg(created.id, tagList);
+        const existing = await findOrg(slug);
+        if (existing) {
+          console.error(chalk.red(`Organization with slug "${slug}" already exists.`));
+          process.exit(1);
         }
-      }
 
-      if (opts.json) console.log(JSON.stringify(created, null, 2));
-      else console.log(chalk.green(`Organization added: ${name} (${slug})`));
-    });
+        if (opts.category && !isValidCategory(opts.category)) {
+          console.error(
+            chalk.red(`Invalid category: "${opts.category}". Valid: ${CATEGORIES.join(", ")}`),
+          );
+          process.exit(1);
+        }
+
+        const created = await createOrg(name, {
+          slug,
+          domain: opts.domain,
+          description: opts.description,
+          category: opts.category,
+        });
+
+        if (opts.tags) {
+          const tagList = opts.tags
+            .split(",")
+            .map((t: string) => t.trim())
+            .filter(Boolean);
+          if (tagList.length > 0) {
+            await addTagsToOrg(created.id, tagList);
+          }
+        }
+
+        if (opts.json) console.log(JSON.stringify(created, null, 2));
+        else console.log(chalk.green(`Organization added: ${name} (${slug})`));
+      },
+    );
 
   // ── org list ──
   org
@@ -116,15 +148,21 @@ export function registerOrgCommand(program: Command) {
       ]);
 
       if (opts.json) {
-        console.log(JSON.stringify({
-          ...found,
-          accounts,
-          products: orgProducts,
-          sources: linkedSources,
-          tags: orgTags,
-          aliases: aliases.map((a) => a.domain),
-          overview: overview?.content ?? null,
-        }, null, 2));
+        console.log(
+          JSON.stringify(
+            {
+              ...found,
+              accounts,
+              products: orgProducts,
+              sources: linkedSources,
+              tags: orgTags,
+              aliases: aliases.map((a) => a.domain),
+              overview: overview?.content ?? null,
+            },
+            null,
+            2,
+          ),
+        );
         return;
       }
 
@@ -162,7 +200,11 @@ export function registerOrgCommand(program: Command) {
             : s.consecutiveErrors && s.consecutiveErrors > 0
               ? "erroring"
               : "active";
-          const statusColor = s.isHidden ? chalk.red : s.consecutiveErrors ? chalk.yellow : chalk.green;
+          const statusColor = s.isHidden
+            ? chalk.red
+            : s.consecutiveErrors
+              ? chalk.yellow
+              : chalk.green;
           const status = statusColor(statusLabel.padEnd(16));
           const fetched = s.lastFetchedAt
             ? chalk.dim(s.lastFetchedAt.replace("T", " ").replace(/\.\d+Z$/, ""))
@@ -182,7 +224,11 @@ export function registerOrgCommand(program: Command) {
         console.log();
         console.log(`${chalk.bold("Overview")}  ${generatedHint}`);
         if (stale) {
-          console.log(chalk.yellow(`  ⚠ Overview is older than ${OVERVIEW_STALE_DAYS} days — may not reflect recent releases.`));
+          console.log(
+            chalk.yellow(
+              `  ⚠ Overview is older than ${OVERVIEW_STALE_DAYS} days — may not reflect recent releases.`,
+            ),
+          );
         }
         console.log(preview);
         console.log(chalk.dim(`\n  Full overview: releases org overview ${found.slug}`));
@@ -195,10 +241,13 @@ export function registerOrgCommand(program: Command) {
     .description("Print the full AI-generated overview for an organization")
     .argument("<identifier>", "Org slug, domain, name, or account handle")
     .option("--json", "Output as JSON")
-    .addHelpText("after", `
+    .addHelpText(
+      "after",
+      `
 Examples:
   releases org overview acme
-  releases org overview acme --json`)
+  releases org overview acme --json`,
+    )
     .action(async (identifier: string, opts: { json?: boolean }) => {
       const found = await findOrg(identifier);
       if (!found) return orgNotFound(identifier);
@@ -218,26 +267,40 @@ Examples:
       const ageDays = overview.generatedAt ? overviewAgeDays(overview.generatedAt) : null;
 
       if (opts.json) {
-        console.log(JSON.stringify({
-          org: found.slug,
-          name: found.name,
-          generatedAt: overview.generatedAt,
-          updatedAt: overview.updatedAt,
-          lastContributingReleaseAt: overview.lastContributingReleaseAt,
-          releaseCount: overview.releaseCount,
-          stale,
-          ageDays,
-          content: overview.content,
-        }, null, 2));
+        console.log(
+          JSON.stringify(
+            {
+              org: found.slug,
+              name: found.name,
+              generatedAt: overview.generatedAt,
+              updatedAt: overview.updatedAt,
+              lastContributingReleaseAt: overview.lastContributingReleaseAt,
+              releaseCount: overview.releaseCount,
+              stale,
+              ageDays,
+              content: overview.content,
+            },
+            null,
+            2,
+          ),
+        );
         return;
       }
 
       console.log(chalk.bold(`${found.name} — overview`));
       if (overview.generatedAt) {
-        console.log(chalk.dim(`  generated ${timeAgo(overview.generatedAt) ?? "?"} · ${overview.releaseCount} releases`));
+        console.log(
+          chalk.dim(
+            `  generated ${timeAgo(overview.generatedAt) ?? "?"} · ${overview.releaseCount} releases`,
+          ),
+        );
       }
       if (stale) {
-        console.log(chalk.yellow(`  ⚠ Overview is older than ${OVERVIEW_STALE_DAYS} days — may not reflect recent releases.`));
+        console.log(
+          chalk.yellow(
+            `  ⚠ Overview is older than ${OVERVIEW_STALE_DAYS} days — may not reflect recent releases.`,
+          ),
+        );
       }
       console.log();
       console.log(stripAnsi(overview.content));
@@ -257,39 +320,54 @@ Examples:
     .option("--avatar <url>", "Set avatar image URL")
     .option("--no-avatar", "Clear avatar URL")
     .option("--json", "Output as JSON")
-    .action(async (identifier: string, opts: { name?: string; slug?: string; domain?: string; description?: string; category?: string | boolean; avatar?: string | boolean; json?: boolean }) => {
-      const found = await findOrg(identifier);
-      if (!found) return orgNotFound(identifier);
+    .action(
+      async (
+        identifier: string,
+        opts: {
+          name?: string;
+          slug?: string;
+          domain?: string;
+          description?: string;
+          category?: string | boolean;
+          avatar?: string | boolean;
+          json?: boolean;
+        },
+      ) => {
+        const found = await findOrg(identifier);
+        if (!found) return orgNotFound(identifier);
 
-      const updates: Record<string, unknown> = {};
-      if (opts.name !== undefined) updates.name = opts.name;
-      if (opts.slug !== undefined) updates.slug = opts.slug;
-      if (opts.domain !== undefined) updates.domain = opts.domain;
-      if (opts.description !== undefined) updates.description = opts.description;
+        const updates: Record<string, unknown> = {};
+        if (opts.name !== undefined) updates.name = opts.name;
+        if (opts.slug !== undefined) updates.slug = opts.slug;
+        if (opts.domain !== undefined) updates.domain = opts.domain;
+        if (opts.description !== undefined) updates.description = opts.description;
 
-      if (opts.category === false) {
-        updates.category = null;
-      } else if (typeof opts.category === "string") {
-        if (!isValidCategory(opts.category)) {
-          console.error(chalk.red(`Invalid category: "${opts.category}". Valid: ${CATEGORIES.join(", ")}`));
+        if (opts.category === false) {
+          updates.category = null;
+        } else if (typeof opts.category === "string") {
+          if (!isValidCategory(opts.category)) {
+            console.error(
+              chalk.red(`Invalid category: "${opts.category}". Valid: ${CATEGORIES.join(", ")}`),
+            );
+            process.exit(1);
+          }
+          updates.category = opts.category;
+        }
+
+        if (opts.avatar === false) updates.avatarUrl = null;
+        else if (typeof opts.avatar === "string") updates.avatarUrl = opts.avatar;
+
+        if (Object.keys(updates).length === 0) {
+          console.error(chalk.yellow("No fields to update."));
           process.exit(1);
         }
-        updates.category = opts.category;
-      }
 
-      if (opts.avatar === false) updates.avatarUrl = null;
-      else if (typeof opts.avatar === "string") updates.avatarUrl = opts.avatar;
+        const updated = await updateOrg(found.slug, updates);
 
-      if (Object.keys(updates).length === 0) {
-        console.error(chalk.yellow("No fields to update."));
-        process.exit(1);
-      }
-
-      const updated = await updateOrg(found.slug, updates);
-
-      if (opts.json) console.log(JSON.stringify(updated, null, 2));
-      else console.log(chalk.green(`Updated organization: ${updated.name} (${updated.slug})`));
-    });
+        if (opts.json) console.log(JSON.stringify(updated, null, 2));
+        else console.log(chalk.green(`Updated organization: ${updated.name} (${updated.slug})`));
+      },
+    );
 
   // ── org remove ──
   org
@@ -303,8 +381,12 @@ Examples:
       if (!found) return orgNotFound(identifier);
 
       if (opts.dryRun) {
-        if (opts.json) console.log(JSON.stringify({ wouldRemove: found.slug, name: found.name }, null, 2));
-        else console.log(chalk.yellow(`[dry-run] Would remove organization: ${found.name} (${found.slug})`));
+        if (opts.json)
+          console.log(JSON.stringify({ wouldRemove: found.slug, name: found.name }, null, 2));
+        else
+          console.log(
+            chalk.yellow(`[dry-run] Would remove organization: ${found.name} (${found.slug})`),
+          );
         return;
       }
 
@@ -322,15 +404,17 @@ Examples:
     .requiredOption("--platform <platform>", "Platform name (github, x, etc.)")
     .requiredOption("--handle <handle>", "Account handle on the platform")
     .option("--json", "Output as JSON")
-    .action(async (identifier: string, opts: { platform: string; handle: string; json?: boolean }) => {
-      const found = await findOrg(identifier);
-      if (!found) return orgNotFound(identifier);
+    .action(
+      async (identifier: string, opts: { platform: string; handle: string; json?: boolean }) => {
+        const found = await findOrg(identifier);
+        if (!found) return orgNotFound(identifier);
 
-      const created = await linkOrgAccount(found.slug, opts.platform, opts.handle);
+        const created = await linkOrgAccount(found.slug, opts.platform, opts.handle);
 
-      if (opts.json) console.log(JSON.stringify(created, null, 2));
-      else console.log(chalk.green(`Linked ${opts.platform}/${opts.handle} to ${found.name}`));
-    });
+        if (opts.json) console.log(JSON.stringify(created, null, 2));
+        else console.log(chalk.green(`Linked ${opts.platform}/${opts.handle} to ${found.name}`));
+      },
+    );
 
   // ── org unlink ──
   org
@@ -340,15 +424,19 @@ Examples:
     .requiredOption("--platform <platform>", "Platform name")
     .requiredOption("--handle <handle>", "Account handle")
     .option("--json", "Output as JSON")
-    .action(async (identifier: string, opts: { platform: string; handle: string; json?: boolean }) => {
-      const found = await findOrg(identifier);
-      if (!found) return orgNotFound(identifier);
+    .action(
+      async (identifier: string, opts: { platform: string; handle: string; json?: boolean }) => {
+        const found = await findOrg(identifier);
+        if (!found) return orgNotFound(identifier);
 
-      await unlinkOrgAccount(found.slug, opts.platform, opts.handle);
+        await unlinkOrgAccount(found.slug, opts.platform, opts.handle);
 
-      if (opts.json) console.log(JSON.stringify({ unlinked: `${opts.platform}/${opts.handle}` }, null, 2));
-      else console.log(chalk.green(`Unlinked ${opts.platform}/${opts.handle} from ${found.name}`));
-    });
+        if (opts.json)
+          console.log(JSON.stringify({ unlinked: `${opts.platform}/${opts.handle}` }, null, 2));
+        else
+          console.log(chalk.green(`Unlinked ${opts.platform}/${opts.handle} from ${found.name}`));
+      },
+    );
 
   // ── org tag ──
   const tag = org.command("tag").description("Manage organization tags");
@@ -422,12 +510,18 @@ Examples:
           const created = await addDomainAlias(domain, { orgId: found.id });
           results.push(created);
         } catch (err) {
-          logger.error(chalk.red(`Failed to add alias "${domain}": ${err instanceof Error ? err.message : err}`));
+          logger.error(
+            chalk.red(
+              `Failed to add alias "${domain}": ${err instanceof Error ? err.message : err}`,
+            ),
+          );
         }
       }
 
       if (opts.json) console.log(JSON.stringify(results, null, 2));
-      else for (const r of results) console.log(chalk.green(`Added alias: ${r.domain} → ${found.name}`));
+      else
+        for (const r of results)
+          console.log(chalk.green(`Added alias: ${r.domain} → ${found.name}`));
     });
 
   alias
@@ -462,8 +556,16 @@ Examples:
 
       const aliases = await listDomainAliases({ orgId: found.id });
 
-      if (opts.json) console.log(JSON.stringify(aliases.map((a) => a.domain), null, 2));
-      else if (aliases.length === 0) console.log(chalk.yellow(`No domain aliases for ${found.name}`));
+      if (opts.json)
+        console.log(
+          JSON.stringify(
+            aliases.map((a) => a.domain),
+            null,
+            2,
+          ),
+        );
+      else if (aliases.length === 0)
+        console.log(chalk.yellow(`No domain aliases for ${found.name}`));
       else for (const a of aliases) console.log(a.domain);
     });
 }

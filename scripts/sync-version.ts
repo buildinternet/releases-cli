@@ -15,9 +15,8 @@ import { join, resolve } from "node:path";
 
 const ROOT = resolve(new URL("..", import.meta.url).pathname);
 
-const newVersion = JSON.parse(
-  readFileSync(join(ROOT, "npm/releases/package.json"), "utf8"),
-).version as string;
+const newVersion = JSON.parse(readFileSync(join(ROOT, "npm/releases/package.json"), "utf8"))
+  .version as string;
 
 function updateJson(path: string, mutate: (j: Record<string, unknown>) => void) {
   const full = join(ROOT, path);

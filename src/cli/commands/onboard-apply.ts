@@ -58,7 +58,11 @@ async function applySource(source: AgentDiscoveredSource, orgId?: string): Promi
     return { slug, url, action: "added" };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    if (message.includes("UNIQUE constraint") || message.includes("409") || message.includes("already exists")) {
+    if (
+      message.includes("UNIQUE constraint") ||
+      message.includes("409") ||
+      message.includes("already exists")
+    ) {
       return { slug, url, action: "skipped" };
     }
     return { slug, url, action: "error", error: message };
@@ -72,9 +76,7 @@ export function registerOnboardApplyCommand(onboardCmd: Command) {
     .argument("<state-file>", "Path to a DiscoveryState JSON file (or - for stdin)")
     .option("--json", "Output results as JSON")
     .action(async (stateFile: string, opts: { json?: boolean }) => {
-      const raw = stateFile === "-"
-        ? await Bun.stdin.text()
-        : await Bun.file(stateFile).text();
+      const raw = stateFile === "-" ? await Bun.stdin.text() : await Bun.file(stateFile).text();
 
       let state: DiscoveryState;
       try {
@@ -119,7 +121,9 @@ export function registerOnboardApplyCommand(onboardCmd: Command) {
       if (opts.json) {
         console.log(JSON.stringify(results, null, 2));
       } else {
-        let added = 0, ignored = 0, errors = 0;
+        let added = 0,
+          ignored = 0,
+          errors = 0;
         for (const r of results) {
           if (r.action === "added") added++;
           else if (r.action === "ignored") ignored++;

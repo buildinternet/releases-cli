@@ -1,0 +1,10 @@
+node_modules
+dist
+**/*.d.ts
+bun.lock
+package-lock.json
+packages/*/dist
+npm/*/bin
+skills
+plugins/claude/releases/skills
+.*.bun-build

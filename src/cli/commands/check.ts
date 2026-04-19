@@ -111,14 +111,16 @@ export function registerCheckCommand(program: Command) {
           console.error(`Source not found: ${slug}`);
           process.exit(1);
         }
-        sourcesToCheck = [{
-          name: source.name,
-          slug: source.slug,
-          type: source.type,
-          url: source.url,
-          metadata: source.metadata,
-          lastFetchedAt: source.lastFetchedAt,
-        }];
+        sourcesToCheck = [
+          {
+            name: source.name,
+            slug: source.slug,
+            type: source.type,
+            url: source.url,
+            metadata: source.metadata,
+            lastFetchedAt: source.lastFetchedAt,
+          },
+        ];
       } else {
         const rows = await listSourcesWithOrg();
         sourcesToCheck = rows.map((r) => ({

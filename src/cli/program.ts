@@ -83,7 +83,9 @@ function printStyledHelp(): string {
   lines.push("The most common commands are:");
   lines.push("");
   lines.push(`  - releases search     : ${chalk.dim("Full-text search across releases")}`);
-  lines.push(`  - releases tail       : ${chalk.dim("Show the most recent releases (add -f to follow)")}`);
+  lines.push(
+    `  - releases tail       : ${chalk.dim("Show the most recent releases (add -f to follow)")}`,
+  );
   lines.push(`  - releases list       : ${chalk.dim("List and inspect sources")}`);
   lines.push("");
 
@@ -104,7 +106,11 @@ function printStyledHelp(): string {
   lines.push(row("-v, --version", "Print version number"));
   lines.push("");
 
-  lines.push(chalk.dim(`Use ${chalk.white('"releases <command> --help"')} for more information about a command.`));
+  lines.push(
+    chalk.dim(
+      `Use ${chalk.white('"releases <command> --help"')} for more information about a command.`,
+    ),
+  );
 
   return lines.join("\n");
 }
@@ -127,7 +133,9 @@ export const program = new Command()
   .configureOutput({
     outputError: (str, write) => {
       write(str);
-      const hint = chalk.dim('\nRun "releases --help" for available commands, or "releases <command> --help" for details.');
+      const hint = chalk.dim(
+        '\nRun "releases --help" for available commands, or "releases <command> --help" for details.',
+      );
       write(hint + "\n");
     },
   })
@@ -183,22 +191,16 @@ const discoveryAdmin = admin
 registerOnboardCommand(discoveryAdmin);
 registerTaskCommand(discoveryAdmin);
 
-const policyAdmin = admin
-  .command("policy")
-  .description("Manage ignored URLs and blocked URLs");
+const policyAdmin = admin.command("policy").description("Manage ignored URLs and blocked URLs");
 registerIgnoreCommand(policyAdmin);
 registerBlockCommand(policyAdmin);
 
-const statsAdmin = admin
-  .command("stats")
-  .description("Inspect operator metrics and usage");
+const statsAdmin = admin.command("stats").description("Inspect operator metrics and usage");
 registerUsageCommand(statsAdmin);
 
 registerEmbedCommand(admin);
 
-const mcpAdmin = admin
-  .command("mcp")
-  .description("MCP server management");
+const mcpAdmin = admin.command("mcp").description("MCP server management");
 registerServeCommand(mcpAdmin);
 
 gateAdminSubtree(admin);
@@ -215,7 +217,9 @@ program
         sub.help();
       } else {
         console.error(chalk.red(`Unknown command: ${command}`));
-        console.log(chalk.dim(`\nRun ${chalk.white('"releases --help"')} to see all available commands.`));
+        console.log(
+          chalk.dim(`\nRun ${chalk.white('"releases --help"')} to see all available commands.`),
+        );
         process.exit(1);
       }
     } else {

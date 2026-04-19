@@ -1,6 +1,12 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import { findSource, findOrg, findProduct, getRelease, getLatestReleases } from "../../api/client.js";
+import {
+  findSource,
+  findOrg,
+  findProduct,
+  getRelease,
+  getLatestReleases,
+} from "../../api/client.js";
 import { stripAnsi } from "../../lib/sanitize.js";
 import { renderLatestReleasesTable } from "../render/releases-table.js";
 import { getEntityType, normalizeReleaseId, isLikelyBareId } from "@releases/core/id";
@@ -48,11 +54,15 @@ async function showRelease(id: string, opts: { json?: boolean }) {
   console.log(chalk.bold(stripAnsi(rel.title)));
   console.log(`  ID:        ${rel.id}`);
   if (rel.version) console.log(`  Version:   ${stripAnsi(rel.version)}`);
-  console.log(`  Source:    ${rel.sourceName ? stripAnsi(rel.sourceName) : chalk.dim("—")} (${rel.sourceSlug ?? chalk.dim("—")})`);
+  console.log(
+    `  Source:    ${rel.sourceName ? stripAnsi(rel.sourceName) : chalk.dim("—")} (${rel.sourceSlug ?? chalk.dim("—")})`,
+  );
   if (rel.publishedAt) console.log(`  Published: ${rel.publishedAt}`);
   if (rel.url) console.log(`  URL:       ${rel.url}`);
   if (rel.suppressed) {
-    console.log(`  ${chalk.yellow("Suppressed")}${rel.suppressedReason ? `: ${stripAnsi(rel.suppressedReason)}` : ""}`);
+    console.log(
+      `  ${chalk.yellow("Suppressed")}${rel.suppressedReason ? `: ${stripAnsi(rel.suppressedReason)}` : ""}`,
+    );
   }
   if (rel.contentSummary) {
     console.log("");
@@ -87,7 +97,18 @@ async function showProduct(identifier: string, opts: { json?: boolean }) {
   await renderProduct(product, opts);
 }
 
-function renderSource(source: { id: string; name: string; slug: string; type: string; url: string; orgId: string | null; productId: string | null }, opts: { json?: boolean }) {
+function renderSource(
+  source: {
+    id: string;
+    name: string;
+    slug: string;
+    type: string;
+    url: string;
+    orgId: string | null;
+    productId: string | null;
+  },
+  opts: { json?: boolean },
+) {
   if (opts.json) {
     console.log(JSON.stringify(source, null, 2));
     return;
@@ -127,7 +148,17 @@ async function renderOrg(
   }
 }
 
-async function renderProduct(product: { id: string; name: string; slug: string; orgId: string; url: string | null; category: string | null }, opts: { json?: boolean }) {
+async function renderProduct(
+  product: {
+    id: string;
+    name: string;
+    slug: string;
+    orgId: string;
+    url: string | null;
+    category: string | null;
+  },
+  opts: { json?: boolean },
+) {
   const org = await findOrg(product.orgId);
   if (opts.json) {
     console.log(JSON.stringify({ ...product, orgSlug: org?.slug ?? null }, null, 2));

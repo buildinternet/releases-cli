@@ -73,15 +73,21 @@ export function registerWhoamiCommand(parent: Command): void {
       const urlSuffix = status.apiUrlSource === "default" ? " (default)" : " (RELEASED_API_URL)";
       row("API URL", `${status.apiUrl}${chalk.dim(urlSuffix)}`);
       row("Mode", status.mode === "admin" ? chalk.green("admin") : chalk.cyan("public"));
-      row("Auth", status.apiKey.set
-        ? `${chalk.green("✓")} RELEASED_API_KEY set ${chalk.dim(`(${status.apiKey.hint})`)}`
-        : `${chalk.dim("—")} RELEASED_API_KEY not set`);
+      row(
+        "Auth",
+        status.apiKey.set
+          ? `${chalk.green("✓")} RELEASED_API_KEY set ${chalk.dim(`(${status.apiKey.hint})`)}`
+          : `${chalk.dim("—")} RELEASED_API_KEY not set`,
+      );
 
       if (status.check) {
         const probeLabel = status.mode === "admin" ? "API + auth" : "API";
-        row("Probe", status.check.ok
-          ? `${chalk.green("✓")} ${probeLabel} reachable`
-          : `${chalk.red("✗")} ${status.check.message}`);
+        row(
+          "Probe",
+          status.check.ok
+            ? `${chalk.green("✓")} ${probeLabel} reachable`
+            : `${chalk.red("✗")} ${status.check.message}`,
+        );
       } else {
         console.log("");
         console.log(chalk.dim('Run "releases whoami --check" to verify connectivity.'));

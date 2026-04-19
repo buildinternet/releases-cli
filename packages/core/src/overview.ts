@@ -31,7 +31,10 @@ function stripLeadingHeading(content: string): string {
   return content.replace(/^\s*#{1,6}\s+[^\n]+\n+/, "");
 }
 
-export function overviewPreview(content: string, maxWords: number = OVERVIEW_PREVIEW_WORDS): string {
+export function overviewPreview(
+  content: string,
+  maxWords: number = OVERVIEW_PREVIEW_WORDS,
+): string {
   const trimmed = stripLeadingHeading(content.trim());
   if (!trimmed) return "";
 

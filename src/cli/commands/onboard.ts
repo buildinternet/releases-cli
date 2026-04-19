@@ -85,7 +85,9 @@ async function runRemoteDiscovery(
     });
     sessionId = result.sessionId;
   } catch (err) {
-    logger.error(`Failed to start remote discovery: ${err instanceof Error ? err.message : String(err)}`);
+    logger.error(
+      `Failed to start remote discovery: ${err instanceof Error ? err.message : String(err)}`,
+    );
     process.exit(1);
   }
 
@@ -103,7 +105,12 @@ async function runRemoteDiscovery(
 
     let status: {
       status: "running" | "complete" | "error" | "idle";
-      progress?: { step: string; sourcesFound: number; sourcesValidated: number; currentAction: string };
+      progress?: {
+        step: string;
+        sourcesFound: number;
+        sourcesValidated: number;
+        currentAction: string;
+      };
       result?: object;
       error?: string;
     };
@@ -179,7 +186,11 @@ function printSummary(state: DiscoveryState): void {
   const validated = sources.filter((s) => s.validated);
   const failed = sources.filter((s) => s.validationError);
 
-  write(chalk.gray(`  ${sources.length} source(s) found, ${validated.length} validated, ${failed.length} failed`));
+  write(
+    chalk.gray(
+      `  ${sources.length} source(s) found, ${validated.length} validated, ${failed.length} failed`,
+    ),
+  );
   write("");
 
   for (const s of sources) {
