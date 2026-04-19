@@ -11,12 +11,15 @@ export function registerFetchLogCommand(program: Command) {
     .description("Show fetch history for sources")
     .option("--limit <n>", "Number of log entries", "20")
     .option("--json", "Output as JSON")
-    .addHelpText("after", `
+    .addHelpText(
+      "after",
+      `
 Examples:
   releases admin source fetch-log                 Show recent fetch history
   releases admin source fetch-log my-source       Show history for one source
   releases admin source fetch-log --limit 50
-  releases admin source fetch-log --json`)
+  releases admin source fetch-log --json`,
+    )
     .action(async (slug: string | undefined, opts: { limit?: string; json?: boolean }) => {
       const limit = parseInt(opts.limit ?? "20", 10);
       const logs = await getFetchLogs({ sourceSlug: slug, limit });
@@ -48,13 +51,14 @@ Examples:
       });
 
       for (const log of logs) {
-        const statusLabel = log.status === "dry_run"
-          ? chalk.magenta("dry run")
-          : log.status === "success"
-            ? chalk.green("success")
-            : log.status === "error"
-              ? chalk.red("error")
-              : chalk.dim("no change");
+        const statusLabel =
+          log.status === "dry_run"
+            ? chalk.magenta("dry run")
+            : log.status === "success"
+              ? chalk.green("success")
+              : log.status === "error"
+                ? chalk.red("error")
+                : chalk.dim("no change");
 
         const errorText = log.error
           ? chalk.red(stripAnsi(log.error.length > 40 ? log.error.slice(0, 40) + "..." : log.error))

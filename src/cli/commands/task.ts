@@ -3,9 +3,7 @@ import chalk from "chalk";
 import * as apiClient from "../../api/client.js";
 
 export function registerTaskCommand(program: Command) {
-  const task = program
-    .command("task")
-    .description("Manage remote fetch and discovery sessions");
+  const task = program.command("task").description("Manage remote fetch and discovery sessions");
 
   task
     .command("list")
@@ -26,15 +24,24 @@ export function registerTaskCommand(program: Command) {
 
       for (const s of sessions) {
         const age = Math.round((Date.now() - s.startedAt) / 1000);
-        const statusColor = s.status === "running" ? chalk.yellow
-          : s.status === "complete" ? chalk.green
-          : s.status === "cancelled" ? chalk.gray
-          : chalk.red;
+        const statusColor =
+          s.status === "running"
+            ? chalk.yellow
+            : s.status === "complete"
+              ? chalk.green
+              : s.status === "cancelled"
+                ? chalk.gray
+                : chalk.red;
         const sources = s.totalSources ? `${s.sourcesFetched ?? 0}/${s.totalSources} sources` : "";
         const releases = s.releasesInserted ? `${s.releasesInserted} new` : "";
         const details = [sources, releases].filter(Boolean).join(", ");
         const detailStr = details ? chalk.gray(` (${details})`) : "";
-        const ageStr = age < 60 ? `${age}s` : age < 3600 ? `${Math.round(age / 60)}m` : `${Math.round(age / 3600)}h`;
+        const ageStr =
+          age < 60
+            ? `${age}s`
+            : age < 3600
+              ? `${Math.round(age / 60)}m`
+              : `${Math.round(age / 3600)}h`;
 
         console.log(
           `  ${statusColor(s.status.padEnd(10))} ${s.company.padEnd(30)} ${chalk.gray(s.sessionId.slice(0, 8))}  ${chalk.gray(ageStr + " ago")}${detailStr}`,

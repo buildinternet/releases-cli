@@ -2,19 +2,29 @@ import { Command } from "commander";
 import chalk from "chalk";
 import Table from "cli-table3";
 import {
-  findOrg, findProduct, getProductsByOrg, createProduct, updateProduct,
-  deleteProduct, getSourcesByOrg, updateSource, removeOrg,
-  getOrgAccountsBySlug, linkOrgAccount,
-  addTagsToProduct, removeTagsFromProduct, getTagsForProduct,
-  listDomainAliases, addDomainAlias, removeDomainAlias,
+  findOrg,
+  findProduct,
+  getProductsByOrg,
+  createProduct,
+  updateProduct,
+  deleteProduct,
+  getSourcesByOrg,
+  updateSource,
+  removeOrg,
+  getOrgAccountsBySlug,
+  linkOrgAccount,
+  addTagsToProduct,
+  removeTagsFromProduct,
+  getTagsForProduct,
+  listDomainAliases,
+  addDomainAlias,
+  removeDomainAlias,
 } from "../../api/client.js";
 import { toSlug } from "@releases/core/slug";
 import { isValidCategory, CATEGORIES } from "@releases/core/categories";
 
 export function registerProductCommand(program: Command) {
-  const product = program
-    .command("product")
-    .description("Manage products");
+  const product = program.command("product").description("Manage products");
 
   product
     .command("list")
@@ -68,46 +78,68 @@ export function registerProductCommand(program: Command) {
     .option("--category <category>", "Category")
     .option("--tags <tags>", "Comma-separated tags")
     .option("--json", "Output as JSON")
-    .action(async (name: string, opts: { org: string; slug?: string; url?: string; description?: string; category?: string; tags?: string; json?: boolean }) => {
-      const org = await findOrg(opts.org);
-      if (!org) {
-        console.error(chalk.red(`Organization not found: ${opts.org}`));
-        process.exit(1);
-      }
-
-      const slug = opts.slug ?? toSlug(name);
-
-      if (opts.category && !isValidCategory(opts.category)) {
-        console.error(chalk.red(`Invalid category: "${opts.category}". Valid: ${CATEGORIES.join(", ")}`));
-        process.exit(1);
-      }
-
-      let created;
-      try {
-        created = await createProduct(org.id, name, {
-          slug,
-          url: opts.url,
-          description: opts.description,
-          category: opts.category,
-        });
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        if (msg.includes("already exists") || msg.includes("UNIQUE constraint") || msg.includes("conflict")) {
-          console.error(chalk.red(`Product with slug "${slug}" already exists.`));
-        } else {
-          console.error(chalk.red(`Failed to create product: ${msg}`));
+    .action(
+      async (
+        name: string,
+        opts: {
+          org: string;
+          slug?: string;
+          url?: string;
+          description?: string;
+          category?: string;
+          tags?: string;
+          json?: boolean;
+        },
+      ) => {
+        const org = await findOrg(opts.org);
+        if (!org) {
+          console.error(chalk.red(`Organization not found: ${opts.org}`));
+          process.exit(1);
         }
-        process.exit(1);
-      }
 
-      if (opts.tags) {
-        const tagList = opts.tags.split(",").map((t: string) => t.trim()).filter(Boolean);
-        if (tagList.length > 0) await addTagsToProduct(created.id, tagList);
-      }
+        const slug = opts.slug ?? toSlug(name);
 
-      if (opts.json) console.log(JSON.stringify(created, null, 2));
-      else console.log(chalk.green(`Product added: ${name} (${slug}) under ${org.name}`));
-    });
+        if (opts.category && !isValidCategory(opts.category)) {
+          console.error(
+            chalk.red(`Invalid category: "${opts.category}". Valid: ${CATEGORIES.join(", ")}`),
+          );
+          process.exit(1);
+        }
+
+        let created;
+        try {
+          created = await createProduct(org.id, name, {
+            slug,
+            url: opts.url,
+            description: opts.description,
+            category: opts.category,
+          });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (
+            msg.includes("already exists") ||
+            msg.includes("UNIQUE constraint") ||
+            msg.includes("conflict")
+          ) {
+            console.error(chalk.red(`Product with slug "${slug}" already exists.`));
+          } else {
+            console.error(chalk.red(`Failed to create product: ${msg}`));
+          }
+          process.exit(1);
+        }
+
+        if (opts.tags) {
+          const tagList = opts.tags
+            .split(",")
+            .map((t: string) => t.trim())
+            .filter(Boolean);
+          if (tagList.length > 0) await addTagsToProduct(created.id, tagList);
+        }
+
+        if (opts.json) console.log(JSON.stringify(created, null, 2));
+        else console.log(chalk.green(`Product added: ${name} (${slug}) under ${org.name}`));
+      },
+    );
 
   product
     .command("edit")
@@ -119,38 +151,51 @@ export function registerProductCommand(program: Command) {
     .option("--category <category>", "Set category")
     .option("--no-category", "Clear category")
     .option("--json", "Output as JSON")
-    .action(async (slug: string, opts: { name?: string; url?: string; description?: string; category?: string | boolean; json?: boolean }) => {
-      const found = await findProduct(slug);
-      if (!found) {
-        console.error(chalk.red(`Product not found: ${slug}`));
-        process.exit(1);
-      }
-
-      const updates: Record<string, unknown> = {};
-      if (opts.name !== undefined) updates.name = opts.name;
-      if (opts.url !== undefined) updates.url = opts.url;
-      if (opts.description !== undefined) updates.description = opts.description;
-
-      if (opts.category === false) {
-        updates.category = null;
-      } else if (typeof opts.category === "string") {
-        if (!isValidCategory(opts.category)) {
-          console.error(chalk.red(`Invalid category: "${opts.category}". Valid: ${CATEGORIES.join(", ")}`));
+    .action(
+      async (
+        slug: string,
+        opts: {
+          name?: string;
+          url?: string;
+          description?: string;
+          category?: string | boolean;
+          json?: boolean;
+        },
+      ) => {
+        const found = await findProduct(slug);
+        if (!found) {
+          console.error(chalk.red(`Product not found: ${slug}`));
           process.exit(1);
         }
-        updates.category = opts.category;
-      }
 
-      if (Object.keys(updates).length === 0) {
-        console.error(chalk.yellow("No fields to update."));
-        process.exit(1);
-      }
+        const updates: Record<string, unknown> = {};
+        if (opts.name !== undefined) updates.name = opts.name;
+        if (opts.url !== undefined) updates.url = opts.url;
+        if (opts.description !== undefined) updates.description = opts.description;
 
-      const updated = await updateProduct(found.slug, updates);
+        if (opts.category === false) {
+          updates.category = null;
+        } else if (typeof opts.category === "string") {
+          if (!isValidCategory(opts.category)) {
+            console.error(
+              chalk.red(`Invalid category: "${opts.category}". Valid: ${CATEGORIES.join(", ")}`),
+            );
+            process.exit(1);
+          }
+          updates.category = opts.category;
+        }
 
-      if (opts.json) console.log(JSON.stringify(updated, null, 2));
-      else console.log(chalk.green(`Product updated: ${updated.name} (${updated.slug})`));
-    });
+        if (Object.keys(updates).length === 0) {
+          console.error(chalk.yellow("No fields to update."));
+          process.exit(1);
+        }
+
+        const updated = await updateProduct(found.slug, updates);
+
+        if (opts.json) console.log(JSON.stringify(updated, null, 2));
+        else console.log(chalk.green(`Product updated: ${updated.name} (${updated.slug})`));
+      },
+    );
 
   product
     .command("remove")
@@ -166,8 +211,12 @@ export function registerProductCommand(program: Command) {
       }
 
       if (opts.dryRun) {
-        if (opts.json) console.log(JSON.stringify({ wouldRemove: found.slug, name: found.name }, null, 2));
-        else console.log(chalk.yellow(`[dry-run] Would remove product: ${found.name} (${found.slug})`));
+        if (opts.json)
+          console.log(JSON.stringify({ wouldRemove: found.slug, name: found.name }, null, 2));
+        else
+          console.log(
+            chalk.yellow(`[dry-run] Would remove product: ${found.name} (${found.slug})`),
+          );
         return;
       }
 
@@ -186,83 +235,106 @@ export function registerProductCommand(program: Command) {
     .option("--url <url>", "URL for the new product")
     .option("--dry-run", "Show what would happen")
     .option("--json", "Output as JSON")
-    .action(async (sourceOrgSlug: string, opts: { into: string; slug?: string; url?: string; dryRun?: boolean; json?: boolean }) => {
-      const sourceOrg = await findOrg(sourceOrgSlug);
-      if (!sourceOrg) {
-        console.error(chalk.red(`Source organization not found: ${sourceOrgSlug}`));
-        process.exit(1);
-      }
+    .action(
+      async (
+        sourceOrgSlug: string,
+        opts: { into: string; slug?: string; url?: string; dryRun?: boolean; json?: boolean },
+      ) => {
+        const sourceOrg = await findOrg(sourceOrgSlug);
+        if (!sourceOrg) {
+          console.error(chalk.red(`Source organization not found: ${sourceOrgSlug}`));
+          process.exit(1);
+        }
 
-      const targetOrg = await findOrg(opts.into);
-      if (!targetOrg) {
-        console.error(chalk.red(`Target organization not found: ${opts.into}`));
-        process.exit(1);
-      }
+        const targetOrg = await findOrg(opts.into);
+        if (!targetOrg) {
+          console.error(chalk.red(`Target organization not found: ${opts.into}`));
+          process.exit(1);
+        }
 
-      if (sourceOrg.id === targetOrg.id) {
-        console.error(chalk.red("Source and target organizations must be different."));
-        process.exit(1);
-      }
+        if (sourceOrg.id === targetOrg.id) {
+          console.error(chalk.red("Source and target organizations must be different."));
+          process.exit(1);
+        }
 
-      const sources = await getSourcesByOrg(sourceOrg.id);
-      const productSlug = opts.slug ?? sourceOrg.slug;
-      const productUrl = opts.url ?? (sourceOrg.domain ? `https://${sourceOrg.domain}` : undefined);
+        const sources = await getSourcesByOrg(sourceOrg.id);
+        const productSlug = opts.slug ?? sourceOrg.slug;
+        const productUrl =
+          opts.url ?? (sourceOrg.domain ? `https://${sourceOrg.domain}` : undefined);
 
-      if (opts.dryRun) {
-        const plan = {
-          action: "adopt",
-          sourceOrg: { slug: sourceOrg.slug, name: sourceOrg.name },
-          targetOrg: { slug: targetOrg.slug, name: targetOrg.name },
-          newProduct: { slug: productSlug, name: sourceOrg.name, url: productUrl ?? null },
-          sourcesToMove: sources.map((s) => s.slug),
-          wouldRemoveOrg: sourceOrg.slug,
-        };
+        if (opts.dryRun) {
+          const plan = {
+            action: "adopt",
+            sourceOrg: { slug: sourceOrg.slug, name: sourceOrg.name },
+            targetOrg: { slug: targetOrg.slug, name: targetOrg.name },
+            newProduct: { slug: productSlug, name: sourceOrg.name, url: productUrl ?? null },
+            sourcesToMove: sources.map((s) => s.slug),
+            wouldRemoveOrg: sourceOrg.slug,
+          };
+
+          if (opts.json) {
+            console.log(JSON.stringify(plan, null, 2));
+          } else {
+            console.log(
+              chalk.yellow(
+                `[dry-run] Would adopt "${sourceOrg.name}" as product under "${targetOrg.name}"`,
+              ),
+            );
+            console.log(`  New product slug: ${productSlug}`);
+            if (productUrl) console.log(`  New product URL:  ${productUrl}`);
+            console.log(
+              `  Sources to move:  ${sources.length > 0 ? sources.map((s) => s.slug).join(", ") : chalk.dim("none")}`,
+            );
+            console.log(`  Would remove org: ${sourceOrg.slug}`);
+          }
+          return;
+        }
+
+        const created = await createProduct(targetOrg.id, sourceOrg.name, {
+          slug: productSlug,
+          url: productUrl,
+          description: sourceOrg.description ?? undefined,
+        });
+
+        for (const source of sources) {
+          await updateSource(source.slug, { orgId: targetOrg.id, productId: created.id });
+        }
+
+        const accounts = await getOrgAccountsBySlug(sourceOrg.slug);
+        for (const acct of accounts) {
+          try {
+            await linkOrgAccount(targetOrg.slug, acct.platform, acct.handle);
+          } catch {
+            /* skip duplicates */
+          }
+        }
+
+        await removeOrg(sourceOrg.slug);
 
         if (opts.json) {
-          console.log(JSON.stringify(plan, null, 2));
+          console.log(
+            JSON.stringify(
+              {
+                adopted: sourceOrg.slug,
+                into: targetOrg.slug,
+                product: created,
+                sourcesMoved: sources.length,
+              },
+              null,
+              2,
+            ),
+          );
         } else {
-          console.log(chalk.yellow(`[dry-run] Would adopt "${sourceOrg.name}" as product under "${targetOrg.name}"`));
-          console.log(`  New product slug: ${productSlug}`);
-          if (productUrl) console.log(`  New product URL:  ${productUrl}`);
-          console.log(`  Sources to move:  ${sources.length > 0 ? sources.map((s) => s.slug).join(", ") : chalk.dim("none")}`);
-          console.log(`  Would remove org: ${sourceOrg.slug}`);
+          console.log(
+            chalk.green(
+              `Adopted "${sourceOrg.name}" as product under "${targetOrg.name}" (${productSlug})`,
+            ),
+          );
+          if (sources.length > 0)
+            console.log(`  Moved ${sources.length} source(s) to ${targetOrg.name}`);
         }
-        return;
-      }
-
-      const created = await createProduct(targetOrg.id, sourceOrg.name, {
-        slug: productSlug,
-        url: productUrl,
-        description: sourceOrg.description ?? undefined,
-      });
-
-      for (const source of sources) {
-        await updateSource(source.slug, { orgId: targetOrg.id, productId: created.id });
-      }
-
-      const accounts = await getOrgAccountsBySlug(sourceOrg.slug);
-      for (const acct of accounts) {
-        try {
-          await linkOrgAccount(targetOrg.slug, acct.platform, acct.handle);
-        } catch {
-          /* skip duplicates */
-        }
-      }
-
-      await removeOrg(sourceOrg.slug);
-
-      if (opts.json) {
-        console.log(JSON.stringify({
-          adopted: sourceOrg.slug,
-          into: targetOrg.slug,
-          product: created,
-          sourcesMoved: sources.length,
-        }, null, 2));
-      } else {
-        console.log(chalk.green(`Adopted "${sourceOrg.name}" as product under "${targetOrg.name}" (${productSlug})`));
-        if (sources.length > 0) console.log(`  Moved ${sources.length} source(s) to ${targetOrg.name}`);
-      }
-    });
+      },
+    );
 
   // ── product tag ──
   const tag = product.command("tag").description("Manage product tags");
@@ -348,12 +420,18 @@ export function registerProductCommand(program: Command) {
           const created = await addDomainAlias(domain, { productId: found.id });
           results.push(created);
         } catch (err) {
-          console.error(chalk.red(`Failed to add alias "${domain}": ${err instanceof Error ? err.message : err}`));
+          console.error(
+            chalk.red(
+              `Failed to add alias "${domain}": ${err instanceof Error ? err.message : err}`,
+            ),
+          );
         }
       }
 
       if (opts.json) console.log(JSON.stringify(results, null, 2));
-      else for (const r of results) console.log(chalk.green(`Added alias: ${r.domain} → ${found.name}`));
+      else
+        for (const r of results)
+          console.log(chalk.green(`Added alias: ${r.domain} → ${found.name}`));
     });
 
   alias
@@ -394,8 +472,16 @@ export function registerProductCommand(program: Command) {
 
       const aliases = await listDomainAliases({ productId: found.id });
 
-      if (opts.json) console.log(JSON.stringify(aliases.map((a) => a.domain), null, 2));
-      else if (aliases.length === 0) console.log(chalk.yellow(`No domain aliases for ${found.name}`));
+      if (opts.json)
+        console.log(
+          JSON.stringify(
+            aliases.map((a) => a.domain),
+            null,
+            2,
+          ),
+        );
+      else if (aliases.length === 0)
+        console.log(chalk.yellow(`No domain aliases for ${found.name}`));
       else for (const a of aliases) console.log(a.domain);
     });
 }

@@ -36,7 +36,9 @@ export function getApiKey(): string {
 export function validateConfig(): void {
   if (process.env.RELEASED_API_URL && !process.env.RELEASED_API_KEY) {
     logger.error("RELEASED_API_URL is set but RELEASED_API_KEY is missing.");
-    logger.error("Set RELEASED_API_KEY to authenticate with the remote API, or unset RELEASED_API_URL for public access.");
+    logger.error(
+      "Set RELEASED_API_KEY to authenticate with the remote API, or unset RELEASED_API_URL for public access.",
+    );
     process.exit(1);
   }
 }

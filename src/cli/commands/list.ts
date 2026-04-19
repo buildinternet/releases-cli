@@ -39,125 +39,153 @@ export function registerListCommand(program: Command) {
     .option("--limit <n>", `Limit the number of results (default ${DEFAULT_PAGE_SIZE})`)
     .option("--page <n>", "Page number for paginated results")
     .option("--flat", "Legacy: return a bare array instead of the paginated envelope (--json only)")
-    .action(async (slug: string | undefined, opts: { json?: boolean; org?: string; product?: string; category?: string; hasFeed?: boolean; query?: string; includeDisabled?: boolean; compact?: boolean; limit?: string; page?: string; flat?: boolean }) => {
-      if (slug) {
-        const source = await findSource(slug);
-        if (!source) return sourceNotFound(slug);
-        const parsedMeta = parseMetadataObject(source.metadata);
-        const method = getFetchMethod(source.type, parsedMeta);
-        if (opts.json) {
-          const parsed: Record<string, unknown> = { ...source, method, metadata: parsedMeta ?? source.metadata };
-          console.log(JSON.stringify(parsed, null, 2));
+    .action(
+      async (
+        slug: string | undefined,
+        opts: {
+          json?: boolean;
+          org?: string;
+          product?: string;
+          category?: string;
+          hasFeed?: boolean;
+          query?: string;
+          includeDisabled?: boolean;
+          compact?: boolean;
+          limit?: string;
+          page?: string;
+          flat?: boolean;
+        },
+      ) => {
+        if (slug) {
+          const source = await findSource(slug);
+          if (!source) return sourceNotFound(slug);
+          const parsedMeta = parseMetadataObject(source.metadata);
+          const method = getFetchMethod(source.type, parsedMeta);
+          if (opts.json) {
+            const parsed: Record<string, unknown> = {
+              ...source,
+              method,
+              metadata: parsedMeta ?? source.metadata,
+            };
+            console.log(JSON.stringify(parsed, null, 2));
+            return;
+          }
+          const label = (key: string, val: string | null | undefined) =>
+            `  ${chalk.bold(key.padEnd(16))} ${val ?? chalk.dim("—")}`;
+          console.log(chalk.bold(`\n${stripAnsi(source.name)}\n`));
+          console.log(label("Slug", source.slug));
+          console.log(label("Type", source.type));
+          console.log(label("Method", method === "-" ? null : method));
+          console.log(label("URL", source.url));
+          console.log(label("Org", source.orgId ?? null));
+          console.log(label("Last Fetched", source.lastFetchedAt));
+          console.log(label("Primary", source.isPrimary ? "yes" : null));
+          console.log(label("Status", source.isHidden ? "disabled" : "active"));
+          console.log(label("Fetch Priority", source.fetchPriority));
+          console.log("");
           return;
         }
-        const label = (key: string, val: string | null | undefined) =>
-          `  ${chalk.bold(key.padEnd(16))} ${val ?? chalk.dim("—")}`;
-        console.log(chalk.bold(`\n${stripAnsi(source.name)}\n`));
-        console.log(label("Slug", source.slug));
-        console.log(label("Type", source.type));
-        console.log(label("Method", method === "-" ? null : method));
-        console.log(label("URL", source.url));
-        console.log(label("Org", source.orgId ?? null));
-        console.log(label("Last Fetched", source.lastFetchedAt));
-        console.log(label("Primary", source.isPrimary ? "yes" : null));
-        console.log(label("Status", source.isHidden ? "disabled" : "active"));
-        console.log(label("Fetch Priority", source.fetchPriority));
-        console.log("");
-        return;
-      }
 
-      const limitOpt = opts.limit ? parseInt(opts.limit, 10) : undefined;
-      const explicitLimit = limitOpt != null && limitOpt > 0;
-      const pageSize = explicitLimit ? limitOpt : DEFAULT_PAGE_SIZE;
-      const page = opts.page ? Math.max(1, parseInt(opts.page, 10)) : 1;
+        const limitOpt = opts.limit ? parseInt(opts.limit, 10) : undefined;
+        const explicitLimit = limitOpt != null && limitOpt > 0;
+        const pageSize = explicitLimit ? limitOpt : DEFAULT_PAGE_SIZE;
+        const page = opts.page ? Math.max(1, parseInt(opts.page, 10)) : 1;
 
-      const { items: pageItems, pagination: apiPagination } = await listSourcesWithOrg({
-        orgSlug: opts.org,
-        productSlug: opts.product,
-        category: opts.category,
-        hasFeed: opts.hasFeed,
-        query: opts.query,
-        includeHidden: opts.includeDisabled,
-        limit: pageSize,
-        page,
-        envelope: true,
-      });
-
-      if (pageItems.length === 0 && page === 1 && !opts.json) {
-        console.log("No sources configured.");
-        return;
-      }
-
-      if (opts.json) {
-        const items: Record<string, unknown>[] = pageItems.map((row) => {
-          const parsedMeta = parseMetadataObject(row.metadata);
-          const method = getFetchMethod(row.type, parsedMeta);
-          if (opts.compact) {
-            return {
-              id: row.id,
-              slug: row.slug,
-              name: row.name,
-              type: row.type,
-              method,
-              orgName: row.orgName ?? null,
-              productName: row.productName ?? null,
-              releaseCount: row.releaseCount,
-              latestDate: row.latestDate ?? null,
-              lastFetchedAt: row.lastFetchedAt ?? null,
-            };
-          }
-          return {
-            ...row,
-            method,
-            metadata: parsedMeta ?? row.metadata,
-          };
+        const { items: pageItems, pagination: apiPagination } = await listSourcesWithOrg({
+          orgSlug: opts.org,
+          productSlug: opts.product,
+          category: opts.category,
+          hasFeed: opts.hasFeed,
+          query: opts.query,
+          includeHidden: opts.includeDisabled,
+          limit: pageSize,
+          page,
+          envelope: true,
         });
 
-        const warnTruncated = !explicitLimit && apiPagination.hasMore;
-
-        if (opts.flat) {
-          console.log(JSON.stringify(items, null, 2));
-        } else {
-          const response: ListResponse<Record<string, unknown>> = { items, pagination: apiPagination };
-          console.log(JSON.stringify(response, null, 2));
+        if (pageItems.length === 0 && page === 1 && !opts.json) {
+          console.log("No sources configured.");
+          return;
         }
 
-        if (warnTruncated) {
-          console.error(formatTruncationWarning({
-            returned: items.length,
-            pageSize,
-            commandExample: paginateExample(true),
-          }));
+        if (opts.json) {
+          const items: Record<string, unknown>[] = pageItems.map((row) => {
+            const parsedMeta = parseMetadataObject(row.metadata);
+            const method = getFetchMethod(row.type, parsedMeta);
+            if (opts.compact) {
+              return {
+                id: row.id,
+                slug: row.slug,
+                name: row.name,
+                type: row.type,
+                method,
+                orgName: row.orgName ?? null,
+                productName: row.productName ?? null,
+                releaseCount: row.releaseCount,
+                latestDate: row.latestDate ?? null,
+                lastFetchedAt: row.lastFetchedAt ?? null,
+              };
+            }
+            return {
+              ...row,
+              method,
+              metadata: parsedMeta ?? row.metadata,
+            };
+          });
+
+          const warnTruncated = !explicitLimit && apiPagination.hasMore;
+
+          if (opts.flat) {
+            console.log(JSON.stringify(items, null, 2));
+          } else {
+            const response: ListResponse<Record<string, unknown>> = {
+              items,
+              pagination: apiPagination,
+            };
+            console.log(JSON.stringify(response, null, 2));
+          }
+
+          if (warnTruncated) {
+            console.error(
+              formatTruncationWarning({
+                returned: items.length,
+                pageSize,
+                commandExample: paginateExample(true),
+              }),
+            );
+          }
+          return;
         }
-        return;
-      }
 
-      const table = new Table({
-        head: ["Name", "Slug", "Type", "Method", "URL", "Org", "Product", "Last Fetched"],
-      });
+        const table = new Table({
+          head: ["Name", "Slug", "Type", "Method", "URL", "Org", "Product", "Last Fetched"],
+        });
 
-      for (const row of pageItems) {
-        const method = getFetchMethod(row.type, parseMetadataObject(row.metadata));
-        const name = stripAnsi(row.name);
-        table.push([
-          row.isPrimary ? `${name} ${chalk.yellow("\u2605")}` : name,
-          row.slug,
-          row.type,
-          method,
-          row.url,
-          row.orgName ? stripAnsi(row.orgName) : chalk.dim("\u2014"),
-          row.productName ?? chalk.dim("\u2014"),
-          row.lastFetchedAt ?? chalk.dim("never"),
-        ]);
-      }
+        for (const row of pageItems) {
+          const method = getFetchMethod(row.type, parseMetadataObject(row.metadata));
+          const name = stripAnsi(row.name);
+          table.push([
+            row.isPrimary ? `${name} ${chalk.yellow("\u2605")}` : name,
+            row.slug,
+            row.type,
+            method,
+            row.url,
+            row.orgName ? stripAnsi(row.orgName) : chalk.dim("\u2014"),
+            row.productName ?? chalk.dim("\u2014"),
+            row.lastFetchedAt ?? chalk.dim("never"),
+          ]);
+        }
 
-      console.log(table.toString());
-      if (!explicitLimit && apiPagination.hasMore) {
-        console.error(formatTruncationWarning({
-          returned: pageItems.length,
-          pageSize,
-          commandExample: paginateExample(false),
-        }));
-      }
-    });
+        console.log(table.toString());
+        if (!explicitLimit && apiPagination.hasMore) {
+          console.error(
+            formatTruncationWarning({
+              returned: pageItems.length,
+              pageSize,
+              commandExample: paginateExample(false),
+            }),
+          );
+        }
+      },
+    );
 }

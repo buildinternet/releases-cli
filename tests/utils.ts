@@ -11,7 +11,7 @@ export function runCli(
   // OSS CLI is remote-only — a real-looking URL must be set so the CLI starts.
   // Commands that don't hit the API (e.g. `categories`) succeed without it.
   const safeEnv: Record<string, string> = {
-    ...process.env as Record<string, string>,
+    ...(process.env as Record<string, string>),
     RELEASED_API_URL: "https://test.example.com",
     RELEASED_API_KEY: "test",
     ...options?.env,

@@ -11,7 +11,15 @@
  *   bun scripts/sync-plugin-skills.ts --dry-run  # preview without changes
  */
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, rmSync, cpSync } from "fs";
+import {
+  readFileSync,
+  writeFileSync,
+  mkdirSync,
+  existsSync,
+  readdirSync,
+  rmSync,
+  cpSync,
+} from "fs";
 import { resolve, join } from "path";
 
 const PROJECT_ROOT = resolve(import.meta.dir, "..");
@@ -47,19 +55,20 @@ function main() {
 
     // Insert comment after frontmatter so YAML parsing isn't broken
     const fmEnd = sourceContent.indexOf("---", 3);
-    const destContent = fmEnd !== -1
-      ? sourceContent.slice(0, fmEnd + 3) + "\n\n" + AUTO_GEN_COMMENT + "\n" + sourceContent.slice(fmEnd + 3)
-      : AUTO_GEN_COMMENT + "\n\n" + sourceContent;
+    const destContent =
+      fmEnd !== -1
+        ? sourceContent.slice(0, fmEnd + 3) +
+          "\n\n" +
+          AUTO_GEN_COMMENT +
+          "\n" +
+          sourceContent.slice(fmEnd + 3)
+        : AUTO_GEN_COMMENT + "\n\n" + sourceContent;
 
     const sourceRefs = join(SOURCE_SKILLS_DIR, dirName, "references");
     const destRefs = join(destDir, "references");
     const refsInSync = refsEqual(sourceRefs, destRefs);
 
-    if (
-      existsSync(destPath) &&
-      readFileSync(destPath, "utf8") === destContent &&
-      refsInSync
-    ) {
+    if (existsSync(destPath) && readFileSync(destPath, "utf8") === destContent && refsInSync) {
       console.log(`  ✓ ${dirName} — up to date`);
       unchanged++;
       continue;

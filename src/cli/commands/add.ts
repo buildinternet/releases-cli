@@ -42,7 +42,14 @@ async function addSingleSource(input: AddSourceInput): Promise<AddSourceResult> 
   const { name, url } = input;
 
   if (input.type && !isValidType(input.type)) {
-    return { name, slug: input.slug ?? toSlug(name), type: input.type, url, status: "error", error: `Invalid type "${input.type}". Must be one of: ${VALID_TYPES.join(", ")}` };
+    return {
+      name,
+      slug: input.slug ?? toSlug(name),
+      type: input.type,
+      url,
+      status: "error",
+      error: `Invalid type "${input.type}". Must be one of: ${VALID_TYPES.join(", ")}`,
+    };
   }
 
   const slug = input.slug ?? toSlug(name);
@@ -63,7 +70,14 @@ async function addSingleSource(input: AddSourceInput): Promise<AddSourceResult> 
   if (input.product) {
     const prod = await findProduct(input.product);
     if (!prod) {
-      return { name, slug, type: "scrape", url, status: "error", error: `Product not found: "${input.product}"` };
+      return {
+        name,
+        slug,
+        type: "scrape",
+        url,
+        status: "error",
+        error: `Product not found: "${input.product}"`,
+      };
     }
     productId = prod.id;
     if (!orgId) orgId = prod.orgId;
@@ -72,8 +86,18 @@ async function addSingleSource(input: AddSourceInput): Promise<AddSourceResult> 
   const exclusion = await isUrlExcluded(url, orgId ?? undefined);
   if (exclusion.excluded) {
     const scopeLabel = exclusion.scope === "blocked" ? "blocked" : "ignored";
-    logger.warn(`Skipping ${scopeLabel} URL: ${url}${exclusion.reason ? ` (${exclusion.reason})` : ""}`);
-    return { name, slug, type: "scrape", url, org: orgName ?? undefined, status: "ignored", reason: exclusion.reason };
+    logger.warn(
+      `Skipping ${scopeLabel} URL: ${url}${exclusion.reason ? ` (${exclusion.reason})` : ""}`,
+    );
+    return {
+      name,
+      slug,
+      type: "scrape",
+      url,
+      org: orgName ?? undefined,
+      status: "ignored",
+      reason: exclusion.reason,
+    };
   }
 
   let sourceType: SourceType;
@@ -119,7 +143,15 @@ async function addSingleSource(input: AddSourceInput): Promise<AddSourceResult> 
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    return { name, slug, type: sourceType, url, org: orgName ?? undefined, status: "error", error: message };
+    return {
+      name,
+      slug,
+      type: sourceType,
+      url,
+      org: orgName ?? undefined,
+      status: "error",
+      error: message,
+    };
   }
 
   return { name, slug, type: sourceType, url, org: orgName ?? undefined, status: "added" };
@@ -130,7 +162,10 @@ export function registerAddCommand(program: Command) {
     .command("add")
     .description("Add a new changelog source")
     .argument("[name]", "Display name for the source")
-    .option("--type <type>", "Source type: github, scrape, feed, or agent (auto-detected from URL if omitted)")
+    .option(
+      "--type <type>",
+      "Source type: github, scrape, feed, or agent (auto-detected from URL if omitted)",
+    )
     .option("--url <url>", "URL of the source")
     .option("--slug <slug>", "Custom slug (auto-derived from name if omitted)")
     .option("--org <org>", "Organization name or slug (creates if not found)")
@@ -139,101 +174,133 @@ export function registerAddCommand(program: Command) {
     .option("--feed-url <feedUrl>", "Explicit feed URL")
     .option("--batch <file>", "JSON file with sources to add (use - for stdin)")
     .option("--json", "Output as JSON")
-    .addHelpText("after", `
+    .addHelpText(
+      "after",
+      `
 Examples:
   releases admin source add "Next.js" --url https://github.com/vercel/next.js
   releases admin source add "Astro" --url https://astro.build/blog --type scrape
-  releases admin source add --batch sources.json`)
-    .action(async (name: string | undefined, opts: { type?: string; url?: string; slug?: string; org?: string; product?: string; name?: string; feedUrl?: string; batch?: string; json?: boolean }) => {
-      if (opts.batch) {
-        let raw: string;
-        if (opts.batch === "-") {
-          raw = await Bun.stdin.text();
-        } else {
-          raw = readFileSync(opts.batch, "utf-8");
-        }
+  releases admin source add --batch sources.json`,
+    )
+    .action(
+      async (
+        name: string | undefined,
+        opts: {
+          type?: string;
+          url?: string;
+          slug?: string;
+          org?: string;
+          product?: string;
+          name?: string;
+          feedUrl?: string;
+          batch?: string;
+          json?: boolean;
+        },
+      ) => {
+        if (opts.batch) {
+          let raw: string;
+          if (opts.batch === "-") {
+            raw = await Bun.stdin.text();
+          } else {
+            raw = readFileSync(opts.batch, "utf-8");
+          }
 
-        let entries: AddSourceInput[];
-        try {
-          entries = JSON.parse(raw);
-        } catch {
-          logger.error("Failed to parse batch JSON input");
-          process.exit(1);
-        }
-
-        if (!Array.isArray(entries)) {
-          logger.error("Batch input must be a JSON array");
-          process.exit(1);
-        }
-
-        for (const [i, entry] of entries.entries()) {
-          if (!entry.name || !entry.url) {
-            logger.error(`Entry ${i} is missing required "name" or "url" field`);
+          let entries: AddSourceInput[];
+          try {
+            entries = JSON.parse(raw);
+          } catch {
+            logger.error("Failed to parse batch JSON input");
             process.exit(1);
           }
-        }
 
-        const results: AddSourceResult[] = [];
-        let hasError = false;
-
-        for (const entry of entries) {
-          const result = await addSingleSource({ ...entry, batch: true });
-          results.push(result);
-
-          if (result.status === "error") {
-            hasError = true;
-            if (!opts.json) logger.error(chalk.red(`Failed to add ${result.name}: ${result.error}`));
-          } else if (result.status === "ignored") {
-            if (!opts.json) logger.info(chalk.yellow(`Skipped (ignored): ${result.name} (${result.url})${result.reason ? ` — ${result.reason}` : ""}`));
-          } else if (!opts.json) {
-            const orgLabel = result.org ? ` [org: ${result.org}]` : "";
-            logger.info(chalk.green(`Source added: ${result.name} (${result.slug}) [${result.type}]${orgLabel}`));
+          if (!Array.isArray(entries)) {
+            logger.error("Batch input must be a JSON array");
+            process.exit(1);
           }
+
+          for (const [i, entry] of entries.entries()) {
+            if (!entry.name || !entry.url) {
+              logger.error(`Entry ${i} is missing required "name" or "url" field`);
+              process.exit(1);
+            }
+          }
+
+          const results: AddSourceResult[] = [];
+          let hasError = false;
+
+          for (const entry of entries) {
+            const result = await addSingleSource({ ...entry, batch: true });
+            results.push(result);
+
+            if (result.status === "error") {
+              hasError = true;
+              if (!opts.json)
+                logger.error(chalk.red(`Failed to add ${result.name}: ${result.error}`));
+            } else if (result.status === "ignored") {
+              if (!opts.json)
+                logger.info(
+                  chalk.yellow(
+                    `Skipped (ignored): ${result.name} (${result.url})${result.reason ? ` — ${result.reason}` : ""}`,
+                  ),
+                );
+            } else if (!opts.json) {
+              const orgLabel = result.org ? ` [org: ${result.org}]` : "";
+              logger.info(
+                chalk.green(
+                  `Source added: ${result.name} (${result.slug}) [${result.type}]${orgLabel}`,
+                ),
+              );
+            }
+          }
+
+          if (opts.json) console.log(JSON.stringify(results, null, 2));
+          if (hasError) process.exit(1);
+          return;
         }
 
-        if (opts.json) console.log(JSON.stringify(results, null, 2));
-        if (hasError) process.exit(1);
-        return;
-      }
+        const effectiveName = name ?? opts.name;
+        if (!effectiveName) {
+          console.error("Error: missing required argument: name\n");
+          console.error(
+            '  releases admin source add "My Source" --url https://example.com/changelog',
+          );
+          process.exit(1);
+        }
+        if (!opts.url) {
+          console.error("Error: missing required option: --url\n");
+          process.exit(1);
+        }
 
-      const effectiveName = name ?? opts.name;
-      if (!effectiveName) {
-        console.error("Error: missing required argument: name\n");
-        console.error("  releases admin source add \"My Source\" --url https://example.com/changelog");
-        process.exit(1);
-      }
-      if (!opts.url) {
-        console.error("Error: missing required option: --url\n");
-        process.exit(1);
-      }
+        const result = await addSingleSource({
+          name: effectiveName,
+          url: opts.url,
+          type: opts.type,
+          slug: opts.slug,
+          org: opts.org,
+          product: opts.product,
+          feedUrl: opts.feedUrl,
+        });
 
-      const result = await addSingleSource({
-        name: effectiveName,
-        url: opts.url,
-        type: opts.type,
-        slug: opts.slug,
-        org: opts.org,
-        product: opts.product,
-        feedUrl: opts.feedUrl,
-      });
+        if (result.status === "error") {
+          if (opts.json) console.log(JSON.stringify(result, null, 2));
+          else logger.error(chalk.red(result.error!));
+          process.exit(1);
+        }
 
-      if (result.status === "error") {
-        if (opts.json) console.log(JSON.stringify(result, null, 2));
-        else logger.error(chalk.red(result.error!));
-        process.exit(1);
-      }
+        if (result.status === "ignored") {
+          if (opts.json) console.log(JSON.stringify(result, null, 2));
+          return;
+        }
 
-      if (result.status === "ignored") {
-        if (opts.json) console.log(JSON.stringify(result, null, 2));
-        return;
-      }
-
-      if (opts.json) {
-        console.log(JSON.stringify(result, null, 2));
-      } else {
-        const orgLabel = result.org ? ` [org: ${result.org}]` : "";
-        const typeLabel = !opts.type ? ` (auto-detected: ${result.type})` : "";
-        console.log(chalk.green(`Source added: ${result.name} (${result.slug})${typeLabel}${orgLabel}`));
-      }
-    });
+        if (opts.json) {
+          console.log(JSON.stringify(result, null, 2));
+        } else {
+          const orgLabel = result.org ? ` [org: ${result.org}]` : "";
+          const typeLabel = !opts.type ? ` (auto-detected: ${result.type})` : "";
+          console.log(
+            chalk.green(`Source added: ${result.name} (${result.slug})${typeLabel}${orgLabel}`),
+          );
+        }
+      },
+    );
 }

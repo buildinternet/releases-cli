@@ -69,9 +69,7 @@ export function sourceToMarkdown(source: SourceDetail, opts: FormatOptions = {})
   const lines: string[] = [];
 
   // ── Frontmatter ──
-  const sourcePath = source.org
-    ? `/${source.org.slug}/${source.slug}`
-    : `/source/${source.slug}`;
+  const sourcePath = source.org ? `/${source.org.slug}/${source.slug}` : `/source/${source.slug}`;
 
   lines.push("---");
   lines.push(yamlLine("name", source.name));
@@ -108,17 +106,25 @@ export function sourceToMarkdown(source: SourceDetail, opts: FormatOptions = {})
 
   // ── Summaries ──
   if (source.summaries?.rolling) {
-    lines.push(`<Summary type="rolling" window-days="${source.summaries.rolling.windowDays}" release-count="${source.summaries.rolling.releaseCount}">`);
+    lines.push(
+      `<Summary type="rolling" window-days="${source.summaries.rolling.windowDays}" release-count="${source.summaries.rolling.releaseCount}">`,
+    );
     lines.push(source.summaries.rolling.summary);
     lines.push("</Summary>");
     lines.push("");
   }
 
   for (const monthly of source.summaries?.monthly ?? []) {
-    const monthName = monthly.month != null && monthly.year != null
-      ? new Date(monthly.year, monthly.month - 1).toLocaleDateString("en-US", { month: "long", year: "numeric" })
-      : "";
-    lines.push(`<Summary type="monthly"${attr("period", monthName)}${attr("release-count", monthly.releaseCount)}>`);
+    const monthName =
+      monthly.month != null && monthly.year != null
+        ? new Date(monthly.year, monthly.month - 1).toLocaleDateString("en-US", {
+            month: "long",
+            year: "numeric",
+          })
+        : "";
+    lines.push(
+      `<Summary type="monthly"${attr("period", monthName)}${attr("release-count", monthly.releaseCount)}>`,
+    );
     lines.push(monthly.summary);
     lines.push("</Summary>");
     lines.push("");
@@ -128,7 +134,7 @@ export function sourceToMarkdown(source: SourceDetail, opts: FormatOptions = {})
   for (const release of source.releases) {
     const dateStr = formatIsoDate(release.publishedAt);
     lines.push(
-      `<Release${attr("version", release.version)}${attr("date", dateStr)}${attr("published", release.publishedAt)}${attr("url", release.url)}>`
+      `<Release${attr("version", release.version)}${attr("date", dateStr)}${attr("published", release.publishedAt)}${attr("url", release.url)}>`,
     );
 
     // Title as heading if it differs from version
@@ -155,7 +161,9 @@ export function sourceToMarkdown(source: SourceDetail, opts: FormatOptions = {})
       `total-items="${source.pagination.totalItems}"`,
     ];
     if (opts.baseUrl) {
-      paginationAttrs.push(`next="${opts.baseUrl}${sourcePath}.md?page=${source.pagination.page + 1}"`);
+      paginationAttrs.push(
+        `next="${opts.baseUrl}${sourcePath}.md?page=${source.pagination.page + 1}"`,
+      );
     }
     lines.push(`<Pagination ${paginationAttrs.join(" ")} />`);
     lines.push("");
@@ -227,7 +235,7 @@ export function orgToMarkdown(org: OrgDetail, opts: FormatOptions = {}): string 
   if (org.products.length > 0) {
     for (const product of org.products) {
       lines.push(
-        `<Product${attr("name", product.name)}${attr("slug", product.slug)}${attr("sources", product.sourceCount)}${product.url ? attr("url", product.url) : ""} />`
+        `<Product${attr("name", product.name)}${attr("slug", product.slug)}${attr("sources", product.sourceCount)}${product.url ? attr("url", product.url) : ""} />`,
       );
     }
     lines.push("");
@@ -237,7 +245,7 @@ export function orgToMarkdown(org: OrgDetail, opts: FormatOptions = {}): string 
   for (const source of org.sources) {
     const sourceUrl = opts.baseUrl ? ` url="${opts.baseUrl}/${org.slug}/${source.slug}"` : "";
     lines.push(
-      `<Source${attr("name", source.name)}${attr("slug", source.slug)}${attr("type", source.type)}${attr("releases", source.releaseCount)}${attr("latest-version", source.latestVersion)}${attr("latest-date", source.latestDate)}${source.isPrimary ? ' primary="true"' : ""}${sourceUrl} />`
+      `<Source${attr("name", source.name)}${attr("slug", source.slug)}${attr("type", source.type)}${attr("releases", source.releaseCount)}${attr("latest-version", source.latestVersion)}${attr("latest-date", source.latestDate)}${source.isPrimary ? ' primary="true"' : ""}${sourceUrl} />`,
     );
   }
 
@@ -248,16 +256,11 @@ export function orgToMarkdown(org: OrgDetail, opts: FormatOptions = {}): string 
 
 // ── Release Detail → Markdown ──────────────────────────────────────
 
-export function releaseToMarkdown(
-  release: ReleaseDetail,
-  opts: FormatOptions = {},
-): string {
+export function releaseToMarkdown(release: ReleaseDetail, opts: FormatOptions = {}): string {
   const lines: string[] = [];
 
   const orgPath = release.org ? `/${release.org.slug}` : "";
-  const sourcePath = orgPath
-    ? `${orgPath}/${release.sourceSlug}`
-    : `/source/${release.sourceSlug}`;
+  const sourcePath = orgPath ? `${orgPath}/${release.sourceSlug}` : `/source/${release.sourceSlug}`;
 
   lines.push("---");
   lines.push(yamlLine("title", release.title));
@@ -317,7 +320,7 @@ export function orgReleaseFeedToMarkdown(
   for (const release of releases) {
     const dateStr = formatIsoDate(release.publishedAt);
     lines.push(
-      `<Release${attr("version", release.version)}${attr("date", dateStr)}${attr("published", release.publishedAt)}${attr("url", release.url)}${attr("source", release.source.slug)}>`
+      `<Release${attr("version", release.version)}${attr("date", dateStr)}${attr("published", release.publishedAt)}${attr("url", release.url)}${attr("source", release.source.slug)}>`,
     );
 
     if (release.title && release.title !== release.version) {
@@ -337,7 +340,9 @@ export function orgReleaseFeedToMarkdown(
   if (pagination.nextCursor) {
     const cursorAttrs = [`cursor="${pagination.nextCursor}"`];
     if (opts.baseUrl) {
-      cursorAttrs.push(`next="${opts.baseUrl}/${orgSlug}/releases?cursor=${encodeURIComponent(pagination.nextCursor)}&limit=${pagination.limit}"`);
+      cursorAttrs.push(
+        `next="${opts.baseUrl}/${orgSlug}/releases?cursor=${encodeURIComponent(pagination.nextCursor)}&limit=${pagination.limit}"`,
+      );
     }
     lines.push(`<Pagination ${cursorAttrs.join(" ")} />`);
     lines.push("");
@@ -348,10 +353,7 @@ export function orgReleaseFeedToMarkdown(
 
 // ── Search Results → Markdown ──────────────────────────────────────
 
-export function searchToMarkdown(
-  results: UnifiedSearchResponse,
-  opts: FormatOptions = {},
-): string {
+export function searchToMarkdown(results: UnifiedSearchResponse, opts: FormatOptions = {}): string {
   const lines: string[] = [];
 
   lines.push("---");
@@ -364,7 +366,9 @@ export function searchToMarkdown(
     lines.push("");
     for (const org of results.orgs) {
       const url = opts.baseUrl ? ` — [view](${opts.baseUrl}/${org.slug})` : "";
-      lines.push(`- **${org.name}** (\`${org.slug}\`)${org.category ? ` [${org.category}]` : ""}${url}`);
+      lines.push(
+        `- **${org.name}** (\`${org.slug}\`)${org.category ? ` [${org.category}]` : ""}${url}`,
+      );
     }
     lines.push("");
   }
@@ -375,10 +379,11 @@ export function searchToMarkdown(
     for (const p of results.products) {
       const orgInfo = p.orgSlug ? ` (${p.orgName})` : "";
       const viewSlug = p.kind === "source" && p.sourceSlug ? p.sourceSlug : `product/${p.slug}`;
-      const url = opts.baseUrl && p.orgSlug
-        ? ` — [view](${opts.baseUrl}/${p.orgSlug}/${viewSlug})`
-        : "";
-      lines.push(`- **${p.name}** (\`${p.slug}\`)${orgInfo}${p.category ? ` [${p.category}]` : ""}${url}`);
+      const url =
+        opts.baseUrl && p.orgSlug ? ` — [view](${opts.baseUrl}/${p.orgSlug}/${viewSlug})` : "";
+      lines.push(
+        `- **${p.name}** (\`${p.slug}\`)${orgInfo}${p.category ? ` [${p.category}]` : ""}${url}`,
+      );
     }
     lines.push("");
   }
@@ -397,8 +402,7 @@ export function searchToMarkdown(
     lines.push("");
   }
 
-  if (results.orgs.length === 0 && results.products.length === 0 &&
-      results.releases.length === 0) {
+  if (results.orgs.length === 0 && results.products.length === 0 && results.releases.length === 0) {
     lines.push("No results found.");
     lines.push("");
   }

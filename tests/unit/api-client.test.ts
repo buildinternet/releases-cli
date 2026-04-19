@@ -47,23 +47,19 @@ describe("apiFetch 404 handling", () => {
 
   it("throws on POST 404 (addIgnoredUrl)", async () => {
     mockFetch(404, { message: "Not Found" });
-    await expect(
-      client.addIgnoredUrl("https://example.com", "org_123"),
-    ).rejects.toThrow(/API error \(404\) on POST/);
+    await expect(client.addIgnoredUrl("https://example.com", "org_123")).rejects.toThrow(
+      /API error \(404\) on POST/,
+    );
   });
 
   it("throws on DELETE 404 (deleteRelease)", async () => {
     mockFetch(404, { message: "Not Found" });
-    await expect(client.deleteRelease("rel_123")).rejects.toThrow(
-      /API error \(404\) on DELETE/,
-    );
+    await expect(client.deleteRelease("rel_123")).rejects.toThrow(/API error \(404\) on DELETE/);
   });
 
   it("throws on non-404 errors for GET", async () => {
     mockFetch(500, { message: "Internal Server Error" });
-    await expect(client.findSource("test")).rejects.toThrow(
-      /API error \(500\)/,
-    );
+    await expect(client.findSource("test")).rejects.toThrow(/API error \(500\)/);
   });
 });
 
@@ -153,8 +149,12 @@ describe("listSourcesWithOrg", () => {
         JSON.stringify({
           items: [apiRow],
           pagination: {
-            page: 2, pageSize: 50, returned: 1,
-            totalItems: 233, totalPages: 5, hasMore: true,
+            page: 2,
+            pageSize: 50,
+            returned: 1,
+            totalItems: 233,
+            totalPages: 5,
+            hasMore: true,
           },
         }),
         { status: 200, headers: { "Content-Type": "application/json" } },

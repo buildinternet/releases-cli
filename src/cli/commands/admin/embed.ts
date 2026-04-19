@@ -82,7 +82,9 @@ async function runBackfillLoop(
     summary.remaining = result.remaining;
 
     if (!opts.json) {
-      console.log(`  Batch ${summary.batches}: processed ${result.processed}, succeeded ${result.succeeded}, failed ${result.failed}, remaining ${result.remaining}`);
+      console.log(
+        `  Batch ${summary.batches}: processed ${result.processed}, succeeded ${result.succeeded}, failed ${result.failed}, remaining ${result.remaining}`,
+      );
     }
 
     if (dryRun) break;
@@ -100,16 +102,18 @@ function printSummary(label: string, summary: LoopSummary, json: boolean): void 
   }
   console.log(`Done. Total: ${summary.totalProcessed} processed, ${summary.totalFailed} failed.`);
   if (summary.remaining > 0) {
-    console.log(chalk.dim(`  ${summary.remaining} remaining. Run again or use 'releases admin embed status' to check.`));
+    console.log(
+      chalk.dim(
+        `  ${summary.remaining} remaining. Run again or use 'releases admin embed status' to check.`,
+      ),
+    );
   } else {
     console.log(chalk.dim("  Run 'releases admin embed status' to verify."));
   }
 }
 
 export function registerEmbedCommand(parent: Command): void {
-  const embed = parent
-    .command("embed")
-    .description("Backfill semantic-search embeddings");
+  const embed = parent.command("embed").description("Backfill semantic-search embeddings");
 
   embed
     .command("releases")
@@ -162,16 +166,14 @@ export function registerEmbedCommand(parent: Command): void {
     .option("--limit <n>", "Max files to process across all batches", (v) => parseInt(v, 10))
     .option("--dry-run", "Report what would be processed without writing")
     .option("--json", "Machine-readable JSON output")
-    .action(
-      async (opts: { source?: string; limit?: number; dryRun?: boolean; json?: boolean }) => {
-        const summary = await runBackfillLoop(
-          "changelogs",
-          (limit) => embedChangelogs({ sourceSlug: opts.source, limit, dryRun: opts.dryRun }),
-          opts,
-        );
-        printSummary("changelogs", summary, opts.json === true);
-      },
-    );
+    .action(async (opts: { source?: string; limit?: number; dryRun?: boolean; json?: boolean }) => {
+      const summary = await runBackfillLoop(
+        "changelogs",
+        (limit) => embedChangelogs({ sourceSlug: opts.source, limit, dryRun: opts.dryRun }),
+        opts,
+      );
+      printSummary("changelogs", summary, opts.json === true);
+    });
 
   embed
     .command("status")
@@ -201,9 +203,21 @@ export function registerEmbedCommand(parent: Command): void {
       console.log("");
       console.log(`  Releases:  ${fmt(status.releases.embedded, status.releases.total)}`);
       console.log(`  Entities:  ${fmt(status.entities.embedded, status.entities.total)}`);
-      console.log(chalk.dim(`    orgs:     ${fmt(status.entities.breakdown.org.embedded, status.entities.breakdown.org.total)}`));
-      console.log(chalk.dim(`    products: ${fmt(status.entities.breakdown.product.embedded, status.entities.breakdown.product.total)}`));
-      console.log(chalk.dim(`    sources:  ${fmt(status.entities.breakdown.source.embedded, status.entities.breakdown.source.total)}`));
+      console.log(
+        chalk.dim(
+          `    orgs:     ${fmt(status.entities.breakdown.org.embedded, status.entities.breakdown.org.total)}`,
+        ),
+      );
+      console.log(
+        chalk.dim(
+          `    products: ${fmt(status.entities.breakdown.product.embedded, status.entities.breakdown.product.total)}`,
+        ),
+      );
+      console.log(
+        chalk.dim(
+          `    sources:  ${fmt(status.entities.breakdown.source.embedded, status.entities.breakdown.source.total)}`,
+        ),
+      );
       console.log(`  Chunks:    ${fmt(status.chunks.embedded, status.chunks.total)}`);
     });
 }
