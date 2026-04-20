@@ -4,7 +4,6 @@
 "@buildinternet/releases-darwin-x64": minor
 "@buildinternet/releases-linux-arm64": minor
 "@buildinternet/releases-linux-x64": minor
-"@buildinternet/releases-core": minor
 "@buildinternet/releases-lib": minor
 "@buildinternet/releases-skills": minor
 ---
