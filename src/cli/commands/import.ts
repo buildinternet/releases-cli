@@ -217,6 +217,7 @@ export function registerImportCommand(program: Command) {
             const orgSlug = orgEntry.slug ?? toSlug(orgEntry.name);
 
             if (opts.dryRun) {
+              // eslint-disable-next-line no-await-in-loop
               const existing = await findOrg(orgSlug);
               if (existing) {
                 if (!opts.json)
@@ -299,12 +300,15 @@ export function registerImportCommand(program: Command) {
               continue;
             }
 
+            // Org creation gates subsequent product/source creation — sequential by design.
+            // eslint-disable-next-line no-await-in-loop
             let org = await findOrg(orgSlug);
             if (org) {
               if (!opts.json)
                 logger.info(chalk.yellow(`Org already exists: ${org.name} (${org.slug})`));
             } else {
               try {
+                // eslint-disable-next-line no-await-in-loop
                 org = await createOrg(orgEntry.name, {
                   slug: orgSlug,
                   domain: orgEntry.domain,
@@ -320,12 +324,14 @@ export function registerImportCommand(program: Command) {
                 continue;
               }
               if (orgEntry.tags && orgEntry.tags.length > 0) {
+                // eslint-disable-next-line no-await-in-loop
                 await addTagsToOrg(org.id, orgEntry.tags);
               }
             }
 
             if (orgEntry.accounts) {
               for (const acc of orgEntry.accounts) {
+                // eslint-disable-next-line no-await-in-loop
                 const existing = await getOrgAccountByPlatform(org.id, acc.platform);
                 if (existing) {
                   if (!opts.json)
@@ -334,6 +340,7 @@ export function registerImportCommand(program: Command) {
                     );
                 } else {
                   try {
+                    // eslint-disable-next-line no-await-in-loop
                     await linkOrgAccount(org.slug, acc.platform, acc.handle);
                     report.created.accounts++;
                     if (!opts.json)
@@ -352,6 +359,8 @@ export function registerImportCommand(program: Command) {
             if (orgEntry.products) {
               for (const prodEntry of orgEntry.products) {
                 const prodSlug = prodEntry.slug ?? toSlug(prodEntry.name);
+                // Product creation gates child source creation — sequential by design.
+                // eslint-disable-next-line no-await-in-loop
                 let prod = await findProduct(prodSlug);
 
                 if (prod) {
@@ -361,6 +370,7 @@ export function registerImportCommand(program: Command) {
                     );
                 } else {
                   try {
+                    // eslint-disable-next-line no-await-in-loop
                     prod = await createProduct(org.id, prodEntry.name, {
                       slug: prodSlug,
                       url: prodEntry.url,
@@ -379,6 +389,7 @@ export function registerImportCommand(program: Command) {
                     continue;
                   }
                   if (prodEntry.tags && prodEntry.tags.length > 0) {
+                    // eslint-disable-next-line no-await-in-loop
                     await addTagsToProduct(prod.id, prodEntry.tags);
                   }
                 }
@@ -402,6 +413,7 @@ export function registerImportCommand(program: Command) {
                     const srcType = resolveSourceType(srcEntry);
 
                     try {
+                      // eslint-disable-next-line no-await-in-loop
                       await createSource({
                         name: srcEntry.name,
                         slug: srcSlug,
@@ -446,6 +458,7 @@ export function registerImportCommand(program: Command) {
                 const srcType = resolveSourceType(srcEntry);
 
                 try {
+                  // eslint-disable-next-line no-await-in-loop
                   await createSource({
                     name: srcEntry.name,
                     slug: srcSlug,
@@ -507,6 +520,7 @@ export function registerImportCommand(program: Command) {
             }
 
             try {
+              // eslint-disable-next-line no-await-in-loop
               await createSource({
                 name: srcEntry.name,
                 slug: srcSlug,

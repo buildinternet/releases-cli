@@ -96,7 +96,7 @@ Examples:
         } else if (rows.length === 0) {
           console.log(chalk.yellow("No releases found."));
         } else if (opts.follow) {
-          for (const row of rows.slice().reverse()) {
+          for (const row of rows.toReversed()) {
             console.log(renderStreamLine(row));
           }
         } else {
@@ -120,8 +120,11 @@ Examples:
         );
         console.error(chalk.dim(`\n  Following (every ${intervalSeconds}s). Ctrl-C to stop.`));
 
+        // Polling loop — each tick depends on the previous sleep + fetch.
         while (true) {
+          // eslint-disable-next-line no-await-in-loop
           await sleep(intervalSeconds * 1000);
+          // eslint-disable-next-line no-await-in-loop
           const fresh = await getLatestReleases(fetchOpts);
           const novel = fresh.filter((r) => !seen.has(r.id));
           if (novel.length === 0) continue;
@@ -130,8 +133,10 @@ Examples:
             seen,
             novel.map((r) => r.id),
           );
-          const ordered = novel.slice().reverse();
+          const ordered = novel.toReversed();
           if (opts.json) {
+            // Preserve stream ordering; writes must land in order.
+            // eslint-disable-next-line no-await-in-loop
             for (const row of ordered) await writeJsonLine(row);
           } else {
             for (const row of ordered) console.log(renderStreamLine(row));

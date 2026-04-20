@@ -229,7 +229,10 @@ Examples:
           const results: AddSourceResult[] = [];
           let hasError = false;
 
+          // Sequential to avoid racing on shared org lookup-or-create for entries
+          // referencing the same org.
           for (const entry of entries) {
+            // eslint-disable-next-line no-await-in-loop
             const result = await addSingleSource({ ...entry, batch: true });
             results.push(result);
 

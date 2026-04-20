@@ -101,7 +101,9 @@ async function runRemoteDiscovery(
   const startTime = Date.now();
   let lastStep = "";
 
+  // Polling loop — each tick depends on the prior sleep + status fetch.
   while (Date.now() - startTime < MAX_POLL_TIME) {
+    // eslint-disable-next-line no-await-in-loop
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL));
 
     let status: {
@@ -116,6 +118,7 @@ async function runRemoteDiscovery(
       error?: string;
     };
     try {
+      // eslint-disable-next-line no-await-in-loop
       status = await apiFetch(`/v1/discover/${sessionId}`);
     } catch (err) {
       logger.error(`Failed to poll status: ${err instanceof Error ? err.message : String(err)}`);
@@ -127,6 +130,7 @@ async function runRemoteDiscovery(
 
       if (status.result) {
         if (opts.json) {
+          // eslint-disable-next-line no-await-in-loop
           await writeJson(status.result);
           return;
         }
@@ -168,9 +172,12 @@ async function runRemoteDiscovery(
   process.exit(1);
 }
 
+function write(s: string): void {
+  process.stderr.write(s + "\n");
+}
+
 function printSummary(state: DiscoveryState): void {
   const { sources } = state;
-  const write = (s: string) => process.stderr.write(s + "\n");
 
   write("");
   write(chalk.bold(`Discovery results for ${state.product}`));

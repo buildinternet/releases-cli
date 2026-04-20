@@ -113,8 +113,8 @@ function refsEqual(sourceDir: string, destDir: string): boolean {
   if (!hasSource && !hasDest) return true;
   if (hasSource !== hasDest) return false;
 
-  const sourceFiles = readdirSync(sourceDir).sort();
-  const destFiles = readdirSync(destDir).sort();
+  const sourceFiles = readdirSync(sourceDir).toSorted();
+  const destFiles = readdirSync(destDir).toSorted();
   if (sourceFiles.length !== destFiles.length) return false;
 
   for (let i = 0; i < sourceFiles.length; i++) {

@@ -60,19 +60,22 @@ export function registerRemoveCommand(program: Command) {
         }
 
         if (opts.ignore && existing.length > 0) {
-          for (const source of existing) {
-            if (!source.orgId) {
-              if (!opts.json) {
-                logger.warn(
-                  chalk.yellow(
-                    `Cannot ignore ${source.url} — source has no organization. Use 'block add' for global blocking.`,
-                  ),
-                );
-              }
-              continue;
-            }
-            await addIgnoredUrl(source.url, source.orgId, opts.reason);
+          const ignorable = existing.filter((source) => {
+            if (source.orgId) return true;
             if (!opts.json) {
+              logger.warn(
+                chalk.yellow(
+                  `Cannot ignore ${source.url} — source has no organization. Use 'block add' for global blocking.`,
+                ),
+              );
+            }
+            return false;
+          });
+          await Promise.all(
+            ignorable.map((source) => addIgnoredUrl(source.url, source.orgId!, opts.reason)),
+          );
+          if (!opts.json) {
+            for (const source of ignorable) {
               logger.info(
                 chalk.yellow(`Ignored URL: ${source.url}${opts.reason ? ` (${opts.reason})` : ""}`),
               );

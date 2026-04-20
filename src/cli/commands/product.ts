@@ -296,18 +296,22 @@ export function registerProductCommand(program: Command) {
           description: sourceOrg.description ?? undefined,
         });
 
-        for (const source of sources) {
-          await updateSource(source.slug, { orgId: targetOrg.id, productId: created.id });
-        }
+        await Promise.all(
+          sources.map((source) =>
+            updateSource(source.slug, { orgId: targetOrg.id, productId: created.id }),
+          ),
+        );
 
         const accounts = await getOrgAccountsBySlug(sourceOrg.slug);
-        for (const acct of accounts) {
-          try {
-            await linkOrgAccount(targetOrg.slug, acct.platform, acct.handle);
-          } catch {
-            /* skip duplicates */
-          }
-        }
+        await Promise.all(
+          accounts.map(async (acct) => {
+            try {
+              await linkOrgAccount(targetOrg.slug, acct.platform, acct.handle);
+            } catch {
+              /* skip duplicates */
+            }
+          }),
+        );
 
         await removeOrg(sourceOrg.slug);
 
@@ -414,19 +418,21 @@ export function registerProductCommand(program: Command) {
         process.exit(1);
       }
 
-      const results = [];
-      for (const domain of domains) {
-        try {
-          const created = await addDomainAlias(domain, { productId: found.id });
-          results.push(created);
-        } catch (err) {
-          console.error(
-            chalk.red(
-              `Failed to add alias "${domain}": ${err instanceof Error ? err.message : err}`,
-            ),
-          );
-        }
-      }
+      const settled = await Promise.all(
+        domains.map(async (domain) => {
+          try {
+            return await addDomainAlias(domain, { productId: found.id });
+          } catch (err) {
+            console.error(
+              chalk.red(
+                `Failed to add alias "${domain}": ${err instanceof Error ? err.message : err}`,
+              ),
+            );
+            return null;
+          }
+        }),
+      );
+      const results = settled.filter((r): r is NonNullable<typeof r> => r !== null);
 
       if (opts.json) await writeJson(results);
       else
@@ -447,9 +453,11 @@ export function registerProductCommand(program: Command) {
         process.exit(1);
       }
 
-      const removed = [];
-      for (const domain of domains) {
-        const ok = await removeDomainAlias(domain);
+      const results = await Promise.all(
+        domains.map(async (domain) => ({ domain, ok: await removeDomainAlias(domain) })),
+      );
+      const removed: string[] = [];
+      for (const { domain, ok } of results) {
         if (ok) removed.push(domain);
         else console.error(chalk.yellow(`Alias "${domain}" not found.`));
       }

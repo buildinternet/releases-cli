@@ -22,6 +22,11 @@ import { writeJson } from "../../../lib/output.js";
 /** Worker batch cap — must stay in sync with BATCH_CAP on the API worker. */
 const ENDPOINT_BATCH_CAP = 50;
 
+function fmt(embedded: number, total: number): string {
+  const pct = total === 0 ? 100 : Math.round((embedded / total) * 100);
+  return `${embedded}/${total} (${pct}%)`;
+}
+
 interface LoopOptions {
   json?: boolean;
   dryRun?: boolean;
@@ -59,16 +64,19 @@ async function runBackfillLoop(
     dryRun,
   };
 
+  // Paginated batches — each call depends on `remaining` from the previous response.
   while (summary.totalProcessed < userLimit) {
     const remainingUserBudget = userLimit - summary.totalProcessed;
     const perCallLimit = Math.min(ENDPOINT_BATCH_CAP, remainingUserBudget);
 
     let result: EmbedBackfillResponse;
     try {
+      // eslint-disable-next-line no-await-in-loop
       result = await callEndpoint(perCallLimit);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (opts.json) {
+        // eslint-disable-next-line no-await-in-loop
         await writeJson({ ok: false, label, error: msg, ...summary });
       } else {
         logger.error(`  Batch ${summary.batches + 1} failed: ${msg}`);
@@ -194,11 +202,6 @@ export function registerEmbedCommand(parent: Command): void {
         await writeJson(status);
         return;
       }
-
-      const fmt = (embedded: number, total: number) => {
-        const pct = total === 0 ? 100 : Math.round((embedded / total) * 100);
-        return `${embedded}/${total} (${pct}%)`;
-      };
 
       console.log(chalk.bold("Semantic search backfill status"));
       console.log("");

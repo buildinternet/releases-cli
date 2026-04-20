@@ -503,19 +503,21 @@ Examples:
       const found = await findOrg(identifier);
       if (!found) return orgNotFound(identifier);
 
-      const results = [];
-      for (const domain of domains) {
-        try {
-          const created = await addDomainAlias(domain, { orgId: found.id });
-          results.push(created);
-        } catch (err) {
-          logger.error(
-            chalk.red(
-              `Failed to add alias "${domain}": ${err instanceof Error ? err.message : err}`,
-            ),
-          );
-        }
-      }
+      const settled = await Promise.all(
+        domains.map(async (domain) => {
+          try {
+            return await addDomainAlias(domain, { orgId: found.id });
+          } catch (err) {
+            logger.error(
+              chalk.red(
+                `Failed to add alias "${domain}": ${err instanceof Error ? err.message : err}`,
+              ),
+            );
+            return null;
+          }
+        }),
+      );
+      const results = settled.filter((r): r is NonNullable<typeof r> => r !== null);
 
       if (opts.json) await writeJson(results);
       else
@@ -533,9 +535,11 @@ Examples:
       const found = await findOrg(identifier);
       if (!found) return orgNotFound(identifier);
 
-      const removed = [];
-      for (const domain of domains) {
-        const ok = await removeDomainAlias(domain);
+      const results = await Promise.all(
+        domains.map(async (domain) => ({ domain, ok: await removeDomainAlias(domain) })),
+      );
+      const removed: string[] = [];
+      for (const { domain, ok } of results) {
         if (ok) removed.push(domain);
         else console.error(chalk.yellow(`Alias "${domain}" not found.`));
       }

@@ -97,7 +97,10 @@ export function registerOnboardApplyCommand(onboardCmd: Command) {
 
       const results: ApplyResult[] = [];
 
+      // Sequential to avoid racing on shared org/product lookup-or-create
+      // across sources that belong to the same parent entity.
       for (const source of state.sources) {
+        // eslint-disable-next-line no-await-in-loop
         const result = await applySource(source, orgId);
         results.push(result);
 
