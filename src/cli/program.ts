@@ -23,6 +23,7 @@ import { registerChangelogCommand } from "./commands/changelog.js";
 import { registerShowCommand } from "./commands/show.js";
 import { registerEmbedCommand } from "./commands/admin/embed.js";
 import { registerEvaluateCommand } from "./commands/admin/evaluate.js";
+import { registerPlaybookCommand } from "./commands/admin/playbook.js";
 import { registerTelemetryCommand } from "./commands/telemetry.js";
 import { registerServeCommand } from "./commands/serve.js";
 import { registerWhoamiCommand } from "./commands/whoami.js";
@@ -202,6 +203,7 @@ const statsAdmin = admin.command("stats").description("Inspect operator metrics 
 registerUsageCommand(statsAdmin);
 
 registerEmbedCommand(admin);
+registerPlaybookCommand(admin);
 
 const mcpAdmin = admin.command("mcp").description("MCP server management");
 registerServeCommand(mcpAdmin);
