@@ -1,6 +1,6 @@
 {
   "name": "@buildinternet/releases",
-  "version": "0.16.1",
+  "version": "0.17.0",
   "description": "Changelog indexer and registry for AI agents and developers",
   "bin": {
     "releases": "bin/releases"
@@ -13,10 +13,10 @@
     "README.md"
   ],
   "optionalDependencies": {
-    "@buildinternet/releases-darwin-arm64": "0.16.1",
-    "@buildinternet/releases-darwin-x64": "0.16.1",
-    "@buildinternet/releases-linux-x64": "0.16.1",
-    "@buildinternet/releases-linux-arm64": "0.16.1"
+    "@buildinternet/releases-darwin-arm64": "0.17.0",
+    "@buildinternet/releases-darwin-x64": "0.17.0",
+    "@buildinternet/releases-linux-x64": "0.17.0",
+    "@buildinternet/releases-linux-arm64": "0.17.0"
   },
   "keywords": [
     "changelog",
