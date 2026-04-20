@@ -4,6 +4,7 @@ import Table from "cli-table3";
 import { getFetchLogs } from "../../api/client.js";
 import { timeAgo } from "@buildinternet/releases-core/dates";
 import { stripAnsi } from "../../lib/sanitize.js";
+import { writeJson } from "../../lib/output.js";
 
 export function registerFetchLogCommand(program: Command) {
   program
@@ -26,7 +27,7 @@ Examples:
 
       if (logs.length === 0) {
         if (opts.json) {
-          console.log(JSON.stringify([], null, 2));
+          await writeJson([]);
         } else {
           console.log("No fetch logs found.");
         }
@@ -34,7 +35,7 @@ Examples:
       }
 
       if (opts.json) {
-        console.log(JSON.stringify(logs, null, 2));
+        await writeJson(logs);
         return;
       }
 

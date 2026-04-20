@@ -2,6 +2,7 @@ import { Command } from "commander";
 import chalk from "chalk";
 import { findOrg, listIgnoredUrls, addIgnoredUrl, removeIgnoredUrl } from "../../api/client.js";
 import { logger } from "@releases/lib/logger";
+import { writeJson } from "../../lib/output.js";
 
 export function registerIgnoreCommand(program: Command) {
   const ignore = program
@@ -30,7 +31,7 @@ Examples:
       const rows = await listIgnoredUrls(org.id);
 
       if (opts.json) {
-        console.log(JSON.stringify(rows, null, 2));
+        await writeJson(rows);
         return;
       }
 
@@ -101,7 +102,7 @@ Examples:
 
       await removeIgnoredUrl(url, org.id);
       if (opts.json) {
-        console.log(JSON.stringify({ url, org: org.slug, status: "unignored" }, null, 2));
+        await writeJson({ url, org: org.slug, status: "unignored" });
       } else {
         logger.info(chalk.green(`Un-ignored for ${org.name}: ${url}`));
       }

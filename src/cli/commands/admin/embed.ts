@@ -17,6 +17,7 @@ import {
   getEmbedStatus,
 } from "../../../api/client.js";
 import type { EmbedBackfillResponse } from "../../../api/types.js";
+import { writeJson } from "../../../lib/output.js";
 
 /** Worker batch cap — must stay in sync with BATCH_CAP on the API worker. */
 const ENDPOINT_BATCH_CAP = 50;
@@ -68,7 +69,7 @@ async function runBackfillLoop(
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (opts.json) {
-        console.log(JSON.stringify({ ok: false, label, error: msg, ...summary }, null, 2));
+        await writeJson({ ok: false, label, error: msg, ...summary });
       } else {
         logger.error(`  Batch ${summary.batches + 1} failed: ${msg}`);
       }
@@ -95,9 +96,9 @@ async function runBackfillLoop(
   return summary;
 }
 
-function printSummary(label: string, summary: LoopSummary, json: boolean): void {
+async function printSummary(label: string, summary: LoopSummary, json: boolean): Promise<void> {
   if (json) {
-    console.log(JSON.stringify({ ok: true, label, ...summary }, null, 2));
+    await writeJson({ ok: true, label, ...summary });
     return;
   }
   console.log(`Done. Total: ${summary.totalProcessed} processed, ${summary.totalFailed} failed.`);
@@ -128,7 +129,7 @@ export function registerEmbedCommand(parent: Command): void {
         (limit) => embedReleases({ since: opts.since, limit, dryRun: opts.dryRun }),
         opts,
       );
-      printSummary("releases", summary, opts.json === true);
+      await printSummary("releases", summary, opts.json === true);
     });
 
   embed
@@ -155,7 +156,7 @@ export function registerEmbedCommand(parent: Command): void {
           (limit) => embedEntities({ kind: opts.kind, limit, dryRun: opts.dryRun }),
           opts,
         );
-        printSummary(label, summary, opts.json === true);
+        await printSummary(label, summary, opts.json === true);
       },
     );
 
@@ -172,7 +173,7 @@ export function registerEmbedCommand(parent: Command): void {
         (limit) => embedChangelogs({ sourceSlug: opts.source, limit, dryRun: opts.dryRun }),
         opts,
       );
-      printSummary("changelogs", summary, opts.json === true);
+      await printSummary("changelogs", summary, opts.json === true);
     });
 
   embed
@@ -190,7 +191,7 @@ export function registerEmbedCommand(parent: Command): void {
       }
 
       if (opts.json) {
-        console.log(JSON.stringify(status, null, 2));
+        await writeJson(status);
         return;
       }
 

@@ -2,6 +2,7 @@ import { Command } from "commander";
 import chalk from "chalk";
 import { getApiKey, getApiUrl, isAdminMode } from "../../lib/mode.js";
 import { VERSION } from "../version.js";
+import { writeJson } from "../../lib/output.js";
 
 export type WhoamiStatus = {
   version: string;
@@ -62,7 +63,7 @@ export function registerWhoamiCommand(parent: Command): void {
       if (opts.check) status.check = await probeApi(status.mode);
 
       if (opts.json) {
-        console.log(JSON.stringify(status, null, 2));
+        await writeJson(status);
         return;
       }
 

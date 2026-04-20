@@ -4,6 +4,7 @@ import Table from "cli-table3";
 import { findSource, listSourcesWithOrg } from "../../api/client.js";
 import { timeAgo } from "@buildinternet/releases-core/dates";
 import { stripAnsi } from "../../lib/sanitize.js";
+import { writeJson } from "../../lib/output.js";
 
 interface SourceLite {
   name: string;
@@ -132,7 +133,7 @@ export function registerCheckCommand(program: Command) {
           lastFetchedAt: r.lastFetchedAt,
         }));
         if (sourcesToCheck.length === 0) {
-          if (opts.json) console.log(JSON.stringify([], null, 2));
+          if (opts.json) await writeJson([]);
           else console.log("No sources configured.");
           return;
         }
@@ -141,7 +142,7 @@ export function registerCheckCommand(program: Command) {
       const results = await Promise.all(sourcesToCheck.map(checkSource));
 
       if (opts.json) {
-        console.log(JSON.stringify(results, null, 2));
+        await writeJson(results);
         return;
       }
 

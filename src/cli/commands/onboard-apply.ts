@@ -2,6 +2,7 @@ import { Command } from "commander";
 import chalk from "chalk";
 import { logger } from "@releases/lib/logger";
 import { addIgnoredUrl, findOrg, createSource } from "../../api/client.js";
+import { writeJson } from "../../lib/output.js";
 
 interface AgentDiscoveredSource {
   slug: string;
@@ -119,7 +120,7 @@ export function registerOnboardApplyCommand(onboardCmd: Command) {
       }
 
       if (opts.json) {
-        console.log(JSON.stringify(results, null, 2));
+        await writeJson(results);
       } else {
         let added = 0,
           ignored = 0,

@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import * as apiClient from "../../api/client.js";
+import { writeJson } from "../../lib/output.js";
 
 export function registerTaskCommand(program: Command) {
   const task = program.command("task").description("Manage remote fetch and discovery sessions");
@@ -13,7 +14,7 @@ export function registerTaskCommand(program: Command) {
       const sessions = await apiClient.listSessions();
 
       if (opts.json) {
-        console.log(JSON.stringify(sessions, null, 2));
+        await writeJson(sessions);
         return;
       }
 

@@ -4,6 +4,7 @@ import { unifiedSearch } from "../../api/client.js";
 import { stripAnsi } from "../../lib/sanitize.js";
 import { logger } from "@releases/lib/logger";
 import type { UnifiedSearchResponse } from "../../api/types.js";
+import { writeJson } from "../../lib/output.js";
 
 const SEARCH_MODES = ["lexical", "semantic", "hybrid"] as const;
 type SearchMode = (typeof SEARCH_MODES)[number];
@@ -51,7 +52,7 @@ export function registerSearchCommand(program: Command) {
           if (response.degraded !== undefined) filtered.degraded = response.degraded;
           if (response.degradedReason !== undefined)
             filtered.degradedReason = response.degradedReason;
-          console.log(JSON.stringify(filtered, null, 2));
+          await writeJson(filtered);
           return;
         }
 

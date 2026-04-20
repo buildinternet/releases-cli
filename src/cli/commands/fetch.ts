@@ -12,6 +12,7 @@ import {
 } from "../../api/client.js";
 import { newCorrelationId } from "@buildinternet/releases-core/id";
 import { orgNotFound, sourceNotFound } from "../suggest.js";
+import { writeJson, writeJsonLine } from "../../lib/output.js";
 
 export function registerFetchCommand(program: Command) {
   program
@@ -66,8 +67,7 @@ Examples:
             (s) => !s.isHidden && s.fetchPriority !== "paused",
           );
           if (activeSources.length === 0) {
-            if (opts.json)
-              console.log(JSON.stringify({ sessionId: null, message: "No active sources" }));
+            if (opts.json) await writeJsonLine({ sessionId: null, message: "No active sources" });
             else logger.info(`No active sources for ${org.name}.`);
             return;
           }
@@ -108,8 +108,7 @@ Examples:
         }
 
         if (entries.length === 0) {
-          if (opts.json)
-            console.log(JSON.stringify({ sessionId: null, message: "No matching sources" }));
+          if (opts.json) await writeJsonLine({ sessionId: null, message: "No matching sources" });
           else logger.info("No matching sources to fetch.");
           return;
         }
@@ -162,7 +161,7 @@ Examples:
           process.exit(1);
         }
         if (opts.json) {
-          console.log(JSON.stringify(result, null, 2));
+          await writeJson(result);
         } else {
           logger.info(`Update session started: ${result.sessionId}`);
           logger.info(`Fetching ${sourceIdentifiers.length} source(s).`);

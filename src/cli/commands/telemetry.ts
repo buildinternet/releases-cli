@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import { setTelemetryEnabled, telemetryStatus } from "../../lib/telemetry.js";
+import { writeJson } from "../../lib/output.js";
 
 export function registerTelemetryCommand(parent: Command): void {
   const cmd = parent.command("telemetry").description("Manage anonymous usage telemetry");
@@ -9,10 +10,10 @@ export function registerTelemetryCommand(parent: Command): void {
     .command("status")
     .description("Show current telemetry configuration")
     .option("--json", "Output as JSON")
-    .action((opts: { json?: boolean }) => {
+    .action(async (opts: { json?: boolean }) => {
       const s = telemetryStatus();
       if (opts.json) {
-        console.log(JSON.stringify(s, null, 2));
+        await writeJson(s);
         return;
       }
       const state = s.enabled ? chalk.green("enabled") : chalk.red("disabled");

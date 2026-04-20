@@ -26,6 +26,7 @@ import { orgNotFound } from "../suggest.js";
 import { toSlug } from "@buildinternet/releases-core/slug";
 import { isValidCategory, CATEGORIES } from "@buildinternet/releases-core/categories";
 import { timeAgo } from "@buildinternet/releases-core/dates";
+import { writeJson } from "../../lib/output.js";
 import {
   OVERVIEW_STALE_DAYS,
   overviewAgeDays,
@@ -91,7 +92,7 @@ export function registerOrgCommand(program: Command) {
           }
         }
 
-        if (opts.json) console.log(JSON.stringify(created, null, 2));
+        if (opts.json) await writeJson(created);
         else console.log(chalk.green(`Organization added: ${name} (${slug})`));
       },
     );
@@ -107,13 +108,13 @@ export function registerOrgCommand(program: Command) {
       const allOrgs = await listOrgs({ query: opts.query, platform: opts.platform });
 
       if (allOrgs.length === 0) {
-        if (opts.json) console.log(JSON.stringify([], null, 2));
+        if (opts.json) await writeJson([]);
         else console.log(chalk.yellow("No organizations found."));
         return;
       }
 
       if (opts.json) {
-        console.log(JSON.stringify(allOrgs, null, 2));
+        await writeJson(allOrgs);
         return;
       }
 
@@ -256,7 +257,7 @@ Examples:
 
       if (!overview?.content) {
         if (opts.json) {
-          console.log(JSON.stringify({ org: found.slug, overview: null }, null, 2));
+          await writeJson({ org: found.slug, overview: null });
         } else {
           console.log(chalk.yellow(`No overview available for ${found.name}.`));
         }
@@ -364,7 +365,7 @@ Examples:
 
         const updated = await updateOrg(found.slug, updates);
 
-        if (opts.json) console.log(JSON.stringify(updated, null, 2));
+        if (opts.json) await writeJson(updated);
         else console.log(chalk.green(`Updated organization: ${updated.name} (${updated.slug})`));
       },
     );
@@ -381,8 +382,7 @@ Examples:
       if (!found) return orgNotFound(identifier);
 
       if (opts.dryRun) {
-        if (opts.json)
-          console.log(JSON.stringify({ wouldRemove: found.slug, name: found.name }, null, 2));
+        if (opts.json) await writeJson({ wouldRemove: found.slug, name: found.name });
         else
           console.log(
             chalk.yellow(`[dry-run] Would remove organization: ${found.name} (${found.slug})`),
@@ -392,7 +392,7 @@ Examples:
 
       await removeOrg(found.slug);
 
-      if (opts.json) console.log(JSON.stringify({ removed: found.slug }, null, 2));
+      if (opts.json) await writeJson({ removed: found.slug });
       else console.log(chalk.green(`Removed organization: ${found.name} (${found.slug})`));
     });
 
@@ -411,7 +411,7 @@ Examples:
 
         const created = await linkOrgAccount(found.slug, opts.platform, opts.handle);
 
-        if (opts.json) console.log(JSON.stringify(created, null, 2));
+        if (opts.json) await writeJson(created);
         else console.log(chalk.green(`Linked ${opts.platform}/${opts.handle} to ${found.name}`));
       },
     );
@@ -431,8 +431,7 @@ Examples:
 
         await unlinkOrgAccount(found.slug, opts.platform, opts.handle);
 
-        if (opts.json)
-          console.log(JSON.stringify({ unlinked: `${opts.platform}/${opts.handle}` }, null, 2));
+        if (opts.json) await writeJson({ unlinked: `${opts.platform}/${opts.handle}` });
         else
           console.log(chalk.green(`Unlinked ${opts.platform}/${opts.handle} from ${found.name}`));
       },
@@ -453,7 +452,7 @@ Examples:
       await addTagsToOrg(found.id, tagNames);
       if (opts.json) {
         const allTags = await getTagsForOrg(found.id);
-        console.log(JSON.stringify({ tags: allTags }, null, 2));
+        await writeJson({ tags: allTags });
       } else {
         console.log(chalk.green(`Added tags to ${found.name}: ${tagNames.join(", ")}`));
       }
@@ -471,7 +470,7 @@ Examples:
       await removeTagsFromOrg(found.id, tagNames);
       if (opts.json) {
         const allTags = await getTagsForOrg(found.id);
-        console.log(JSON.stringify({ tags: allTags }, null, 2));
+        await writeJson({ tags: allTags });
       } else {
         console.log(chalk.green(`Removed tags from ${found.name}: ${tagNames.join(", ")}`));
       }
@@ -486,7 +485,7 @@ Examples:
       const found = await findOrg(identifier);
       if (!found) return orgNotFound(identifier);
       const allTags = await getTagsForOrg(found.id);
-      if (opts.json) console.log(JSON.stringify(allTags, null, 2));
+      if (opts.json) await writeJson(allTags);
       else if (allTags.length === 0) console.log(chalk.yellow(`No tags for ${found.name}`));
       else console.log(allTags.join(", "));
     });
@@ -518,7 +517,7 @@ Examples:
         }
       }
 
-      if (opts.json) console.log(JSON.stringify(results, null, 2));
+      if (opts.json) await writeJson(results);
       else
         for (const r of results)
           console.log(chalk.green(`Added alias: ${r.domain} → ${found.name}`));
@@ -541,7 +540,7 @@ Examples:
         else console.error(chalk.yellow(`Alias "${domain}" not found.`));
       }
 
-      if (opts.json) console.log(JSON.stringify({ removed }, null, 2));
+      if (opts.json) await writeJson({ removed });
       else for (const d of removed) console.log(chalk.green(`Removed alias: ${d}`));
     });
 

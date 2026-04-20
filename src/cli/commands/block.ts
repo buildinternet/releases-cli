@@ -2,6 +2,7 @@ import { Command } from "commander";
 import chalk from "chalk";
 import { listBlockedUrls, addBlockedUrl, removeBlockedUrl } from "../../api/client.js";
 import { logger } from "@releases/lib/logger";
+import { writeJson } from "../../lib/output.js";
 
 export function registerBlockCommand(program: Command) {
   const block = program.command("block").description("Manage globally blocked URLs and domains");
@@ -21,7 +22,7 @@ Examples:
       const rows = await listBlockedUrls();
 
       if (opts.json) {
-        console.log(JSON.stringify(rows, null, 2));
+        await writeJson(rows);
         return;
       }
 
@@ -108,7 +109,7 @@ Examples:
     .action(async (pattern: string, opts: { json?: boolean }) => {
       await removeBlockedUrl(pattern);
       if (opts.json) {
-        console.log(JSON.stringify({ pattern, status: "unblocked" }, null, 2));
+        await writeJson({ pattern, status: "unblocked" });
       } else {
         logger.info(chalk.green(`Unblocked: ${pattern}`));
       }

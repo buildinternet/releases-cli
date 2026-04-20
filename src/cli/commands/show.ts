@@ -10,6 +10,7 @@ import {
 import { stripAnsi } from "../../lib/sanitize.js";
 import { renderLatestReleasesTable } from "../render/releases-table.js";
 import { getEntityType, normalizeReleaseId, isLikelyBareId } from "@buildinternet/releases-core/id";
+import { writeJson } from "../../lib/output.js";
 
 export function registerShowCommand(program: Command) {
   program
@@ -32,7 +33,7 @@ export function registerShowCommand(program: Command) {
       const product = await findProduct(identifier);
       if (product) return await renderProduct(product, opts);
       const source = await findSource(identifier);
-      if (source) return renderSource(source, opts);
+      if (source) return await renderSource(source, opts);
 
       console.error(chalk.red(`Not found: ${identifier}`));
       process.exit(1);
@@ -47,7 +48,7 @@ async function showRelease(id: string, opts: { json?: boolean }) {
   }
   const rel = result;
   if (opts.json) {
-    console.log(JSON.stringify(rel, null, 2));
+    await writeJson(rel);
     return;
   }
   console.log(chalk.dim("Release"));
@@ -76,7 +77,7 @@ async function showSource(identifier: string, opts: { json?: boolean }) {
     console.error(chalk.red(`Source not found: ${identifier}`));
     process.exit(1);
   }
-  renderSource(source, opts);
+  await renderSource(source, opts);
 }
 
 async function showOrg(identifier: string, opts: { json?: boolean }) {
@@ -97,7 +98,7 @@ async function showProduct(identifier: string, opts: { json?: boolean }) {
   await renderProduct(product, opts);
 }
 
-function renderSource(
+async function renderSource(
   source: {
     id: string;
     name: string;
@@ -110,7 +111,7 @@ function renderSource(
   opts: { json?: boolean },
 ) {
   if (opts.json) {
-    console.log(JSON.stringify(source, null, 2));
+    await writeJson(source);
     return;
   }
   console.log(chalk.dim("Source"));
@@ -128,7 +129,7 @@ async function renderOrg(
   const releases = await getLatestReleases({ orgSlug: org.slug, count: 10 });
 
   if (opts.json) {
-    console.log(JSON.stringify({ ...org, releases }, null, 2));
+    await writeJson({ ...org, releases });
     return;
   }
 
@@ -161,7 +162,7 @@ async function renderProduct(
 ) {
   const org = await findOrg(product.orgId);
   if (opts.json) {
-    console.log(JSON.stringify({ ...product, orgSlug: org?.slug ?? null }, null, 2));
+    await writeJson({ ...product, orgSlug: org?.slug ?? null });
     return;
   }
   console.log(chalk.dim("Product"));
