@@ -4,6 +4,7 @@ import { findOrg, createOrg, createSource, isUrlExcluded, findProduct } from "..
 import { toSlug } from "@buildinternet/releases-core/slug";
 import { logger } from "@releases/lib/logger";
 import { readFileSync } from "fs";
+import { writeJson } from "../../lib/output.js";
 
 const VALID_TYPES = ["github", "scrape", "feed", "agent"] as const;
 type SourceType = (typeof VALID_TYPES)[number];
@@ -253,7 +254,7 @@ Examples:
             }
           }
 
-          if (opts.json) console.log(JSON.stringify(results, null, 2));
+          if (opts.json) await writeJson(results);
           if (hasError) process.exit(1);
           return;
         }
@@ -282,18 +283,18 @@ Examples:
         });
 
         if (result.status === "error") {
-          if (opts.json) console.log(JSON.stringify(result, null, 2));
+          if (opts.json) await writeJson(result);
           else logger.error(chalk.red(result.error!));
           process.exit(1);
         }
 
         if (result.status === "ignored") {
-          if (opts.json) console.log(JSON.stringify(result, null, 2));
+          if (opts.json) await writeJson(result);
           return;
         }
 
         if (opts.json) {
-          console.log(JSON.stringify(result, null, 2));
+          await writeJson(result);
         } else {
           const orgLabel = result.org ? ` [org: ${result.org}]` : "";
           const typeLabel = !opts.type ? ` (auto-detected: ${result.type})` : "";

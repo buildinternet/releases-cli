@@ -4,6 +4,7 @@ import { findSource, sourceChangelog } from "../../api/client.js";
 import { formatChangelogSliceLine } from "@buildinternet/releases-core/changelog-slice";
 import { sourceNotFound } from "../suggest.js";
 import { logger } from "@releases/lib/logger";
+import { writeJson } from "../../lib/output.js";
 
 export function registerChangelogCommand(program: Command) {
   program
@@ -43,7 +44,7 @@ export function registerChangelogCommand(program: Command) {
         }
 
         if (opts.json) {
-          console.log(JSON.stringify(response, null, 2));
+          await writeJson(response);
           return;
         }
 

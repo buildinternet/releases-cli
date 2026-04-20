@@ -4,6 +4,7 @@ import { logger } from "@releases/lib/logger";
 import { registerOnboardApplyCommand } from "./onboard-apply.js";
 import { apiFetch } from "../../api/client.js";
 import { getApiUrl } from "../../lib/mode.js";
+import { writeJson } from "../../lib/output.js";
 
 interface OnboardOpts {
   domain?: string;
@@ -126,7 +127,7 @@ async function runRemoteDiscovery(
 
       if (status.result) {
         if (opts.json) {
-          console.log(JSON.stringify(status.result, null, 2));
+          await writeJson(status.result);
           return;
         }
 

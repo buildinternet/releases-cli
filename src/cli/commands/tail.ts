@@ -5,6 +5,7 @@ import type { LatestRelease } from "../../api/types.js";
 import { orgNotFound, sourceNotFound } from "../suggest.js";
 import { stripAnsi } from "../../lib/sanitize.js";
 import { renderLatestReleasesTable } from "../render/releases-table.js";
+import { writeJson, writeJsonLine } from "../../lib/output.js";
 
 function renderStreamLine(row: LatestRelease): string {
   const version = row.version ? chalk.yellow(stripAnsi(row.version)) : "";
@@ -91,7 +92,7 @@ Examples:
         const rows = await getLatestReleases(fetchOpts);
 
         if (opts.json) {
-          console.log(JSON.stringify(rows, null, 2));
+          await writeJson(rows);
         } else if (rows.length === 0) {
           console.log(chalk.yellow("No releases found."));
         } else if (opts.follow) {
@@ -131,7 +132,7 @@ Examples:
           );
           const ordered = novel.slice().reverse();
           if (opts.json) {
-            for (const row of ordered) console.log(JSON.stringify(row));
+            for (const row of ordered) await writeJsonLine(row);
           } else {
             for (const row of ordered) console.log(renderStreamLine(row));
           }

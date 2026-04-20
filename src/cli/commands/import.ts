@@ -6,6 +6,7 @@ import { toSlug } from "@buildinternet/releases-core/slug";
 import { logger } from "@releases/lib/logger";
 import { isGitHubUrl } from "./add.js";
 import { isValidCategory } from "@buildinternet/releases-core/categories";
+import { writeJson } from "../../lib/output.js";
 import {
   findOrg,
   createOrg,
@@ -526,7 +527,7 @@ export function registerImportCommand(program: Command) {
         }
 
         if (opts.json) {
-          console.log(JSON.stringify(report, null, 2));
+          await writeJson(report);
         } else {
           console.log("");
           const prefix = opts.dryRun ? "[dry-run] " : "";

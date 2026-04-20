@@ -28,6 +28,7 @@ import { registerWhoamiCommand } from "./commands/whoami.js";
 import { CATEGORIES } from "@buildinternet/releases-core/categories";
 import { isAdminMode } from "../lib/mode.js";
 import { VERSION } from "./version.js";
+import { writeJson } from "../lib/output.js";
 
 export { VERSION };
 
@@ -232,9 +233,9 @@ program
   .command("categories")
   .description("List valid category values")
   .option("--json", "Output as JSON")
-  .action((opts: { json?: boolean }) => {
+  .action(async (opts: { json?: boolean }) => {
     if (opts.json) {
-      console.log(JSON.stringify(CATEGORIES, null, 2));
+      await writeJson(CATEGORIES);
     } else {
       for (const cat of CATEGORIES) {
         console.log(cat);

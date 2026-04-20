@@ -12,6 +12,7 @@ import {
 } from "../../api/client.js";
 import { stripAnsi } from "../../lib/sanitize.js";
 import { normalizeReleaseId } from "@buildinternet/releases-core/id";
+import { writeJson, writeJsonLine } from "../../lib/output.js";
 
 function releaseNotFound(id: string): never {
   console.error(chalk.red(`Release not found: ${id}`));
@@ -35,7 +36,7 @@ export function registerReleaseCommand(program: Command) {
       const rel = result;
 
       if (opts.json) {
-        console.log(JSON.stringify(rel, null, 2));
+        await writeJson(rel);
         return;
       }
 
@@ -120,7 +121,7 @@ export function registerReleaseCommand(program: Command) {
             console.error(chalk.red("No matching releases found."));
             process.exit(1);
           }
-          if (opts.json) console.log(JSON.stringify({ deleted: 1 }, null, 2));
+          if (opts.json) await writeJson({ deleted: 1 });
           else console.log(chalk.green(`Deleted 1 release.`));
           return;
         }
@@ -141,7 +142,7 @@ export function registerReleaseCommand(program: Command) {
             console.error(chalk.red(err instanceof Error ? err.message : String(err)));
             process.exit(1);
           }
-          if (opts.json) console.log(JSON.stringify(result, null, 2));
+          if (opts.json) await writeJson(result);
           else
             console.log(
               chalk.green(`Deleted ${result.deleted} release${result.deleted === 1 ? "" : "s"}.`),
@@ -195,7 +196,7 @@ export function registerReleaseCommand(program: Command) {
 
         const updated = await updateRelease(id, updates);
 
-        if (opts.json) console.log(JSON.stringify(updated, null, 2));
+        if (opts.json) await writeJson(updated);
         else {
           console.log(chalk.green(`Updated release ${id}:`));
           for (const change of changes) console.log(`  ${change}`);
@@ -230,7 +231,7 @@ export function registerReleaseCommand(program: Command) {
       if (!found) releaseNotFound(id);
 
       if (opts.json)
-        console.log(JSON.stringify({ id, suppressed: true, reason: opts.reason ?? null }));
+        await writeJsonLine({ id, suppressed: true, reason: opts.reason ?? null });
       else
         console.log(
           chalk.green(`Suppressed release ${id}${opts.reason ? ` (${opts.reason})` : ""}`),
@@ -247,7 +248,7 @@ export function registerReleaseCommand(program: Command) {
       const found = await unsuppressRelease(id);
       if (!found) releaseNotFound(id);
 
-      if (opts.json) console.log(JSON.stringify({ id, suppressed: false }));
+      if (opts.json) await writeJsonLine({ id, suppressed: false });
       else console.log(chalk.green(`Unsuppressed release ${id}`));
     });
 }

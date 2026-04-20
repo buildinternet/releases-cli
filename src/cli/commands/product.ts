@@ -22,6 +22,7 @@ import {
 } from "../../api/client.js";
 import { toSlug } from "@buildinternet/releases-core/slug";
 import { isValidCategory, CATEGORIES } from "@buildinternet/releases-core/categories";
+import { writeJson } from "../../lib/output.js";
 
 export function registerProductCommand(program: Command) {
   const product = program.command("product").description("Manage products");
@@ -46,13 +47,13 @@ export function registerProductCommand(program: Command) {
       const productList = await getProductsByOrg(org.id);
 
       if (productList.length === 0) {
-        if (opts.json) console.log(JSON.stringify([], null, 2));
+        if (opts.json) await writeJson([]);
         else console.log(chalk.yellow(`No products found for organization: ${org.name}`));
         return;
       }
 
       if (opts.json) {
-        console.log(JSON.stringify(productList, null, 2));
+        await writeJson(productList);
         return;
       }
 
@@ -136,7 +137,7 @@ export function registerProductCommand(program: Command) {
           if (tagList.length > 0) await addTagsToProduct(created.id, tagList);
         }
 
-        if (opts.json) console.log(JSON.stringify(created, null, 2));
+        if (opts.json) await writeJson(created);
         else console.log(chalk.green(`Product added: ${name} (${slug}) under ${org.name}`));
       },
     );
@@ -192,7 +193,7 @@ export function registerProductCommand(program: Command) {
 
         const updated = await updateProduct(found.slug, updates);
 
-        if (opts.json) console.log(JSON.stringify(updated, null, 2));
+        if (opts.json) await writeJson(updated);
         else console.log(chalk.green(`Product updated: ${updated.name} (${updated.slug})`));
       },
     );
@@ -212,7 +213,7 @@ export function registerProductCommand(program: Command) {
 
       if (opts.dryRun) {
         if (opts.json)
-          console.log(JSON.stringify({ wouldRemove: found.slug, name: found.name }, null, 2));
+          await writeJson({ wouldRemove: found.slug, name: found.name });
         else
           console.log(
             chalk.yellow(`[dry-run] Would remove product: ${found.name} (${found.slug})`),
@@ -222,7 +223,7 @@ export function registerProductCommand(program: Command) {
 
       await deleteProduct(found.id);
 
-      if (opts.json) console.log(JSON.stringify({ removed: found.slug }, null, 2));
+      if (opts.json) await writeJson({ removed: found.slug });
       else console.log(chalk.green(`Removed product: ${found.name} (${found.slug})`));
     });
 
@@ -273,7 +274,7 @@ export function registerProductCommand(program: Command) {
           };
 
           if (opts.json) {
-            console.log(JSON.stringify(plan, null, 2));
+            await writeJson(plan);
           } else {
             console.log(
               chalk.yellow(
@@ -354,7 +355,7 @@ export function registerProductCommand(program: Command) {
       await addTagsToProduct(found.id, tagNames);
       if (opts.json) {
         const allTags = await getTagsForProduct(found.id);
-        console.log(JSON.stringify({ tags: allTags }, null, 2));
+        await writeJson({ tags: allTags });
       } else {
         console.log(chalk.green(`Added tags to ${found.name}: ${tagNames.join(", ")}`));
       }
@@ -375,7 +376,7 @@ export function registerProductCommand(program: Command) {
       await removeTagsFromProduct(found.id, tagNames);
       if (opts.json) {
         const allTags = await getTagsForProduct(found.id);
-        console.log(JSON.stringify({ tags: allTags }, null, 2));
+        await writeJson({ tags: allTags });
       } else {
         console.log(chalk.green(`Removed tags from ${found.name}: ${tagNames.join(", ")}`));
       }
@@ -393,7 +394,7 @@ export function registerProductCommand(program: Command) {
         process.exit(1);
       }
       const allTags = await getTagsForProduct(found.id);
-      if (opts.json) console.log(JSON.stringify(allTags, null, 2));
+      if (opts.json) await writeJson(allTags);
       else if (allTags.length === 0) console.log(chalk.yellow(`No tags for ${found.name}`));
       else console.log(allTags.join(", "));
     });
@@ -428,7 +429,7 @@ export function registerProductCommand(program: Command) {
         }
       }
 
-      if (opts.json) console.log(JSON.stringify(results, null, 2));
+      if (opts.json) await writeJson(results);
       else
         for (const r of results)
           console.log(chalk.green(`Added alias: ${r.domain} → ${found.name}`));
@@ -454,7 +455,7 @@ export function registerProductCommand(program: Command) {
         else console.error(chalk.yellow(`Alias "${domain}" not found.`));
       }
 
-      if (opts.json) console.log(JSON.stringify({ removed }, null, 2));
+      if (opts.json) await writeJson({ removed });
       else for (const d of removed) console.log(chalk.green(`Removed alias: ${d}`));
     });
 

@@ -4,6 +4,7 @@ import Table from "cli-table3";
 import { listSourcesWithOrg, findSource } from "../../api/client.js";
 import { sourceNotFound } from "../suggest.js";
 import { stripAnsi } from "../../lib/sanitize.js";
+import { writeJson } from "../../lib/output.js";
 import {
   DEFAULT_PAGE_SIZE,
   parseMetadataObject,
@@ -67,7 +68,7 @@ export function registerListCommand(program: Command) {
               method,
               metadata: parsedMeta ?? source.metadata,
             };
-            console.log(JSON.stringify(parsed, null, 2));
+            await writeJson(parsed);
             return;
           }
           const label = (key: string, val: string | null | undefined) =>
@@ -136,13 +137,13 @@ export function registerListCommand(program: Command) {
           const warnTruncated = !explicitLimit && apiPagination.hasMore;
 
           if (opts.flat) {
-            console.log(JSON.stringify(items, null, 2));
+            await writeJson(items);
           } else {
             const response: ListResponse<Record<string, unknown>> = {
               items,
               pagination: apiPagination,
             };
-            console.log(JSON.stringify(response, null, 2));
+            await writeJson(response);
           }
 
           if (warnTruncated) {

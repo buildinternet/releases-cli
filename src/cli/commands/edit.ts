@@ -11,6 +11,7 @@ import {
 import { sourceNotFound } from "../suggest.js";
 import { toSlug } from "@buildinternet/releases-core/slug";
 import { logger } from "@releases/lib/logger";
+import { writeJson } from "../../lib/output.js";
 
 const VALID_TYPES = ["github", "scrape", "feed", "agent"] as const;
 
@@ -253,7 +254,7 @@ export function registerEditCommand(program: Command) {
 
         if (opts.json) {
           const refreshed = await findSource(displaySlug);
-          console.log(JSON.stringify(refreshed, null, 2));
+          await writeJson(refreshed);
         } else {
           console.log(chalk.green(`Updated ${source.name} (${displaySlug}):`));
           for (const change of changes) console.log(`  ${change}`);
