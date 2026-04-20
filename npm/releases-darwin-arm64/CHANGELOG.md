@@ -1,5 +1,28 @@
 # @buildinternet/releases-darwin-arm64
 
+## 0.17.0
+
+### Minor Changes
+
+- eaeb755: **`releases admin discovery evaluate <url>` is back**
+
+  Ships the missing thin wrapper around `GET /v1/evaluate?url=...`, returning the AI-backed ingestion recommendation (method, feed URL, provider, confidence, alternatives). Supports `--json` for piping into `jq`. Mirrors the typed MCP `evaluate_url` tool.
+
+  The legacy top-level alias `releases evaluate <url>` still resolves to this subcommand (with a deprecation warning).
+
+  The stale `discover` entry in the legacy alias table has been removed — it pointed to a subcommand that never existed, and the API's `POST /v1/discover` is already covered by `releases admin discovery onboard`. The one in-repo docs reference has been updated.
+
+- 51ec406: **`releases admin playbook <org>` is back**
+
+  Ships the missing CLI wrapper for reading and updating an organization's playbook. Same shape as the old monorepo command, flattened from `admin content playbook` to `admin playbook` (no other live inhabitants of the `admin content` subgroup remain).
+  - `releases admin playbook <org>` — read the assembled playbook (header + agent notes)
+  - `releases admin playbook <org> --json` — JSON output
+  - `releases admin playbook <org> --notes "..."` — replace agent notes; seeds a fresh header on first write
+
+  The old `--regenerate` flag is not being ported. It called deterministic logic (no AI) that already runs automatically via `waitUntil` after every source add/edit/remove, and the `--notes` PATCH route auto-seeds a fresh header if no playbook exists yet.
+
+  Closes buildinternet/releases#246.
+
 ## 0.16.1
 
 ### Patch Changes
