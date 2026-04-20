@@ -230,8 +230,7 @@ export function registerReleaseCommand(program: Command) {
       const found = await suppressRelease(id, opts.reason);
       if (!found) releaseNotFound(id);
 
-      if (opts.json)
-        await writeJsonLine({ id, suppressed: true, reason: opts.reason ?? null });
+      if (opts.json) await writeJsonLine({ id, suppressed: true, reason: opts.reason ?? null });
       else
         console.log(
           chalk.green(`Suppressed release ${id}${opts.reason ? ` (${opts.reason})` : ""}`),

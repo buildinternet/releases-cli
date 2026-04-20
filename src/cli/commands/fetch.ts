@@ -67,8 +67,7 @@ Examples:
             (s) => !s.isHidden && s.fetchPriority !== "paused",
           );
           if (activeSources.length === 0) {
-            if (opts.json)
-              await writeJsonLine({ sessionId: null, message: "No active sources" });
+            if (opts.json) await writeJsonLine({ sessionId: null, message: "No active sources" });
             else logger.info(`No active sources for ${org.name}.`);
             return;
           }
@@ -109,8 +108,7 @@ Examples:
         }
 
         if (entries.length === 0) {
-          if (opts.json)
-            await writeJsonLine({ sessionId: null, message: "No matching sources" });
+          if (opts.json) await writeJsonLine({ sessionId: null, message: "No matching sources" });
           else logger.info("No matching sources to fetch.");
           return;
         }

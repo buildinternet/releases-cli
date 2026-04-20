@@ -382,8 +382,7 @@ Examples:
       if (!found) return orgNotFound(identifier);
 
       if (opts.dryRun) {
-        if (opts.json)
-          await writeJson({ wouldRemove: found.slug, name: found.name });
+        if (opts.json) await writeJson({ wouldRemove: found.slug, name: found.name });
         else
           console.log(
             chalk.yellow(`[dry-run] Would remove organization: ${found.name} (${found.slug})`),
@@ -432,8 +431,7 @@ Examples:
 
         await unlinkOrgAccount(found.slug, opts.platform, opts.handle);
 
-        if (opts.json)
-          await writeJson({ unlinked: `${opts.platform}/${opts.handle}` });
+        if (opts.json) await writeJson({ unlinked: `${opts.platform}/${opts.handle}` });
         else
           console.log(chalk.green(`Unlinked ${opts.platform}/${opts.handle} from ${found.name}`));
       },

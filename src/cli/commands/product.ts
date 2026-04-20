@@ -212,8 +212,7 @@ export function registerProductCommand(program: Command) {
       }
 
       if (opts.dryRun) {
-        if (opts.json)
-          await writeJson({ wouldRemove: found.slug, name: found.name });
+        if (opts.json) await writeJson({ wouldRemove: found.slug, name: found.name });
         else
           console.log(
             chalk.yellow(`[dry-run] Would remove product: ${found.name} (${found.slug})`),
