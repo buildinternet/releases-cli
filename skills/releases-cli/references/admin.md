@@ -158,7 +158,7 @@ AI-powered onboarding for whole companies:
 ```bash
 releases admin discovery onboard "Vercel"
 releases admin discovery onboard "Stripe" --domain stripe.com --github-org stripe
-releases admin discovery discover vercel.com --verify --add
+releases admin discovery evaluate https://linear.app/changelog --json
 releases admin discovery task list                # in-flight discovery sessions
 releases admin discovery task cancel <sessionId>
 ```

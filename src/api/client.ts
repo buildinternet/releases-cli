@@ -29,6 +29,7 @@ import type {
   Session,
   EmbedBackfillResponse,
   EmbedStatusResponse,
+  EvaluationResult,
   MediaItem,
 } from "./types.js";
 import type { ListResponse } from "@buildinternet/releases-core/cli-contracts";
@@ -44,6 +45,7 @@ export type {
   Session,
   EmbedBackfillResponse,
   EmbedStatusResponse,
+  EvaluationResult,
   Stats,
   SourceListItem,
 } from "./types.js";
@@ -896,6 +898,12 @@ export async function cancelSession(sessionId: string): Promise<{ ok: boolean; e
   return apiFetch<{ ok: boolean; error?: string }>(`/v1/sessions/${sessionId}/cancel`, {
     method: "POST",
   });
+}
+
+// ── URL evaluation (admin-only) ──
+
+export async function evaluateUrl(url: string): Promise<EvaluationResult> {
+  return apiFetch<EvaluationResult>(`/v1/evaluate?url=${encodeURIComponent(url)}`);
 }
 
 // ── Semantic search backfill (admin-only) ──

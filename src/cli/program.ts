@@ -22,6 +22,7 @@ import { registerTaskCommand } from "./commands/task.js";
 import { registerChangelogCommand } from "./commands/changelog.js";
 import { registerShowCommand } from "./commands/show.js";
 import { registerEmbedCommand } from "./commands/admin/embed.js";
+import { registerEvaluateCommand } from "./commands/admin/evaluate.js";
 import { registerTelemetryCommand } from "./commands/telemetry.js";
 import { registerServeCommand } from "./commands/serve.js";
 import { registerWhoamiCommand } from "./commands/whoami.js";
@@ -191,6 +192,7 @@ const discoveryAdmin = admin
   .description("Run onboarding and remote session workflows");
 registerOnboardCommand(discoveryAdmin);
 registerTaskCommand(discoveryAdmin);
+registerEvaluateCommand(discoveryAdmin);
 
 const policyAdmin = admin.command("policy").description("Manage ignored URLs and blocked URLs");
 registerIgnoreCommand(policyAdmin);

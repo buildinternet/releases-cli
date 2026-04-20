@@ -657,3 +657,16 @@ export interface EmbedStatusResponse {
   };
   chunks: { total: number; embedded: number; unembedded: number };
 }
+
+export interface EvaluationResult {
+  recommendedMethod: "feed" | "github" | "markdown" | "scrape" | "crawl";
+  recommendedUrl: string;
+  feedUrl?: string;
+  feedType?: "rss" | "atom" | "jsonfeed";
+  githubRepo?: string;
+  pageStructure: "single-page" | "index" | "unknown";
+  alternatives: Array<{ url: string; method: string; note: string }>;
+  confidence: "high" | "medium" | "low";
+  provider?: string;
+  notes?: string;
+}
