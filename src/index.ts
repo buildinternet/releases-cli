@@ -58,9 +58,9 @@ gateAdminArgv(argv);
 
 validateConfig();
 
-function telemetryCommandName(argv: string[]): string {
-  const args = argv.slice(2).filter((a) => !a.startsWith("-"));
-  const name = args.slice(0, 3).join(" ");
+function telemetryCommandName(args: string[]): string {
+  const positional = args.slice(2).filter((a) => !a.startsWith("-"));
+  const name = positional.slice(0, 3).join(" ");
   return name || "(root)";
 }
 

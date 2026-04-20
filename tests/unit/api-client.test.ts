@@ -10,6 +10,14 @@ mock.module("../../src/lib/mode.js", () => ({
 
 const client = await import("../../src/api/client.js");
 
+function mockFetch(status: number, body: unknown = null) {
+  globalThis.fetch = (async () =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { "Content-Type": "application/json" },
+    })) as any;
+}
+
 // ---------------------------------------------------------------------------
 // apiFetch 404 behavior — GET vs mutating methods
 // ---------------------------------------------------------------------------
@@ -24,14 +32,6 @@ describe("apiFetch 404 handling", () => {
   afterEach(() => {
     globalThis.fetch = originalFetch;
   });
-
-  function mockFetch(status: number, body: unknown = null) {
-    globalThis.fetch = (async () =>
-      new Response(JSON.stringify(body), {
-        status,
-        headers: { "Content-Type": "application/json" },
-      })) as any;
-  }
 
   it("returns null for GET 404 (findSource)", async () => {
     mockFetch(404);
