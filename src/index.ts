@@ -14,7 +14,6 @@ const LEGACY_COMMAND_ALIASES: Record<string, string[]> = {
   fetch: ["admin", "source", "fetch"],
   "fetch-log": ["admin", "source", "fetch-log"],
   poll: ["admin", "source", "poll"],
-  discover: ["admin", "discovery", "discover"],
   evaluate: ["admin", "discovery", "evaluate"],
   org: ["admin", "org"],
   product: ["admin", "product"],
