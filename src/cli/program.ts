@@ -25,7 +25,7 @@ import { registerEmbedCommand } from "./commands/admin/embed.js";
 import { registerTelemetryCommand } from "./commands/telemetry.js";
 import { registerServeCommand } from "./commands/serve.js";
 import { registerWhoamiCommand } from "./commands/whoami.js";
-import { CATEGORIES } from "@releases/core/categories";
+import { CATEGORIES } from "@buildinternet/releases-core/categories";
 import { isAdminMode } from "../lib/mode.js";
 import { VERSION } from "./version.js";
 

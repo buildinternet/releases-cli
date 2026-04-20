@@ -9,7 +9,7 @@ import {
 } from "../../api/client.js";
 import { stripAnsi } from "../../lib/sanitize.js";
 import { renderLatestReleasesTable } from "../render/releases-table.js";
-import { getEntityType, normalizeReleaseId, isLikelyBareId } from "@releases/core/id";
+import { getEntityType, normalizeReleaseId, isLikelyBareId } from "@buildinternet/releases-core/id";
 
 export function registerShowCommand(program: Command) {
   program

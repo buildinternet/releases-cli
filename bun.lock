@@ -5,7 +5,7 @@
     "": {
       "name": "releases-cli",
       "dependencies": {
-        "@buildinternet/releases-core": "workspace:*",
+        "@buildinternet/releases-core": "^0.16.0",
         "@buildinternet/releases-lib": "workspace:*",
         "@buildinternet/releases-skills": "workspace:*",
         "@modelcontextprotocol/sdk": "^1.29.0",
@@ -51,15 +51,6 @@
       "name": "@buildinternet/releases-linux-x64",
       "version": "0.15.0",
     },
-    "packages/core": {
-      "name": "@buildinternet/releases-core",
-      "version": "0.15.0",
-      "dependencies": {
-        "drizzle-orm": "^0.45.2",
-        "js-tiktoken": "^1.0.21",
-        "nanoid": "^5.1.7",
-      },
-    },
     "packages/lib": {
       "name": "@buildinternet/releases-lib",
       "version": "0.15.0",
@@ -74,7 +65,7 @@
 
     "@buildinternet/releases": ["@buildinternet/releases@workspace:npm/releases"],
 
-    "@buildinternet/releases-core": ["@buildinternet/releases-core@workspace:packages/core"],
+    "@buildinternet/releases-core": ["@buildinternet/releases-core@0.16.0", "", { "dependencies": { "drizzle-orm": "^0.45.2", "js-tiktoken": "^1.0.21", "nanoid": "^5.1.7" } }, "sha512-FBhN6RxKLe6NVyJuiakfYtmOidvRnJAa3N7GhjB9b7XfH/yZc0OGM+OYQAHYB0iji96C90BZOSmxdtNoK7QsDQ=="],
 
     "@buildinternet/releases-darwin-arm64": ["@buildinternet/releases-darwin-arm64@workspace:npm/releases-darwin-arm64"],
 

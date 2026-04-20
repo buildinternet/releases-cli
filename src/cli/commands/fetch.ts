@@ -10,7 +10,7 @@ import {
   findOrg,
   getSourcesByOrg,
 } from "../../api/client.js";
-import { newCorrelationId } from "@releases/core/id";
+import { newCorrelationId } from "@buildinternet/releases-core/id";
 import { orgNotFound, sourceNotFound } from "../suggest.js";
 
 export function registerFetchCommand(program: Command) {

@@ -1,6 +1,6 @@
 import { getApiUrl, getApiKey, isAdminMode } from "../lib/mode.js";
 import { logger } from "@releases/lib/logger";
-import { daysAgoIso } from "@releases/core/dates";
+import { daysAgoIso } from "@buildinternet/releases-core/dates";
 import type {
   Source,
   Release,
@@ -15,7 +15,7 @@ import type {
   DomainAlias,
   KnowledgePage,
   ReleaseType,
-} from "@releases/core/schema";
+} from "@buildinternet/releases-core/schema";
 import type {
   SourceWithOrg,
   Stats,
@@ -31,7 +31,7 @@ import type {
   EmbedStatusResponse,
   MediaItem,
 } from "./types.js";
-import type { ListResponse } from "@releases/core/cli-contracts";
+import type { ListResponse } from "@buildinternet/releases-core/cli-contracts";
 export type {
   SourceWithOrg,
   SourcePatchInput,
