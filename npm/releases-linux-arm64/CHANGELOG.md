@@ -1,5 +1,11 @@
 # @buildinternet/releases-linux-arm64
 
+## 0.16.1
+
+### Patch Changes
+
+- 8c3a579: Fix `--json` output being truncated at ~96 KB when piped to another process. All JSON output now awaits stdout `drain` before the CLI exits, so piping `releases admin source list --json | jq ...` works correctly on large datasets.
+
 ## 0.16.0
 
 ### Minor Changes
