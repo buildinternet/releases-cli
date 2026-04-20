@@ -12,7 +12,6 @@
     "isolatedModules": true,
     "types": ["bun"],
     "paths": {
-      "@releases/core/*": ["./packages/core/src/*"],
       "@releases/lib/*": ["./packages/lib/src/*"]
     }
   },

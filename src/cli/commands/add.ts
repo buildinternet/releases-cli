@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import { findOrg, createOrg, createSource, isUrlExcluded, findProduct } from "../../api/client.js";
-import { toSlug } from "@releases/core/slug";
+import { toSlug } from "@buildinternet/releases-core/slug";
 import { logger } from "@releases/lib/logger";
 import { readFileSync } from "fs";
 

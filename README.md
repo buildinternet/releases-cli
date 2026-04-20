@@ -123,7 +123,7 @@ bun run typecheck                         # tsc --noEmit
 bun test                                  # unit tests
 ```
 
-The project is a Bun workspace. The three shared packages (`@buildinternet/releases-core`, `-lib`, `-skills`) are published from this repo alongside the CLI.
+The project is a Bun workspace. Two shared packages (`@buildinternet/releases-lib`, `@buildinternet/releases-skills`) are published from this repo alongside the CLI. `@buildinternet/releases-core` is published from the private monorepo and consumed here as a regular npm dependency.
 
 ### Releasing
 
@@ -135,7 +135,7 @@ bun run changeset:version   # apply pending bumps (runs in CI)
 bun run changeset:publish   # publish to npm (runs in CI)
 ```
 
-The eight `@buildinternet/releases*` packages (5 binaries + 3 shared libraries) live in a fixed group so they bump together.
+Seven `@buildinternet/releases*` packages (5 binaries + `-lib` + `-skills`) live in a fixed group so they bump together. `@buildinternet/releases-core` is published independently from the monorepo.
 
 ## License
 

@@ -23,15 +23,15 @@ import {
 import { stripAnsi } from "../../lib/sanitize.js";
 import { logger } from "@releases/lib/logger";
 import { orgNotFound } from "../suggest.js";
-import { toSlug } from "@releases/core/slug";
-import { isValidCategory, CATEGORIES } from "@releases/core/categories";
-import { timeAgo } from "@releases/core/dates";
+import { toSlug } from "@buildinternet/releases-core/slug";
+import { isValidCategory, CATEGORIES } from "@buildinternet/releases-core/categories";
+import { timeAgo } from "@buildinternet/releases-core/dates";
 import {
   OVERVIEW_STALE_DAYS,
   overviewAgeDays,
   isOverviewStale,
   overviewPreview,
-} from "@releases/core/overview";
+} from "@buildinternet/releases-core/overview";
 
 export function registerOrgCommand(program: Command) {
   const org = program.command("org").description("Manage organizations");

@@ -9,7 +9,7 @@ import {
   updateSourceMeta,
 } from "../../api/client.js";
 import { sourceNotFound } from "../suggest.js";
-import { toSlug } from "@releases/core/slug";
+import { toSlug } from "@buildinternet/releases-core/slug";
 import { logger } from "@releases/lib/logger";
 
 const VALID_TYPES = ["github", "scrape", "feed", "agent"] as const;

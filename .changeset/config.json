@@ -9,7 +9,6 @@
       "@buildinternet/releases-darwin-x64",
       "@buildinternet/releases-linux-arm64",
       "@buildinternet/releases-linux-x64",
-      "@buildinternet/releases-core",
       "@buildinternet/releases-lib",
       "@buildinternet/releases-skills"
     ]
@@ -20,3 +19,4 @@
   "updateInternalDependencies": "patch",
   "ignore": []
 }
+

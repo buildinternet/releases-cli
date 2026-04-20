@@ -20,8 +20,8 @@ import {
   addDomainAlias,
   removeDomainAlias,
 } from "../../api/client.js";
-import { toSlug } from "@releases/core/slug";
-import { isValidCategory, CATEGORIES } from "@releases/core/categories";
+import { toSlug } from "@buildinternet/releases-core/slug";
+import { isValidCategory, CATEGORIES } from "@buildinternet/releases-core/categories";
 
 export function registerProductCommand(program: Command) {
   const product = program.command("product").description("Manage products");

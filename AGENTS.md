@@ -28,7 +28,7 @@ bun test                      # bun test
 - **`src/lib/mode.ts`** — `getApiUrl()` / `getApiKey()` / `isAdminMode()` / `validateConfig()`. Always remote.
 - **`src/lib/telemetry.ts`** — anonymous usage pings to `api.releases.sh/v1/telemetry`. First-run notice shown once. Opt out via `RELEASED_TELEMETRY_DISABLED=1` or `DO_NOT_TRACK=1`.
 - **`src/mcp/server.ts`** — local stdio MCP bridge. Exposes read-only tools (`search_releases`, `get_latest_releases`, `list_sources`, `get_source`, `get_source_changelog`, `list_organizations`, `get_organization`, `list_products`, `get_product`) that proxy to `api.releases.sh`. Does NOT ship AI tools — use the hosted server at `mcp.releases.sh` for `summarize_changes` / `compare_products`.
-- **`packages/core/`** (`@buildinternet/releases-core`) — runtime-neutral helpers: schema, categories, slicing, IDs, slugs, tokens. Drizzle is a transitive dep for schema type inference only.
+- **`@buildinternet/releases-core`** — runtime-neutral helpers (schema, categories, slicing, IDs, slugs, tokens, CLI contracts). Published from the private [`buildinternet/releases`](https://github.com/buildinternet/releases) monorepo (canonical source in `packages/core/`), consumed here as a regular npm dependency. Bump the pin in `package.json` when adopting a new schema.
 - **`packages/lib/`** (`@buildinternet/releases-lib`) — logger, errors, trimmed config.
 - **`packages/skills/`** (`@buildinternet/releases-skills`) — thin wrapper around top-level `skills/` for consumers who want to load the bundled playbooks programmatically.
 - **`skills/`** — source of truth for agent skills. The Claude plugin in `plugins/claude/releases/skills/` is generated via `bun scripts/sync-plugin-skills.ts`.
@@ -43,7 +43,7 @@ bun test                      # bun test
 - IDs over slugs everywhere. Every `<identifier>` arg accepts `org_…`, `src_…`, `prod_…`, `rel_…`, or a slug.
 - `--json` supported on every reader command. Admin commands support it where it makes sense.
 - `--json` list responses return `{ items, pagination }` via the shared `ListResponse<T>` contract in `@buildinternet/releases-core/cli-contracts`. Pagination carries `{ page, pageSize, returned, hasMore }` plus `totalItems`/`totalPages` once the tail has been seen. When a default call returns a full page and more exists, the CLI also emits a stderr truncation warning so scripts don't silently miss rows. `metadata` fields are parsed into nested objects — don't call `JSON.parse` again. Use `parseMetadataField()` from the same module when adding new commands that surface metadata.
-- `daysAgoIso()` from `@releases/core/dates` for cutoff math. Don't roll your own.
+- `daysAgoIso()` from `@buildinternet/releases-core/dates` for cutoff math. Don't roll your own.
 - Org overviews: `releases org show <slug>` includes a short overview preview; `releases org overview <slug>` is the unauthenticated public reader for the full body. Both surfaces add a `⚠ older than 30 days` warning past `OVERVIEW_STALE_DAYS` (from `@buildinternet/releases-core/overview`).
 
 ## Telemetry
@@ -52,11 +52,13 @@ The CLI sends anonymous pings (command name, duration, exit code, CLI version, O
 
 ## Releasing
 
-Changesets versions the eight `@buildinternet/releases*` packages together (fixed group):
+Changesets versions seven `@buildinternet/releases*` packages together (fixed group):
 
 - `@buildinternet/releases` — meta package
 - `@buildinternet/releases-{darwin-arm64,darwin-x64,linux-arm64,linux-x64}` — platform binaries
-- `@buildinternet/releases-{core,lib,skills}` — shared libraries
+- `@buildinternet/releases-{lib,skills}` — shared libraries
+
+`@buildinternet/releases-core` is published independently from the monorepo and consumed here as a regular npm dependency — bump its pin in `package.json` when adopting a new schema.
 
 `scripts/sync-version.ts` mirrors the bumped version into `src/cli/version.ts`, `src/mcp/server.ts`, and the root `package.json` after `changeset version` runs. Never hand-edit versions.
 
