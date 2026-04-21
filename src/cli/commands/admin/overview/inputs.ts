@@ -3,21 +3,12 @@ import chalk from "chalk";
 import { findOrg, getOverviewInputs } from "../../../../api/client.js";
 import { orgNotFound } from "../../../suggest.js";
 import { writeJson } from "../../../../lib/output.js";
+import { parsePositiveIntFlag } from "../../../../lib/flags.js";
 
 interface OverviewInputsOpts {
   json?: boolean;
   window?: string;
   limit?: string;
-}
-
-function parsePositiveInt(label: string, raw: string | undefined): number | undefined {
-  if (raw === undefined) return undefined;
-  const n = Number.parseInt(raw, 10);
-  if (!Number.isFinite(n) || n <= 0) {
-    console.error(chalk.red(`Invalid --${label}: must be a positive integer (got ${raw})`));
-    process.exit(2);
-  }
-  return n;
 }
 
 export function registerOverviewInputsCommand(program: Command) {
@@ -45,8 +36,8 @@ result with \`releases admin overview-write\`.`,
       const org = await findOrg(orgIdentifier);
       if (!org) return orgNotFound(orgIdentifier);
 
-      const window = parsePositiveInt("window", opts.window);
-      const limit = parsePositiveInt("limit", opts.limit);
+      const window = parsePositiveIntFlag("window", opts.window);
+      const limit = parsePositiveIntFlag("limit", opts.limit);
       const inputs = await getOverviewInputs(org.slug, { window, limit });
 
       if (opts.json) {

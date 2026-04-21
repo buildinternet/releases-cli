@@ -1,9 +1,9 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import { readFile } from "node:fs/promises";
 import { findOrg, getOverviewInputs, upsertOverview } from "../../../../api/client.js";
 import { orgNotFound } from "../../../suggest.js";
 import { writeJson } from "../../../../lib/output.js";
+import { parsePositiveIntFlag } from "../../../../lib/flags.js";
 
 interface OverviewWriteOpts {
   contentFile: string;
@@ -48,7 +48,7 @@ overview-inputs to derive them.`,
         process.exit(2);
       }
 
-      let releaseCount = opts.releaseCount === undefined ? undefined : Number(opts.releaseCount);
+      let releaseCount = parsePositiveIntFlag("release-count", opts.releaseCount);
       let lastContributingAt = opts.lastContributingAt ?? undefined;
 
       if (releaseCount === undefined || lastContributingAt === undefined) {
@@ -85,20 +85,6 @@ overview-inputs to derive them.`,
 }
 
 async function readContent(path: string): Promise<string> {
-  if (path === "-") {
-    return await readStdin();
-  }
-  return await readFile(path, "utf8");
-}
-
-function readStdin(): Promise<string> {
-  return new Promise((resolve, reject) => {
-    let data = "";
-    process.stdin.setEncoding("utf8");
-    process.stdin.on("data", (chunk) => {
-      data += chunk;
-    });
-    process.stdin.on("end", () => resolve(data));
-    process.stdin.on("error", reject);
-  });
+  if (path === "-") return Bun.stdin.text();
+  return Bun.file(path).text();
 }
