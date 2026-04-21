@@ -845,6 +845,25 @@ export async function updatePlaybookNotes(orgSlug: string, notes: string): Promi
   });
 }
 
+export interface OverviewInputs {
+  org: Pick<Organization, "id" | "slug" | "name" | "description">;
+  sources: Pick<Source, "id" | "slug" | "name" | "type">[];
+  existingContent: string | null;
+  selected: Release[];
+  totalAvailable: number;
+  windowDays: number;
+}
+
+export async function getOverviewInputs(
+  slug: string,
+  opts: { window?: number; limit?: number } = {},
+): Promise<OverviewInputs> {
+  const params = new URLSearchParams({ slug });
+  if (opts.window !== undefined) params.set("window", String(opts.window));
+  if (opts.limit !== undefined) params.set("limit", String(opts.limit));
+  return apiFetch<OverviewInputs>(`/v1/overview-inputs?${params.toString()}`);
+}
+
 // ── Media Assets ──
 
 export interface MediaAssetInput {
