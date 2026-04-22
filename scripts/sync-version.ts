@@ -3,8 +3,8 @@
 // npm/releases/package.json (the source of truth for the published CLI)
 // back to the places the build needs it:
 //   - root package.json (displayed by `releases --version`)
-//   - src/cli/version.ts (compiled into the binary)
-//   - src/mcp/server.ts (MCP server identifier)
+//   - src/cli/version.ts (compiled into the binary; also re-exported
+//     as the MCP server identifier via src/mcp/server.ts)
 //   - npm/releases-*/package.json (platform packages)
 // The Homebrew formula lives in the public tap repo
 // (buildinternet/homebrew-tap) and is regenerated on publish by CI —
@@ -68,8 +68,8 @@ updateJson("npm/releases/package.json", (j) => {
   }
 });
 
-// CLI version.ts and MCP server identifier
+// CLI version.ts — single TypeScript source of truth. src/mcp/server.ts
+// imports VERSION from this file, so no separate write needed.
 replaceInFile("src/cli/version.ts", /VERSION = "[^"]+"/, `VERSION = "${newVersion}"`);
-replaceInFile("src/mcp/server.ts", /version: "[^"]+"/, `version: "${newVersion}"`);
 
 console.log("Done.");
