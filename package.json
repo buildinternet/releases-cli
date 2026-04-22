@@ -51,11 +51,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/zachdunn/releases-cli.git"
+    "url": "git+https://github.com/buildinternet/releases-cli.git"
   },
   "homepage": "https://releases.sh",
   "dependencies": {
-    "@buildinternet/releases-core": "^0.16.0",
+    "@buildinternet/releases-core": "^0.17.0",
     "@buildinternet/releases-lib": "workspace:*",
     "@buildinternet/releases-skills": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.29.0",

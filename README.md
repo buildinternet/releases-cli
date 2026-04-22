@@ -28,8 +28,10 @@ npm install -g @buildinternet/releases
 Or run without installing:
 
 ```bash
-npx @buildinternet/releases search "react"
+npx @buildinternet/releases@latest search "react"
 ```
+
+Always include the `@latest` tag — bare `npx @buildinternet/releases` caches the first-fetched version forever and won't pick up updates.
 
 ### Shell installer
 
