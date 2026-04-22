@@ -13,10 +13,10 @@
     "README.md"
   ],
   "optionalDependencies": {
-    "@buildinternet/releases-darwin-arm64": "0.19.0",
-    "@buildinternet/releases-darwin-x64": "0.19.0",
-    "@buildinternet/releases-linux-x64": "0.19.0",
-    "@buildinternet/releases-linux-arm64": "0.19.0"
+    "@buildinternet/releases-darwin-arm64": "0.18.0",
+    "@buildinternet/releases-darwin-x64": "0.18.0",
+    "@buildinternet/releases-linux-x64": "0.18.0",
+    "@buildinternet/releases-linux-arm64": "0.18.0"
   },
   "keywords": [
     "changelog",
