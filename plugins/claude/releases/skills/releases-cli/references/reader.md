@@ -48,16 +48,7 @@ releases list --category ai            # filter by category
 releases list --json                   # machine-readable output
 releases list --json --compact         # lightweight JSON (id, slug, name, type, org, date)
 releases list --json --limit 20 --page 2  # pagination (server-side)
-releases list --json --flat            # legacy bare-array shape (discouraged)
 ```
-
-`--json` always emits `{ items, pagination }`. The `pagination` object carries
-`{ page, pageSize, returned, hasMore }` and includes `totalItems`/`totalPages`
-once the last page has been seen. When a default (no-`--limit`) call returns a
-page worth of items and `hasMore: true`, the CLI also emits a stderr warning so
-scripts don't silently miss rows. `metadata` is a parsed object on every row
-(no `fromjson` required). Pass `--flat` to revert to the legacy bare-array
-shape when you have existing scripts that expect it.
 
 Aliased as `releases admin source list` for discoverability within admin workflows.
 

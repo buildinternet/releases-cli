@@ -14,10 +14,10 @@ Operations can be performed via CLI commands or typed MCP/agent tools. Use which
 | Operation | CLI | Typed tool |
 |-----------|-----|------------|
 | List sources | `releases list [slug] --json [--org <org>] [--query <text>] [--has-feed] [--category <c>] [--compact] [--limit <n>] [--page <n>]` | `list_sources` with query, organization, category, has_feed params |
-| Add source | `releases admin source add <name> --url <url> [--type <type>] [--org <org>] [--feed-url <url>]` | `add_source` with name, url, type, organization, feed_url params |
-| Edit source | `releases admin source edit <identifier> [--primary] [--priority <p>]` | `edit_source` with identifier (ID or slug), is_primary, fetch_priority params |
-| Remove source | `releases admin source remove <slug> [--ignore --reason <reason>]` | `remove_source` with identifier (ID or slug) param |
-| Fetch releases | `releases admin source fetch <slug> [--dry-run] [--max <n>]` | `fetch_source` with identifier (ID or slug) param |
+| Add source | `releases admin source add <name> --url <url> [--type <type>] [--org <org>] [--feed-url <url>] [--primary]` | `manage_source` action "add" with name, url, type, organization, feed_url, **is_primary** (type auto-detected if omitted; only pass is_primary=true when the source is the org's primary changelog — see "Primary Sources") |
+| Edit source | `releases admin source edit <identifier> [--primary] [--priority <p>]` | `manage_source` action "edit" with identifier, is_primary, fetch_priority, name, url, type (use only when changing an already-added source; prefer setting flags on "add") |
+| Remove source | `releases admin source remove <slug> [--ignore --reason <reason>]` | `manage_source` action "remove" with identifier |
+| Fetch releases | `releases admin source fetch <slug> [--dry-run] [--max <n>]` | `manage_source` action "fetch" with identifier |
 | Get latest releases | `releases tail [slug] --json [--org <org>]` | `get_latest_releases` with source, organization, limit params |
 | Search releases | `releases search <query> --json` | `search_releases` with query, limit params |
 | Evaluate URL | `releases admin discovery evaluate <url> --json` | `evaluate_url` with url param |
@@ -29,9 +29,10 @@ Operations can be performed via CLI commands or typed MCP/agent tools. Use which
 | Add product | `releases admin product add <name> --org <org> [--category <c>] [--tags <t>]` | `manage_product` action "add" with name, organization, category, tags |
 | Ignore URL | `releases admin policy ignore add --org <org> <url>` | `exclude_url` action "ignore" with url, organization |
 | Block URL | `releases admin policy block add <url>` | `exclude_url` action "block" with url |
-| List categories | `releases categories --json` | `list_categories` |
-| Get playbook | `releases admin content playbook <org>` | `get_playbook` with organization param |
-| Update playbook notes | `releases admin content playbook <org> --notes "..."` | `update_playbook_notes` with organization, notes params |
+| Get playbook | `releases admin playbook <org>` | `manage_playbook` action "get" with organization |
+| Update playbook notes | `releases admin playbook <org> --notes "..."` | `manage_playbook` action "update_notes" with organization, notes |
+
+Valid categories (pass to `manage_org`/`manage_product`): see the enum in those tool descriptions or your system prompt. `list_categories` (now retired) has been folded into the two tool descriptions.
 
 ## Listing Sources
 
@@ -47,6 +48,8 @@ Use `--json` (CLI) for structured output. Typed tools always return JSON.
 ## Adding Sources
 
 Required: **name** and **url**. Optional: **type** (github, scrape, feed, agent — auto-detected from URL if omitted), **organization** (org ID or slug to associate with), **feed_url** (direct feed URL if known).
+
+On slug collision the API auto-suffixes (`changelog` → `changelog-2`, `-3`, …) and the created row in the response tells you the resolved slug — no rename-and-retry needed.
 
 ### Naming sources and products
 
@@ -72,7 +75,7 @@ Adding or editing an org, product, or source triggers an entity embedding into t
 
 ## Removing Sources
 
-When removing discovery results, also ignore the URL to prevent re-discovery. In CLI: `releases admin source remove <slug> --ignore --reason "..."`. With typed tools: call `remove_source` then `exclude_url` with action "ignore".
+When removing discovery results, also ignore the URL to prevent re-discovery. In CLI: `releases admin source remove <slug> --ignore --reason "..."`. With typed tools: call `manage_source` action "remove" then `exclude_url` action "ignore".
 
 ## Ignored URLs (org-scoped)
 
@@ -87,25 +90,41 @@ For spam domains and known-bad URLs that should never be added for any org. Use 
 After adding a source, validate it:
 
 1. **Add the source** — provide name and URL
-2. **Fetch** — trigger a fetch (CLI: `--dry-run` for preview, then real fetch; typed tools: `fetch_source`)
+2. **Fetch** — trigger a fetch (CLI: `--dry-run` for preview, then real fetch; typed tools: `manage_source` action "fetch")
 3. **Check results** — get latest releases and verify they have titles, dates, content
 4. **If bad:** remove the source and ignore the URL
 5. **If good:** the source is ready for production fetches
 
 ## Primary Sources
 
-An org can have one source marked as its **primary changelog** — the main, company-wide changelog. Mark it with `--primary` (CLI) or `is_primary: true` (typed tool).
+An org can have one source marked as its **primary changelog** — the main, company-wide changelog.
 
-When onboarding an org, if you find a single top-level changelog alongside product-specific or GitHub sources, mark the top-level one as primary.
+`is_primary` is conditional, not default. Only set it when the source you are adding is clearly the org's primary changelog:
+
+- Onboarding a new org with a single top-level changelog (e.g. `example.com/changelog`) — set `is_primary=true` on the add.
+- Adding a supplementary or secondary source to an existing org (an engineering blog, a per-product changelog, an RSS feed alongside an already-primary page) — **do not** set `is_primary`. Leave the existing primary alone.
+- The task prompt doesn't mention "primary" or similar — default to not setting it.
+
+When it does apply, set it on the `add` call in one step, not via a follow-up edit:
+
+```
+manage_source(action="add", name="Changelog", url="https://example.com/changelog", organization="example-corp", is_primary=true)
+```
+
+The same applies on CLI: pass `--primary` to `releases admin source add`, not a follow-up `source edit`.
+
+Use `manage_source(action="edit", is_primary=true)` only when promoting a source you added in a prior session — never in the same flow as the add.
 
 ## Playbooks
 
-Each org has a **playbook** — a README that tells any agent how to efficiently work with that org's changelog sources. The playbook has two layers:
+**A playbook is a per-org skill for fetching that org's releases.** Same mental model as the global skills in this corpus, scoped to one organization. Agents load the playbook into context alongside global skills whenever they fetch from this org — the playbook overrides general rules with the org's specific behavior (naming conventions, what counts as a release, cross-source dedup, rollup cadence).
+
+Each playbook has two layers:
 
 - **Header** — auto-generated from source metadata. Shows source types, URLs, priorities, parseInstructions, and product groupings. Regenerates automatically on every source mutation. You never edit this directly.
-- **Agent notes** — free-form markdown that you fully control. This is the most important part of the playbook. Write it like a README for a teammate who needs to fetch releases from this org without asking questions.
+- **Agent notes** — free-form markdown that you fully control. This is the most important part of the playbook. Write it like a skill an agent will follow — imperative, action-oriented, concise — not like human documentation.
 
-**Always read the playbook before fetching or working with an org's sources.** Typed tool: `get_playbook` with organization param. CLI: `releases admin content playbook <org>`. If no playbook exists yet, one will be auto-generated on the next source mutation (add/edit/remove).
+**Always read the playbook before fetching or working with an org's sources.** Typed tool: `manage_playbook` action "get" with organization param. CLI: `releases admin playbook <org>`. If no playbook exists yet, one will be auto-generated on the next source mutation (add/edit/remove).
 
 ### Writing good agent notes
 
@@ -151,9 +170,9 @@ Use the verified approach for high-value orgs, when onboarding new orgs with scr
 
 Write notes during onboarding after you've fetched and validated sources. Update them when you discover new quirks or when source behavior changes. If notes are empty or stale, write them before doing fetch work — future agents (including yourself in later sessions) will benefit.
 
-**Updating notes:** Use `update_playbook_notes` with the complete notes content — it replaces the entire notes section. You can rewrite, reorganize, or clear notes at any time.
+**Updating notes:** Use `manage_playbook` action "update_notes" with the complete notes content — it replaces the entire notes section. You can rewrite, reorganize, or clear notes at any time.
 
-**Changing source configuration:** The header reflects current source metadata. To change things like `parseInstructions`, `fetchPriority`, or `crawlEnabled`, use `edit_source` with metadata — the header updates automatically.
+**Changing source configuration:** The header reflects current source metadata. To change things like `parseInstructions`, `fetchPriority`, or `crawlEnabled`, use `manage_source` action "edit" with metadata — the header updates automatically.
 
 **Product context:** Playbooks group sources by product when products are configured. Some sources (like an org's engineering blog) aren't tied to a specific product but may contain content relevant to any product under that org — the playbook calls these out as "Organization-Level Sources" with a note about which products they may cover.
 
