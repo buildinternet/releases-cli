@@ -52,15 +52,17 @@ The CLI sends anonymous pings (command name, duration, exit code, CLI version, O
 
 ## Releasing
 
+**Every PR with user-visible changes MUST ship a `.changeset/*.md` file.** Run `bun changeset` (interactive) or write the file directly in `.changeset/`. Bump level: `patch` for bug fixes, `minor` for additive features, `major` for breaking changes. The seven fixed-group packages below must all appear in the changeset header — `bun changeset` selects them together; if writing by hand, copy the header from a prior changeset in git history.
+
+**Never hand-edit a `version` field.** Not in the root `package.json`, not in `npm/*/package.json`, not in `packages/*/package.json`, not in `src/cli/version.ts`, and not in `src/mcp/server.ts`. The release pipeline owns all of them — `changeset version` updates the package files, and `scripts/sync-version.ts` mirrors the result into `src/cli/version.ts` and `src/mcp/server.ts`.
+
 Changesets versions seven `@buildinternet/releases*` packages together (fixed group):
 
 - `@buildinternet/releases` — meta package
 - `@buildinternet/releases-{darwin-arm64,darwin-x64,linux-arm64,linux-x64}` — platform binaries
 - `@buildinternet/releases-{lib,skills}` — shared libraries
 
-`@buildinternet/releases-core` is published independently from the monorepo and consumed here as a regular npm dependency — bump its pin in `package.json` when adopting a new schema.
-
-`scripts/sync-version.ts` mirrors the bumped version into `src/cli/version.ts`, `src/mcp/server.ts`, and the root `package.json` after `changeset version` runs. Never hand-edit versions.
+`@buildinternet/releases-core` is published independently from the monorepo and consumed here as a regular npm dependency — bump its pin in `package.json` when adopting a new schema. It is **not** part of the fixed group.
 
 On merge to `main`, `.github/workflows/release.yml` opens or updates a `chore: version packages` PR. Merging that PR re-runs the workflow, publishes to npm, and cuts a GitHub release with the platform binaries attached.
 
