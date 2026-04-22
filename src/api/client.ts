@@ -932,7 +932,7 @@ export async function embedReleases(body: {
   limit?: number;
   dryRun?: boolean;
 }): Promise<EmbedBackfillResponse> {
-  return apiFetch<EmbedBackfillResponse>("/v1/admin/embed/releases", {
+  return apiFetch<EmbedBackfillResponse>("/v1/workflows/embed-releases", {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -943,7 +943,7 @@ export async function embedEntities(body: {
   limit?: number;
   dryRun?: boolean;
 }): Promise<EmbedBackfillResponse> {
-  return apiFetch<EmbedBackfillResponse>("/v1/admin/embed/entities", {
+  return apiFetch<EmbedBackfillResponse>("/v1/workflows/embed-entities", {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -954,7 +954,7 @@ export async function embedChangelogs(body: {
   limit?: number;
   dryRun?: boolean;
 }): Promise<EmbedBackfillResponse> {
-  return apiFetch<EmbedBackfillResponse>("/v1/admin/embed/changelogs", {
+  return apiFetch<EmbedBackfillResponse>("/v1/workflows/embed-changelogs", {
     method: "POST",
     body: JSON.stringify(body),
   });

@@ -168,3 +168,60 @@ describe("listSourcesWithOrg", () => {
     expect(res.pagination.hasMore).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Embed backfill routes — paths moved from /v1/admin/embed/* to /v1/workflows/embed-*
+// (monorepo #494); status endpoint stayed on /v1/admin/embed/status.
+// ---------------------------------------------------------------------------
+
+describe("embed backfill routes", () => {
+  let originalFetch: typeof globalThis.fetch;
+  let capturedUrl = "";
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    capturedUrl = "";
+    globalThis.fetch = (async (url: string) => {
+      capturedUrl = url;
+      return new Response(JSON.stringify({ processed: 0, remaining: 0, dryRun: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as any;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it("embedReleases posts to /v1/workflows/embed-releases", async () => {
+    await client.embedReleases({ dryRun: true });
+    expect(capturedUrl).toBe("https://test.example.com/v1/workflows/embed-releases");
+  });
+
+  it("embedEntities posts to /v1/workflows/embed-entities", async () => {
+    await client.embedEntities({ dryRun: true });
+    expect(capturedUrl).toBe("https://test.example.com/v1/workflows/embed-entities");
+  });
+
+  it("embedChangelogs posts to /v1/workflows/embed-changelogs", async () => {
+    await client.embedChangelogs({ dryRun: true });
+    expect(capturedUrl).toBe("https://test.example.com/v1/workflows/embed-changelogs");
+  });
+
+  it("getEmbedStatus stays on /v1/admin/embed/status", async () => {
+    globalThis.fetch = (async (url: string) => {
+      capturedUrl = url;
+      return new Response(
+        JSON.stringify({
+          releases: { total: 0, embedded: 0, remaining: 0 },
+          entities: { total: 0, embedded: 0, remaining: 0 },
+          changelogs: { total: 0, embedded: 0, remaining: 0 },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }) as any;
+    await client.getEmbedStatus();
+    expect(capturedUrl).toBe("https://test.example.com/v1/admin/embed/status");
+  });
+});
