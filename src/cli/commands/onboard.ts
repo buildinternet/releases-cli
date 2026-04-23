@@ -80,7 +80,7 @@ async function runRemoteDiscovery(
 
   let sessionId: string;
   try {
-    const result = await apiFetch<{ sessionId: string }>("/v1/discover", {
+    const result = await apiFetch<{ sessionId: string }>("/v1/workflows/discover", {
       method: "POST",
       body: JSON.stringify({ company, domain: opts.domain, githubOrg: opts.githubOrg, engine }),
     });
@@ -107,23 +107,23 @@ async function runRemoteDiscovery(
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL));
 
     let status: {
-      status: "running" | "complete" | "error" | "idle";
-      progress?: {
-        step: string;
-        sourcesFound: number;
-        sourcesValidated: number;
-        currentAction: string;
-      };
+      status: "running" | "complete" | "error" | "cancelled";
+      step?: string;
+      sourcesFound?: number;
+      sourcesValidated?: number;
+      currentAction?: string;
       result?: object;
       error?: string;
-    };
+    } | null;
     try {
       // eslint-disable-next-line no-await-in-loop
-      status = await apiFetch(`/v1/discover/${sessionId}`);
+      status = await apiFetch(`/v1/sessions/${sessionId}`);
     } catch (err) {
       logger.error(`Failed to poll status: ${err instanceof Error ? err.message : String(err)}`);
       process.exit(1);
     }
+
+    if (!status) continue;
 
     if (status.status === "complete") {
       if (!opts.json) process.stderr.write(chalk.green("\n  Discovery complete.\n"));
@@ -152,19 +152,23 @@ async function runRemoteDiscovery(
       process.exit(1);
     }
 
-    if (!opts.json && status.progress) {
-      const { step, sourcesFound, sourcesValidated, currentAction } = status.progress;
-      if (step !== lastStep) {
-        const elapsed = Math.round((Date.now() - startTime) / 1000);
-        process.stderr.write(
-          chalk.gray(`  [${elapsed}s] `) +
-            chalk.dim(`${step}`) +
-            chalk.gray(` — ${sourcesFound} found, ${sourcesValidated} validated`) +
-            (currentAction ? chalk.dim(` — ${currentAction}`) : "") +
-            "\n",
-        );
-        lastStep = step;
-      }
+    if (status.status === "cancelled") {
+      logger.error("Remote discovery was cancelled.");
+      process.exit(1);
+    }
+
+    if (!opts.json && status.step && status.step !== lastStep) {
+      const elapsed = Math.round((Date.now() - startTime) / 1000);
+      const found = status.sourcesFound ?? 0;
+      const validated = status.sourcesValidated ?? 0;
+      process.stderr.write(
+        chalk.gray(`  [${elapsed}s] `) +
+          chalk.dim(status.step) +
+          chalk.gray(` — ${found} found, ${validated} validated`) +
+          (status.currentAction ? chalk.dim(` — ${status.currentAction}`) : "") +
+          "\n",
+      );
+      lastStep = status.step;
     }
   }
 

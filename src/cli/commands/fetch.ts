@@ -145,7 +145,7 @@ Examples:
 
         let result: { sessionId: string };
         try {
-          result = await apiFetch<{ sessionId: string }>("/v1/update", {
+          result = await apiFetch<{ sessionId: string }>("/v1/workflows/update", {
             method: "POST",
             body: JSON.stringify({
               company: label,
