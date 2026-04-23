@@ -3,6 +3,7 @@ import { join } from "path";
 import { randomUUID } from "crypto";
 import { getDataDir } from "@releases/lib/config";
 import { VERSION } from "../cli/version.js";
+import { RELEASES_CLI_UA } from "./user-agent.js";
 import type { TelemetryClientKind, TelemetrySurface } from "@buildinternet/releases-core/schema";
 
 const ANON_ID_FILE = "telemetry-id";
@@ -145,7 +146,7 @@ export async function recordEvent(input: TelemetryEventInput): Promise<void> {
     try {
       await fetch(`${endpoint()}/v1/telemetry`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", "User-Agent": RELEASES_CLI_UA },
         body: JSON.stringify(body),
         signal: controller.signal,
       });

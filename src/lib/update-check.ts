@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import { getDataDir } from "@releases/lib/config";
 import { VERSION } from "../cli/version.js";
+import { RELEASES_CLI_UA } from "./user-agent.js";
 
 const CACHE_FILE = "update-check.json";
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -81,7 +82,7 @@ async function fetchLatestVersion(): Promise<string | null> {
       const res = await fetch(
         `https://registry.npmjs.org/${encodeURIComponent(NPM_PACKAGE)}/latest`,
         {
-          headers: { accept: "application/json" },
+          headers: { accept: "application/json", "User-Agent": RELEASES_CLI_UA },
           signal: controller.signal,
         },
       );

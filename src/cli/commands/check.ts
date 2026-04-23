@@ -5,6 +5,7 @@ import { findSource, listSourcesWithOrg } from "../../api/client.js";
 import { timeAgo } from "@buildinternet/releases-core/dates";
 import { stripAnsi } from "../../lib/sanitize.js";
 import { writeJson } from "../../lib/output.js";
+import { RELEASES_CLI_UA } from "../../lib/user-agent.js";
 
 interface SourceLite {
   name: string;
@@ -36,7 +37,12 @@ async function probe(url: string): Promise<{ status: number | null; ms: number }
   const timeout = setTimeout(() => controller.abort(), 10_000);
   const start = Date.now();
   try {
-    const res = await fetch(url, { method: "HEAD", signal: controller.signal, redirect: "follow" });
+    const res = await fetch(url, {
+      method: "HEAD",
+      headers: { "User-Agent": RELEASES_CLI_UA },
+      signal: controller.signal,
+      redirect: "follow",
+    });
     const ms = Date.now() - start;
     return { status: res.status, ms };
   } catch {

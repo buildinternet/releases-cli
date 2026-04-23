@@ -1,6 +1,7 @@
 import { getApiUrl, getApiKey, isAdminMode } from "../lib/mode.js";
 import { logger } from "@releases/lib/logger";
 import { daysAgoIso } from "@buildinternet/releases-core/dates";
+import { RELEASES_CLI_UA } from "../lib/user-agent.js";
 import type {
   Source,
   Release,
@@ -54,6 +55,7 @@ export async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T> 
   const url = `${getApiUrl()}${path}`;
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
+    "User-Agent": RELEASES_CLI_UA,
     ...(opts?.headers as Record<string, string>),
   };
   // Only send auth header when an API key is configured (admin mode)
