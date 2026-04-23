@@ -815,26 +815,30 @@ export async function getMonthlySummary(
 
 // ── Overview / Playbook Pages ──
 
+const SCOPE_RESOURCE = { org: "orgs", product: "products" } as const;
+
 export async function getOverview(
-  scope: "org" | "product",
+  scope: keyof typeof SCOPE_RESOURCE,
   slug: string,
 ): Promise<KnowledgePage | null> {
-  return apiFetch<KnowledgePage | null>(`/v1/overview?scope=${scope}&slug=${slug}`);
+  return apiFetch<KnowledgePage | null>(
+    `/v1/${SCOPE_RESOURCE[scope]}/${encodeURIComponent(slug)}/overview`,
+  );
 }
 
 export async function getPlaybook(slug: string): Promise<KnowledgePage | null> {
   return apiFetch<KnowledgePage | null>(`/v1/playbook?slug=${slug}`);
 }
 
-export async function upsertOverview(data: {
-  scope: "org" | "product" | "playbook";
-  orgId?: string | null;
-  productId?: string | null;
-  content: string;
-  releaseCount: number;
-  lastContributingReleaseAt?: string | null;
-}): Promise<void> {
-  await apiFetch("/v1/overview", {
+export async function upsertOverview(
+  orgSlug: string,
+  data: {
+    content: string;
+    releaseCount: number;
+    lastContributingReleaseAt?: string | null;
+  },
+): Promise<void> {
+  await apiFetch(`/v1/orgs/${encodeURIComponent(orgSlug)}/overview`, {
     method: "POST",
     body: JSON.stringify(data),
   });
@@ -847,11 +851,27 @@ export async function updatePlaybookNotes(orgSlug: string, notes: string): Promi
   });
 }
 
+/**
+ * Release shape in overview inputs. `content` is pre-hydrated (absolute CDN
+ * URLs), and `media` entries carry resolved `r2Url`s — ready to paste into
+ * generated markdown. This is a narrower projection than the raw `Release`
+ * row: only the fields the overview agent needs.
+ */
+export interface OverviewInputRelease {
+  id: string;
+  version: string | null;
+  title: string;
+  content: string;
+  publishedAt: string | null;
+  url: string | null;
+  media: MediaItem[];
+}
+
 export interface OverviewInputs {
   org: Pick<Organization, "id" | "slug" | "name" | "description">;
   sources: Pick<Source, "id" | "slug" | "name" | "type">[];
   existingContent: string | null;
-  selected: Release[];
+  selected: OverviewInputRelease[];
   totalAvailable: number;
   windowDays: number;
 }
@@ -860,10 +880,13 @@ export async function getOverviewInputs(
   slug: string,
   opts: { window?: number; limit?: number } = {},
 ): Promise<OverviewInputs> {
-  const params = new URLSearchParams({ slug });
+  const params = new URLSearchParams();
   if (opts.window !== undefined) params.set("window", String(opts.window));
   if (opts.limit !== undefined) params.set("limit", String(opts.limit));
-  return apiFetch<OverviewInputs>(`/v1/overview-inputs?${params.toString()}`);
+  const qs = params.toString();
+  return apiFetch<OverviewInputs>(
+    `/v1/orgs/${encodeURIComponent(slug)}/overview/inputs${qs ? `?${qs}` : ""}`,
+  );
 }
 
 // ── Media Assets ──
