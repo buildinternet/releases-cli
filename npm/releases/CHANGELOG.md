@@ -1,5 +1,25 @@
 # @buildinternet/releases
 
+## 0.19.3
+
+### Patch Changes
+
+- 4f9ed94: Discovery triggers moved under `/v1/workflows/*` on the API per issue #504 tier 2. The `releases admin discovery onboard` and `releases admin fetch` commands are unchanged from the user's perspective, but the underlying URLs now follow the convention:
+  - `POST /v1/discover` → `POST /v1/workflows/discover`
+  - `POST /v1/update` → `POST /v1/workflows/update`
+  - `GET /v1/discover/:sessionId` is gone — the CLI polls `GET /v1/sessions/:sessionId` instead, which reads from the same DO with a richer shape (progress fields live at the top level, not nested under `progress`).
+
+- 1ef271f: Follow-up to the overview nesting: three more API surfaces moved under their parent resource.
+  - Playbook: `getPlaybook(slug)` and `updatePlaybookNotes(slug, notes)` now call `/v1/orgs/:slug/playbook` and `/v1/orgs/:slug/playbook/notes`.
+  - Summaries: `getSummariesForSource`, `upsertSummary`, and `getMonthlySummary` now call `/v1/sources/:slug/summaries`. `upsertSummary`'s signature changed from `(data)` (with `sourceId` in the body) to `(sourceSlugOrId, data)`.
+  - Aliases: the `/v1/aliases` endpoints are gone. Domain aliases are now a `string[]` field on the parent — read via `/v1/orgs/:slug` or `/v1/products/:slug`, written via `PATCH { aliases: [...] }` on the parent. The CLI replaces `addDomainAlias`/`removeDomainAlias`/`listDomainAliases` with `getAliases(scope, slug)` and `setAliases(scope, slug, aliases)`. `releases org alias add|remove|list` and `releases product alias add|remove|list` commands are unchanged from the user's perspective.
+
+  `/v1/knowledge` is also gone from the API. No CLI helper referenced it.
+
+- 049528f: Overview admin commands now call the nested API routes (`/v1/orgs/:slug/overview`, `/v1/orgs/:slug/overview/inputs`, `/v1/products/:slug/overview`). The `releases admin overview-read`, `overview-write`, and `overview-inputs` commands are unchanged — only the URLs the CLI hits have moved.
+
+  `OverviewInputs.selected` entries now carry pre-hydrated `content` (absolute CDN URLs) and a typed `media` array with `r2Url` resolved, so the overview agent can paste image URLs directly into generated markdown.
+
 ## 0.19.2
 
 ### Patch Changes
