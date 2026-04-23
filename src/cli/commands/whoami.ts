@@ -3,6 +3,7 @@ import chalk from "chalk";
 import { getApiKey, getApiUrl, isAdminMode } from "../../lib/mode.js";
 import { VERSION } from "../version.js";
 import { writeJson } from "../../lib/output.js";
+import { RELEASES_CLI_UA } from "../../lib/user-agent.js";
 
 export type WhoamiStatus = {
   version: string;
@@ -39,7 +40,10 @@ async function probeApi(mode: WhoamiStatus["mode"]): Promise<NonNullable<WhoamiS
   // We call fetch directly (not apiFetch) because apiFetch returns null on
   // GET 404 — which would false-positive the probe for a misconfigured URL.
   const path = mode === "admin" ? "/v1/blocked-urls?limit=1" : "/v1/sources?limit=1";
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "User-Agent": RELEASES_CLI_UA,
+  };
   if (mode === "admin") headers["Authorization"] = `Bearer ${getApiKey()}`;
   try {
     const res = await fetch(`${getApiUrl()}${path}`, { headers });
