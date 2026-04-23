@@ -321,7 +321,7 @@ export async function getStatsSummary(days: number): Promise<StatsSummary> {
         error: string | null;
         createdAt: string;
       }>
-    >("/v1/fetch-log?limit=20"),
+    >("/v1/admin/logs/fetch?limit=20"),
     apiFetch<
       Array<{
         slug: string;
@@ -374,7 +374,7 @@ export async function getStatsSummary(days: number): Promise<StatsSummary> {
 // ── Usage log ──
 
 export async function getUsageStats(days: number): Promise<UsageStatsResponse> {
-  return apiFetch<UsageStatsResponse>(`/v1/usage-log/stats?days=${days}`);
+  return apiFetch<UsageStatsResponse>(`/v1/admin/logs/usage/stats?days=${days}`);
 }
 
 export async function postUsageLog(entry: {
@@ -385,7 +385,7 @@ export async function postUsageLog(entry: {
   sourceSlug?: string | null;
   releaseCount?: number | null;
 }): Promise<void> {
-  await apiFetch("/v1/usage-log", {
+  await apiFetch("/v1/admin/logs/usage", {
     method: "POST",
     body: JSON.stringify(entry),
   });
@@ -403,7 +403,7 @@ export async function postFetchLog(entry: {
   rawContent?: string | null;
   sessionId?: string | null;
 }): Promise<void> {
-  await apiFetch("/v1/fetch-log", {
+  await apiFetch("/v1/admin/logs/fetch", {
     method: "POST",
     body: JSON.stringify(entry),
   });
@@ -429,7 +429,7 @@ export async function getFetchLogs(opts: {
       rawContent: string | null;
       createdAt: string;
     }>
-  >(`/v1/fetch-log?${params}`);
+  >(`/v1/admin/logs/fetch?${params}`);
 
   // The API fetch-log endpoint returns raw fetch_log rows without source name/slug.
   // In remote mode we don't have the join data, so we provide what we can.
