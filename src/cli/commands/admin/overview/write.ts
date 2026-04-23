@@ -34,7 +34,7 @@ Examples:
   releases admin overview-write vercel --content-file /tmp/vercel-overview.md
   releases admin overview-write vercel --content-file - --json   (reads stdin)
 
-Writes via the upsert at POST /v1/overview. Last-write-wins on conflict.
+Writes via POST /v1/orgs/:slug/overview. Last-write-wins on conflict.
 When --release-count or --last-contributing-at are omitted, the CLI re-fetches
 overview-inputs to derive them.`,
     )
@@ -59,9 +59,7 @@ overview-inputs to derive them.`,
         }
       }
 
-      await upsertOverview({
-        scope: "org",
-        orgId: org.id,
+      await upsertOverview(org.slug, {
         content,
         releaseCount,
         lastContributingReleaseAt: lastContributingAt ?? null,
