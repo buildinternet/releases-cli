@@ -1,5 +1,7 @@
 # @buildinternet/releases-skills
 
+## 0.19.2
+
 ## 0.19.1
 
 ### Patch Changes
