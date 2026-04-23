@@ -9,7 +9,7 @@ import {
   getLatestReleases,
   unifiedSearch,
   sourceChangelog,
-  listDomainAliases,
+  getAliases,
   getTagsForOrg,
   getOrgAccountsBySlug,
   getProductsByOrg,
@@ -358,7 +358,7 @@ server.registerTool(
       getTagsForOrg(org.id),
       getSourcesByOrg(org.id),
       getProductsByOrg(org.id),
-      listDomainAliases({ orgId: org.id }),
+      getAliases("org", org.slug),
     ]);
 
     const lines: string[] = [];
@@ -374,9 +374,7 @@ server.registerTool(
         : "Accounts: none",
     );
     lines.push(tagRows.length > 0 ? `Tags: ${tagRows.join(", ")}` : "Tags: none");
-    lines.push(
-      aliases.length > 0 ? `Aliases: ${aliases.map((a) => a.domain).join(", ")}` : "Aliases: none",
-    );
+    lines.push(aliases.length > 0 ? `Aliases: ${aliases.join(", ")}` : "Aliases: none");
 
     if (orgProducts.length > 0) {
       lines.push("");

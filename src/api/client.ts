@@ -13,7 +13,6 @@ import type {
   NewReleaseSummary,
   Product,
   Tag,
-  DomainAlias,
   KnowledgePage,
   ReleaseType,
 } from "@buildinternet/releases-core/schema";
@@ -791,24 +790,27 @@ export async function getRecentReleases(sourceSlug: string, cutoffIso: string): 
 
 // ── Release summaries ──
 
-export async function getSummariesForSource(sourceId: string): Promise<ReleaseSummary[]> {
-  return apiFetch<ReleaseSummary[]>(`/v1/summaries?sourceId=${sourceId}`);
+export async function getSummariesForSource(sourceSlugOrId: string): Promise<ReleaseSummary[]> {
+  return apiFetch<ReleaseSummary[]>(`/v1/sources/${encodeURIComponent(sourceSlugOrId)}/summaries`);
 }
 
-export async function upsertSummary(data: NewReleaseSummary): Promise<void> {
-  await apiFetch("/v1/summaries", {
+export async function upsertSummary(
+  sourceSlugOrId: string,
+  data: Omit<NewReleaseSummary, "sourceId" | "orgId">,
+): Promise<void> {
+  await apiFetch(`/v1/sources/${encodeURIComponent(sourceSlugOrId)}/summaries`, {
     method: "POST",
     body: JSON.stringify(data),
   });
 }
 
 export async function getMonthlySummary(
-  sourceId: string,
+  sourceSlugOrId: string,
   year: number,
   month: number,
 ): Promise<ReleaseSummary | undefined> {
   const rows = await apiFetch<ReleaseSummary[]>(
-    `/v1/summaries?sourceId=${sourceId}&type=monthly&year=${year}&month=${month}`,
+    `/v1/sources/${encodeURIComponent(sourceSlugOrId)}/summaries?type=monthly&year=${year}&month=${month}`,
   );
   return rows[0];
 }
@@ -827,7 +829,7 @@ export async function getOverview(
 }
 
 export async function getPlaybook(slug: string): Promise<KnowledgePage | null> {
-  return apiFetch<KnowledgePage | null>(`/v1/playbook?slug=${slug}`);
+  return apiFetch<KnowledgePage | null>(`/v1/orgs/${encodeURIComponent(slug)}/playbook`);
 }
 
 export async function upsertOverview(
@@ -845,7 +847,7 @@ export async function upsertOverview(
 }
 
 export async function updatePlaybookNotes(orgSlug: string, notes: string): Promise<void> {
-  await apiFetch(`/v1/playbook/notes?slug=${encodeURIComponent(orgSlug)}`, {
+  await apiFetch(`/v1/orgs/${encodeURIComponent(orgSlug)}/playbook/notes`, {
     method: "PATCH",
     body: JSON.stringify({ notes }),
   });
@@ -991,31 +993,25 @@ export async function getEmbedStatus(): Promise<EmbedStatusResponse> {
 
 // ── Domain Aliases ──
 
-export async function addDomainAlias(
-  domain: string,
-  target: { orgId?: string; productId?: string },
-): Promise<DomainAlias> {
-  return apiFetch<DomainAlias>("/v1/aliases", {
-    method: "POST",
-    body: JSON.stringify({ domain, orgId: target.orgId, productId: target.productId }),
-  });
-}
-
-export async function removeDomainAlias(domain: string): Promise<boolean> {
-  const result = await apiFetch<{ deleted: boolean } | null>(
-    `/v1/aliases/${encodeURIComponent(domain)}`,
-    { method: "DELETE" },
+export async function getAliases(
+  scope: keyof typeof SCOPE_RESOURCE,
+  slug: string,
+): Promise<string[]> {
+  const row = await apiFetch<{ aliases?: string[] } | null>(
+    `/v1/${SCOPE_RESOURCE[scope]}/${encodeURIComponent(slug)}`,
   );
-  return result !== null;
+  return row?.aliases ?? [];
 }
 
-export async function listDomainAliases(target: {
-  orgId?: string;
-  productId?: string;
-}): Promise<DomainAlias[]> {
-  if (!target.orgId && !target.productId) return [];
-  const params = target.orgId ? `orgId=${target.orgId}` : `productId=${target.productId}`;
-  return apiFetch<DomainAlias[]>(`/v1/aliases?${params}`);
+export async function setAliases(
+  scope: keyof typeof SCOPE_RESOURCE,
+  slug: string,
+  aliases: string[],
+): Promise<void> {
+  await apiFetch(`/v1/${SCOPE_RESOURCE[scope]}/${encodeURIComponent(slug)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ aliases }),
+  });
 }
 
 // ── Source metadata (merge-and-update helper) ──

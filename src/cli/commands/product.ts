@@ -16,9 +16,8 @@ import {
   addTagsToProduct,
   removeTagsFromProduct,
   getTagsForProduct,
-  listDomainAliases,
-  addDomainAlias,
-  removeDomainAlias,
+  getAliases,
+  setAliases,
 } from "../../api/client.js";
 import { toSlug } from "@buildinternet/releases-core/slug";
 import { isValidCategory, CATEGORIES } from "@buildinternet/releases-core/categories";
@@ -418,26 +417,28 @@ export function registerProductCommand(program: Command) {
         process.exit(1);
       }
 
-      const settled = await Promise.all(
-        domains.map(async (domain) => {
-          try {
-            return await addDomainAlias(domain, { productId: found.id });
-          } catch (err) {
-            console.error(
-              chalk.red(
-                `Failed to add alias "${domain}": ${err instanceof Error ? err.message : err}`,
-              ),
-            );
-            return null;
-          }
-        }),
-      );
-      const results = settled.filter((r): r is NonNullable<typeof r> => r !== null);
+      const current = await getAliases("product", found.slug);
+      const currentSet = new Set(current);
+      const added: string[] = [];
+      for (const d of domains) {
+        if (!currentSet.has(d)) {
+          currentSet.add(d);
+          added.push(d);
+        }
+      }
+      if (added.length > 0) {
+        try {
+          await setAliases("product", found.slug, [...currentSet]);
+        } catch (err) {
+          console.error(
+            chalk.red(`Failed to add aliases: ${err instanceof Error ? err.message : err}`),
+          );
+          return;
+        }
+      }
 
-      if (opts.json) await writeJson(results);
-      else
-        for (const r of results)
-          console.log(chalk.green(`Added alias: ${r.domain} → ${found.name}`));
+      if (opts.json) await writeJson({ added });
+      else for (const d of added) console.log(chalk.green(`Added alias: ${d} → ${found.name}`));
     });
 
   alias
@@ -453,14 +454,14 @@ export function registerProductCommand(program: Command) {
         process.exit(1);
       }
 
-      const results = await Promise.all(
-        domains.map(async (domain) => ({ domain, ok: await removeDomainAlias(domain) })),
-      );
+      const current = await getAliases("product", found.slug);
+      const currentSet = new Set(current);
       const removed: string[] = [];
-      for (const { domain, ok } of results) {
-        if (ok) removed.push(domain);
-        else console.error(chalk.yellow(`Alias "${domain}" not found.`));
+      for (const d of domains) {
+        if (currentSet.delete(d)) removed.push(d);
+        else console.error(chalk.yellow(`Alias "${d}" not found.`));
       }
+      if (removed.length > 0) await setAliases("product", found.slug, [...currentSet]);
 
       if (opts.json) await writeJson({ removed });
       else for (const d of removed) console.log(chalk.green(`Removed alias: ${d}`));
@@ -478,18 +479,11 @@ export function registerProductCommand(program: Command) {
         process.exit(1);
       }
 
-      const aliases = await listDomainAliases({ productId: found.id });
+      const aliases = await getAliases("product", found.slug);
 
-      if (opts.json)
-        console.log(
-          JSON.stringify(
-            aliases.map((a) => a.domain),
-            null,
-            2,
-          ),
-        );
+      if (opts.json) console.log(JSON.stringify(aliases, null, 2));
       else if (aliases.length === 0)
         console.log(chalk.yellow(`No domain aliases for ${found.name}`));
-      else for (const a of aliases) console.log(a.domain);
+      else for (const d of aliases) console.log(d);
     });
 }
