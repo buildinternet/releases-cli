@@ -347,7 +347,7 @@ export async function getStatsSummary(days: number): Promise<StatsSummary> {
       stale: 0,
       neverFetched: 0,
     },
-    sources: sourcesData.map((s) => ({
+    sourceActivity: sourcesData.map((s) => ({
       sourceName: s.name,
       sourceSlug: s.slug,
       sourceType: s.type,
