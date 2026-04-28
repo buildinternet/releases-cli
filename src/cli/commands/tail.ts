@@ -4,6 +4,7 @@ import { findOrg, findSource, getLatestReleases } from "../../api/client.js";
 import type { LatestRelease } from "../../api/types.js";
 import { orgNotFound, sourceNotFound } from "../suggest.js";
 import { stripAnsi } from "../../lib/sanitize.js";
+import { sleep } from "../../lib/sleep.js";
 import { renderLatestReleasesTable } from "../render/releases-table.js";
 import { writeJson, writeJsonLine } from "../../lib/output.js";
 
@@ -14,10 +15,6 @@ function renderStreamLine(row: LatestRelease): string {
   const title = stripAnsi(row.title);
   const id = chalk.dim(row.id.slice(0, 12));
   return `${when}  ${src}  ${version ? version + "  " : ""}${title}  ${id}`;
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 // Cap the seen-id set so a long-running follow loop can't grow unbounded.

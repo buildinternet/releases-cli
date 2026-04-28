@@ -4,6 +4,7 @@ import { logger } from "@releases/lib/logger";
 import {
   apiFetch,
   getActiveSources,
+  getSession,
   listFetchableSources,
   listSourcesWithChanges,
   findSource,
@@ -13,6 +14,14 @@ import {
 import { newCorrelationId } from "@buildinternet/releases-core/id";
 import { orgNotFound, sourceNotFound } from "../suggest.js";
 import { writeJson, writeJsonLine } from "../../lib/output.js";
+import { sleep } from "../../lib/sleep.js";
+import {
+  classifySessionTerminalState,
+  DEFAULT_WAIT_SECONDS,
+  NOT_FOUND_GRACE_MS,
+  POLL_INTERVAL_MS,
+  type SessionWithClassification,
+} from "./fetch-wait.js";
 
 export function registerFetchCommand(program: Command) {
   program
@@ -28,6 +37,11 @@ export function registerFetchCommand(program: Command) {
     .option("--changed", "Only fetch sources where poll detected upstream changes")
     .option("--retry-errors", "Only fetch sources whose last fetch was an error")
     .option("--org <slug>", "Fetch all active sources for an organization")
+    .option(
+      "--wait [seconds]",
+      `Block until the session reaches a terminal state (default: ${DEFAULT_WAIT_SECONDS}s). ` +
+        `Exits non-zero on failure: 2 for managed-agents/provider errors, 1 for our-side errors, 130 for cancellation.`,
+    )
     .addHelpText(
       "after",
       `
@@ -38,7 +52,9 @@ Examples:
   releases admin source fetch --unfetched           Fetch sources never fetched before
   releases admin source fetch --changed             Fetch sources where poll detected changes
   releases admin source fetch --retry-errors        Retry sources that errored last time
-  releases admin source fetch --org acme            Fetch all active sources for an org`,
+  releases admin source fetch --org acme            Fetch all active sources for an org
+  releases admin source fetch --org acme --wait     Wait for completion; exit non-zero on failure
+  releases admin source fetch --org acme --wait 60  Wait up to 60 seconds`,
     )
     .action(
       async (
@@ -51,6 +67,7 @@ Examples:
           changed?: boolean;
           retryErrors?: boolean;
           org?: string;
+          wait?: string | true;
         },
       ) => {
         const identifier = slugArg ?? opts.source;
@@ -165,8 +182,98 @@ Examples:
         } else {
           logger.info(`Update session started: ${result.sessionId}`);
           logger.info(`Fetching ${sourceIdentifiers.length} source(s).`);
-          logger.info(`Track progress: releases admin discovery task list`);
+          if (opts.wait === undefined) {
+            logger.info(`Track progress: releases admin discovery task list`);
+          }
+        }
+
+        if (opts.wait !== undefined) {
+          const waitSeconds =
+            opts.wait === true ? DEFAULT_WAIT_SECONDS : parseWaitSeconds(opts.wait);
+          if (waitSeconds === null) {
+            logger.error(`--wait must be a positive integer (seconds), got "${opts.wait}"`);
+            process.exit(1);
+          }
+          await waitForSession({
+            sessionId: result.sessionId,
+            waitSeconds,
+            json: opts.json === true,
+          });
         }
       },
     );
+}
+
+function parseWaitSeconds(raw: string): number | null {
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return n;
+}
+
+async function waitForSession({
+  sessionId,
+  waitSeconds,
+  json,
+}: {
+  sessionId: string;
+  waitSeconds: number;
+  json: boolean;
+}): Promise<void> {
+  const startedAt = Date.now();
+  const deadline = startedAt + waitSeconds * 1000;
+  if (!json) logger.info(`Waiting up to ${waitSeconds}s for session to complete…`);
+
+  while (Date.now() < deadline) {
+    let session: SessionWithClassification | null = null;
+    try {
+      // oxlint-disable-next-line no-await-in-loop -- sequential polling: each tick depends on the previous response
+      session = await getSession(sessionId);
+    } catch (err) {
+      if (Date.now() - startedAt > NOT_FOUND_GRACE_MS) {
+        logger.error(
+          `Failed to poll session ${sessionId.slice(0, 8)}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        process.exit(1);
+      }
+    }
+
+    if (!session) {
+      // 404 right after start is normal — the StatusHub event may not have landed yet.
+      if (Date.now() - startedAt > NOT_FOUND_GRACE_MS) {
+        logger.error(`Session ${sessionId} not found after grace window — giving up`);
+        process.exit(1);
+      }
+      // oxlint-disable-next-line no-await-in-loop -- intentional poll interval
+      await sleep(POLL_INTERVAL_MS);
+      continue;
+    }
+
+    const summary = classifySessionTerminalState(session);
+    if (summary) {
+      if (json) {
+        // oxlint-disable-next-line no-await-in-loop -- terminal write before exiting; not actually a loop iteration
+        await writeJson({ ...session, exitCode: summary.exitCode });
+      } else if (summary.exitCode === 0) {
+        logger.info(chalk.green(summary.message));
+      } else {
+        logger.error(chalk.red(summary.message));
+      }
+      process.exit(summary.exitCode);
+    }
+
+    // oxlint-disable-next-line no-await-in-loop -- intentional poll interval
+    await sleep(POLL_INTERVAL_MS);
+  }
+
+  // Hit the wait deadline — session is still running.
+  if (json) {
+    await writeJson({ sessionId, status: "timeout", waitSeconds });
+  } else {
+    logger.error(
+      chalk.red(
+        `Session ${sessionId.slice(0, 8)} did not reach a terminal state within ${waitSeconds}s`,
+      ),
+    );
+  }
+  process.exit(1);
 }
