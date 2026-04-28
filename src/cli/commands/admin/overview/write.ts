@@ -4,11 +4,13 @@ import { findOrg, getOverviewInputs, upsertOverview } from "../../../../api/clie
 import { orgNotFound } from "../../../suggest.js";
 import { writeJson } from "../../../../lib/output.js";
 import { parsePositiveIntFlag } from "../../../../lib/flags.js";
+import { unescapeHtmlEntities } from "./unescape-html.js";
 
 interface OverviewWriteOpts {
   contentFile: string;
   releaseCount?: string;
   lastContributingAt?: string;
+  unescapeHtml?: boolean;
   json?: boolean;
 }
 
@@ -26,6 +28,7 @@ export function registerOverviewWriteCommand(program: Command) {
       "--last-contributing-at <iso>",
       "ISO timestamp of the most recent release reflected (defaults to first selected release)",
     )
+    .option("--unescape-html", "Decode &amp;, &lt;, &gt;, &quot;, &#39; before uploading")
     .option("--json", "Output as JSON")
     .addHelpText(
       "after",
@@ -42,7 +45,8 @@ overview-inputs to derive them.`,
       const org = await findOrg(orgIdentifier);
       if (!org) return orgNotFound(orgIdentifier);
 
-      const content = await readContent(opts.contentFile);
+      let content = await readContent(opts.contentFile);
+      if (opts.unescapeHtml) content = unescapeHtmlEntities(content);
       if (!content.trim()) {
         console.error(chalk.red("Content is empty — refusing to write."));
         process.exit(2);
