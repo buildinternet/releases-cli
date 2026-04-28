@@ -72,6 +72,16 @@ Examples:
       ) => {
         const identifier = slugArg ?? opts.source;
 
+        // Resolve --wait up front so a malformed value fails before we kick off a remote workflow.
+        let waitSeconds: number | null = null;
+        if (opts.wait !== undefined) {
+          waitSeconds = opts.wait === true ? DEFAULT_WAIT_SECONDS : parseWaitSeconds(opts.wait);
+          if (waitSeconds === null) {
+            logger.error(`--wait must be a positive integer (seconds), got "${opts.wait}"`);
+            process.exit(1);
+          }
+        }
+
         let entries: Array<{ id: string; slug: string }> = [];
         let label = "manual fetch";
         let orgId: string | undefined;
@@ -177,23 +187,20 @@ Examples:
           );
           process.exit(1);
         }
-        if (opts.json) {
+        const waiting = opts.wait !== undefined;
+        if (opts.json && !waiting) {
+          // When waiting, the final JSON is emitted by waitForSession so we
+          // don't write two top-level documents to stdout.
           await writeJson(result);
-        } else {
+        } else if (!opts.json) {
           logger.info(`Update session started: ${result.sessionId}`);
           logger.info(`Fetching ${sourceIdentifiers.length} source(s).`);
-          if (opts.wait === undefined) {
+          if (!waiting) {
             logger.info(`Track progress: releases admin discovery task list`);
           }
         }
 
-        if (opts.wait !== undefined) {
-          const waitSeconds =
-            opts.wait === true ? DEFAULT_WAIT_SECONDS : parseWaitSeconds(opts.wait);
-          if (waitSeconds === null) {
-            logger.error(`--wait must be a positive integer (seconds), got "${opts.wait}"`);
-            process.exit(1);
-          }
+        if (waiting && waitSeconds !== null) {
           await waitForSession({
             sessionId: result.sessionId,
             waitSeconds,
@@ -204,8 +211,10 @@ Examples:
     );
 }
 
-function parseWaitSeconds(raw: string): number | null {
-  const n = parseInt(raw, 10);
+/** Strict integer parse — `parseInt("60abc")` returns 60, which would silently misuse `--wait 60s`. */
+export function parseWaitSeconds(raw: string): number | null {
+  if (!/^\d+$/.test(raw)) return null;
+  const n = Number.parseInt(raw, 10);
   if (!Number.isFinite(n) || n <= 0) return null;
   return n;
 }
@@ -224,17 +233,17 @@ async function waitForSession({
   if (!json) logger.info(`Waiting up to ${waitSeconds}s for session to complete…`);
 
   while (Date.now() < deadline) {
-    let session: SessionWithClassification | null = null;
+    let session: SessionWithClassification | null;
     try {
       // oxlint-disable-next-line no-await-in-loop -- sequential polling: each tick depends on the previous response
       session = await getSession(sessionId);
     } catch (err) {
-      if (Date.now() - startedAt > NOT_FOUND_GRACE_MS) {
-        logger.error(
-          `Failed to poll session ${sessionId.slice(0, 8)}: ${err instanceof Error ? err.message : String(err)}`,
-        );
-        process.exit(1);
-      }
+      // apiFetch returns null on GET 404 — anything thrown here is a real
+      // transport/auth/5xx problem. Surface it instead of swallowing.
+      logger.error(
+        `Failed to poll session ${sessionId.slice(0, 8)}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      process.exit(1);
     }
 
     if (!session) {

@@ -3,6 +3,7 @@ import {
   classifySessionTerminalState,
   type SessionWithClassification,
 } from "../../src/cli/commands/fetch-wait.js";
+import { parseWaitSeconds } from "../../src/cli/commands/fetch.js";
 
 const baseSession: SessionWithClassification = {
   sessionId: "sess_abc",
@@ -97,5 +98,27 @@ describe("classifySessionTerminalState", () => {
     });
     expect(summary?.exitCode).toBe(2);
     expect(summary?.message).toBe("Provider error (managed-agents): Session error");
+  });
+});
+
+describe("parseWaitSeconds", () => {
+  it("accepts plain positive integers", () => {
+    expect(parseWaitSeconds("60")).toBe(60);
+    expect(parseWaitSeconds("1")).toBe(1);
+    expect(parseWaitSeconds("900")).toBe(900);
+  });
+
+  it("rejects strings with trailing non-digits", () => {
+    // parseInt("60s") would return 60 — silent acceptance of malformed input.
+    expect(parseWaitSeconds("60s")).toBeNull();
+    expect(parseWaitSeconds("1m")).toBeNull();
+    expect(parseWaitSeconds("60.5")).toBeNull();
+  });
+
+  it("rejects zero, negative numbers, and non-numeric strings", () => {
+    expect(parseWaitSeconds("0")).toBeNull();
+    expect(parseWaitSeconds("-5")).toBeNull();
+    expect(parseWaitSeconds("forever")).toBeNull();
+    expect(parseWaitSeconds("")).toBeNull();
   });
 });
