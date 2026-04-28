@@ -20,8 +20,8 @@ import {
   DEFAULT_WAIT_SECONDS,
   NOT_FOUND_GRACE_MS,
   POLL_INTERVAL_MS,
-  type SessionWithClassification,
 } from "./fetch-wait.js";
+import type { Session } from "@buildinternet/releases-api-types";
 
 export function registerFetchCommand(program: Command) {
   program
@@ -233,7 +233,7 @@ async function waitForSession({
   if (!json) logger.info(`Waiting up to ${waitSeconds}s for session to complete…`);
 
   while (Date.now() < deadline) {
-    let session: SessionWithClassification | null;
+    let session: Session | null;
     try {
       // oxlint-disable-next-line no-await-in-loop -- sequential polling: each tick depends on the previous response
       session = await getSession(sessionId);

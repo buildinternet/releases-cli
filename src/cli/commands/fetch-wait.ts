@@ -1,18 +1,5 @@
 import type { Session } from "@buildinternet/releases-api-types";
 
-/**
- * Local extension of `Session` carrying the classification fields added in
- * the registry's API release (api-types ≥ 0.2.0). The pinned api-types is
- * still 0.1.0 — drop this alias and import `Session` directly once the CLI
- * bumps.
- */
-export type SessionWithClassification = Session & {
-  errorSource?: "provider" | "us";
-  errorType?: string;
-  stopReason?: string;
-  retryCount?: number;
-};
-
 export const DEFAULT_WAIT_SECONDS = 900;
 export const POLL_INTERVAL_MS = 3_000;
 /** Tolerate brief 404s right after starting (StatusHub may lag the workflow trigger). */
@@ -30,9 +17,7 @@ export interface TerminalSummary {
  * - Provider messages are tagged `(managed-agents · <type>)` and include retry
  *   count when the session ended in `retries_exhausted`.
  */
-export function classifySessionTerminalState(
-  session: SessionWithClassification,
-): TerminalSummary | null {
+export function classifySessionTerminalState(session: Session): TerminalSummary | null {
   if (session.status === "running") return null;
   if (session.status === "complete") {
     return { exitCode: 0, status: "complete", message: "Session complete" };

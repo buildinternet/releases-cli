@@ -1,11 +1,9 @@
 import { describe, it, expect } from "bun:test";
-import {
-  classifySessionTerminalState,
-  type SessionWithClassification,
-} from "../../src/cli/commands/fetch-wait.js";
+import { classifySessionTerminalState } from "../../src/cli/commands/fetch-wait.js";
 import { parseWaitSeconds } from "../../src/cli/commands/fetch.js";
+import type { Session } from "@buildinternet/releases-api-types";
 
-const baseSession: SessionWithClassification = {
+const baseSession: Session = {
   sessionId: "sess_abc",
   company: "acme",
   type: "update",
