@@ -39,7 +39,7 @@ async function probeApi(mode: WhoamiStatus["mode"]): Promise<NonNullable<WhoamiS
   // Public probe hits a public read to confirm connectivity.
   // We call fetch directly (not apiFetch) because apiFetch returns null on
   // GET 404 — which would false-positive the probe for a misconfigured URL.
-  const path = mode === "admin" ? "/v1/blocked-urls?limit=1" : "/v1/sources?limit=1";
+  const path = mode === "admin" ? "/v1/admin/blocklist?limit=1" : "/v1/sources?limit=1";
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "User-Agent": RELEASES_CLI_UA,
