@@ -373,10 +373,18 @@ export function searchToMarkdown(results: UnifiedSearchResponse, opts: FormatOpt
     lines.push("");
   }
 
-  if (results.products.length > 0) {
-    lines.push("## Products");
+  // Read the new `catalog` field, falling back to the deprecated `products`
+  // alias so older API deployments keep working. Drop the fallback once the
+  // alias is removed from the wire.
+  const legacyCatalog = (results as unknown as Record<string, unknown>)["products"] as
+    | UnifiedSearchResponse["catalog"]
+    | undefined;
+  const catalog: UnifiedSearchResponse["catalog"] = results.catalog ?? legacyCatalog ?? [];
+
+  if (catalog.length > 0) {
+    lines.push("## Catalog");
     lines.push("");
-    for (const p of results.products) {
+    for (const p of catalog) {
       const orgInfo = p.orgSlug ? ` (${p.orgName})` : "";
       const viewSlug = p.kind === "source" && p.sourceSlug ? p.sourceSlug : `product/${p.slug}`;
       const url =
@@ -402,7 +410,7 @@ export function searchToMarkdown(results: UnifiedSearchResponse, opts: FormatOpt
     lines.push("");
   }
 
-  if (results.orgs.length === 0 && results.products.length === 0 && results.releases.length === 0) {
+  if (results.orgs.length === 0 && catalog.length === 0 && results.releases.length === 0) {
     lines.push("No results found.");
     lines.push("");
   }

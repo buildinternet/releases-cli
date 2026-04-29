@@ -15,13 +15,21 @@ function parseMode(raw: string | undefined): SearchMode | undefined {
   throw new Error(`Invalid --mode value: "${raw}". Expected one of: ${SEARCH_MODES.join(", ")}.`);
 }
 
+type SearchSection = "orgs" | "catalog" | "releases";
+
+function normalizeType(raw: string): SearchSection {
+  if (raw === "products") return "catalog";
+  if (raw === "orgs" || raw === "catalog" || raw === "releases") return raw;
+  throw new Error(`Invalid --type value: "${raw}". Expected one of: orgs, catalog, releases.`);
+}
+
 export function registerSearchCommand(program: Command) {
   program
     .command("search")
-    .description("Search across organizations, products, and releases")
+    .description("Search across organizations, the catalog, and releases")
     .argument("<query>", "Search query")
     .option("-l, --limit <n>", "Max results per type", "10")
-    .option("--type <type>", "Limit to a result type: orgs, products, releases")
+    .option("--type <type>", "Limit to a result type: orgs, catalog, releases")
     .option("--mode <mode>", `Search mode: ${SEARCH_MODES.join(" | ")}`)
     .option("--json", "Output as JSON")
     .action(
@@ -39,15 +47,32 @@ export function registerSearchCommand(program: Command) {
           process.exit(1);
         }
 
+        let types: readonly SearchSection[];
+        try {
+          types = opts.type
+            ? [normalizeType(opts.type)]
+            : (["orgs", "catalog", "releases"] as const);
+        } catch (err) {
+          logger.error(err instanceof Error ? err.message : String(err));
+          process.exit(1);
+        }
+
         const response = await unifiedSearch(query, limit, mode ? { mode } : undefined);
 
-        const types = opts.type
-          ? [opts.type as keyof Omit<UnifiedSearchResponse, "query">]
-          : (["orgs", "products", "releases"] as const);
+        // Read the new `catalog` field, falling back to the deprecated `products`
+        // alias so older API deployments keep working. Drop the fallback once
+        // the alias is removed from the wire. Bracket access avoids the
+        // deprecation diagnostic on the alias read.
+        const legacy = (response as unknown as Record<string, unknown>)["products"] as
+          | UnifiedSearchResponse["catalog"]
+          | undefined;
+        const catalog: UnifiedSearchResponse["catalog"] = response.catalog ?? legacy ?? [];
 
         if (opts.json) {
           const filtered: Record<string, unknown> = { query: response.query };
-          for (const t of types) filtered[t] = response[t];
+          for (const t of types) {
+            filtered[t] = t === "catalog" ? catalog : response[t];
+          }
           if (response.mode !== undefined) filtered.mode = response.mode;
           if (response.degraded !== undefined) filtered.degraded = response.degraded;
           if (response.degradedReason !== undefined)
@@ -75,16 +100,16 @@ export function registerSearchCommand(program: Command) {
           totalResults += response.orgs.length;
         }
 
-        if (types.includes("products") && response.products.length > 0) {
-          console.log(chalk.bold.underline("Products"));
-          for (const p of response.products) {
+        if (types.includes("catalog") && catalog.length > 0) {
+          console.log(chalk.bold.underline("Catalog"));
+          for (const p of catalog) {
             const org = p.orgName ? ` ${chalk.dim(`by ${stripAnsi(p.orgName)}`)}` : "";
             console.log(
               `  ${chalk.cyan.bold(stripAnsi(p.name))} ${chalk.dim(`(${p.slug})`)}${org}`,
             );
           }
           console.log();
-          totalResults += response.products.length;
+          totalResults += catalog.length;
         }
 
         if (types.includes("releases") && response.releases.length > 0) {

@@ -19,9 +19,11 @@ Activate when the user:
 
 ## How to Look Up Releases
 
-### Step 1: Find the Organization or Product
+### Step 1: Find the Organization or Catalog Entry
 
-Call `list_organizations` with the library/product name as the `query` parameter. Multi-product orgs (e.g. Vercel → Next.js, Turborepo) are exposed via `list_products` and `get_product` — use those when the user's question is product-specific rather than company-wide.
+Call `list_organizations` with the library/product name as the `query` parameter. For product-specific questions, browse the catalog (products + standalone sources) with `list_catalog` and fetch detail with `get_catalog_entry` — these replaced the older `list_products` / `get_product` / `list_sources` / `get_source` tools, which still exist as deprecated aliases.
+
+The unified `search` tool is also available — it returns `orgs`, `catalog`, and `releases` sections in one call. Catalog hits carry a `kind: "product" | "source"` discriminator, so you can route a click to either a product page or a standalone source. (Older API responses send the same array under a deprecated `products` alias; new clients should consume `catalog`.)
 
 If the query returns no results, try variations:
 - The company name instead of the product name (e.g., "Vercel" instead of "Next.js")
@@ -31,9 +33,11 @@ If the query returns no results, try variations:
 ### Step 2: Choose the Right Tool
 
 - **"What's new?" / "Latest releases"** → Use `get_latest_releases` with the organization or product slug
-- **Specific feature or keyword** → Use `search_releases` with a descriptive query and organization filter
+- **Specific feature or keyword across orgs + catalog + releases** → Use `search` (unified) with a descriptive query; narrow via `type: ["releases"]` etc.
+- **Releases-only search** → Use `search_releases` (kept for back-compat) when you only want release rows
 - **Single release by id** → Use `get_release` when you already have a `rel_` id (search results include ids)
-- **Source or product deep-dive** → Use `get_source`, `get_product`, or `get_organization` for metadata, tags, and linkage
+- **Catalog deep-dive (product or standalone source)** → Use `get_catalog_entry` for metadata, tags, and linkage
+- **Organization detail** → Use `get_organization`
 - **Canonical CHANGELOG.md from a GitHub repo** → Use `get_source_changelog` when the user wants the full maintained file, not just the tagged releases (refreshed on every fetch). For large files, pass `tokens` (cl100k_base budget, e.g. 5000 or 10000) to get a heading-aligned slice that fits a known context window; chain via the returned `nextOffset`. Every response reports `totalTokens` so you can plan how many calls you need upfront.
 - **Compare two products** → Use `compare_products` with an array of two product slugs
 - **Summarize recent activity** → Use `summarize_changes` with the product slug

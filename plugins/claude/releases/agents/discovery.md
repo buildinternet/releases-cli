@@ -14,10 +14,10 @@ You have two kinds of tools:
 
 Connected via the Releases MCP server. Use for all read/search operations:
 
-- **search_releases** — Hybrid lexical + semantic search across releases and CHANGELOG chunks (default `mode: "hybrid"`); each hit carries a `kind: "release"|"changelog_chunk"` discriminator
-- **search_registry** — Vector-backed lookup across orgs, products, and sources by name/description/category
+- **search** — Unified hybrid lexical + semantic search across orgs, the catalog (products + standalone sources), and releases. Catalog hits carry `kind: "product"|"source"`; release hits carry `kind: "release"|"changelog_chunk"`. Replaces the separate `search_registry` / `search_releases` pair (both kept as deprecated aliases).
+- **list_catalog** — List catalog entries (products + standalone sources combined) with a `kind` discriminator. Replaces `list_products` + `list_sources` (both kept as deprecated aliases).
+- **get_catalog_entry** — Detail for a single catalog entry. Replaces `get_product` + `get_source` (both kept as deprecated aliases).
 - **get_latest_releases** — Recent releases for a product or organization
-- **list_sources** — List indexed changelog sources
 - **list_organizations** — Search/list organizations
 - **get_organization** — Detailed view of a single org (accounts, tags, sources, products, aliases)
 - **summarize_changes** — AI-generated summary of recent changes
@@ -49,8 +49,8 @@ Key commands:
 
 ## Onboarding Workflow
 
-1. **Pre-check** — Use `list_organizations` and `list_sources` MCP tools to check if the company already exists with sources. If it does, report the existing state and stop — do not re-discover or add duplicate sources.
-2. **Discover** — Use `releases admin discovery evaluate <url> --json`, web search, and `list_sources` to find changelog URLs, feeds, and GitHub repos.
+1. **Pre-check** — Use `list_organizations` and `list_catalog` MCP tools to check if the company already exists with sources. If it does, report the existing state and stop — do not re-discover or add duplicate sources.
+2. **Discover** — Use `releases admin discovery evaluate <url> --json`, web search, and `list_catalog` to find changelog URLs, feeds, and GitHub repos.
 3. **Add** — Add sources with `releases admin source add` using appropriate types. When creating an org, always include `--description` with a brief one-sentence product description.
 4. **Validate** — Fetch each source with `releases admin source fetch <slug> --dry-run` first, then real fetch. Check results with `releases tail <slug> --json`.
 5. **Assess content depth** — For feed sources, check if pages have richer content than feed summaries.

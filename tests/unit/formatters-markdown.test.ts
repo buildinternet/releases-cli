@@ -48,21 +48,31 @@ const feedReleases: OrgReleaseItem[] = [
   },
 ];
 
+const catalogHits: UnifiedSearchResponse["catalog"] = [
+  {
+    slug: "react",
+    name: "React",
+    orgSlug: "meta",
+    orgName: "Meta",
+    category: "frontend",
+    kind: "product",
+  },
+  {
+    slug: "react-native",
+    name: "React Native",
+    orgSlug: "meta",
+    orgName: "Meta",
+    category: null,
+    kind: "source",
+    sourceSlug: "react-native",
+  },
+];
+
 const searchResults: UnifiedSearchResponse = {
   query: "react",
   orgs: [{ slug: "meta", name: "Meta", domain: "meta.com", avatarUrl: null, category: "ai" }],
-  products: [
-    { slug: "react", name: "React", orgSlug: "meta", orgName: "Meta", category: "frontend" },
-    {
-      slug: "react-native",
-      name: "React Native",
-      orgSlug: "meta",
-      orgName: "Meta",
-      category: null,
-      kind: "source",
-      sourceSlug: "react-native",
-    },
-  ],
+  catalog: catalogHits,
+  products: catalogHits,
   sources: [],
   releases: [
     {
@@ -234,14 +244,29 @@ describe("searchToMarkdown", () => {
     expect(md).toContain("[ai]");
   });
 
-  it("has Products section with product and standalone source details", () => {
+  it("has Catalog section with product and standalone source details", () => {
     const md = searchToMarkdown(searchResults);
-    expect(md).toContain("## Products");
+    expect(md).toContain("## Catalog");
     expect(md).toContain("**React**");
     expect(md).toContain("`react`");
     expect(md).toContain("(Meta)");
     expect(md).toContain("**React Native**");
     expect(md).not.toContain("## Sources");
+  });
+
+  it("falls back to deprecated `products` alias when `catalog` is absent", () => {
+    // Older API deploys send only `products`. Drop this test once the alias
+    // is removed from the wire (see monorepo issue #539 follow-up).
+    const legacyOnly = {
+      query: "react",
+      orgs: [],
+      products: catalogHits,
+      sources: [],
+      releases: [],
+    } as unknown as UnifiedSearchResponse;
+    const md = searchToMarkdown(legacyOnly);
+    expect(md).toContain("## Catalog");
+    expect(md).toContain("**React**");
   });
 
   it("has Releases section with release details", () => {
@@ -268,6 +293,7 @@ describe("searchToMarkdown", () => {
     const empty: UnifiedSearchResponse = {
       query: "nothing",
       orgs: [],
+      catalog: [],
       products: [],
       sources: [],
       releases: [],
@@ -275,7 +301,7 @@ describe("searchToMarkdown", () => {
     const md = searchToMarkdown(empty);
     expect(md).toContain("No results found.");
     expect(md).not.toContain("## Organizations");
-    expect(md).not.toContain("## Products");
+    expect(md).not.toContain("## Catalog");
     expect(md).not.toContain("## Sources");
     expect(md).not.toContain("## Releases");
   });
@@ -284,6 +310,7 @@ describe("searchToMarkdown", () => {
     const partial: UnifiedSearchResponse = {
       query: "test",
       orgs: [],
+      catalog: [],
       products: [],
       sources: [],
       releases: [
@@ -301,7 +328,7 @@ describe("searchToMarkdown", () => {
     };
     const md = searchToMarkdown(partial);
     expect(md).not.toContain("## Organizations");
-    expect(md).not.toContain("## Products");
+    expect(md).not.toContain("## Catalog");
     expect(md).not.toContain("## Sources");
     expect(md).toContain("## Releases");
   });
