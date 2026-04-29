@@ -1,5 +1,15 @@
 # @buildinternet/releases
 
+## 0.20.1
+
+### Patch Changes
+
+- 24316b1: Move admin blocklist calls to `/v1/admin/blocklist` (was `/v1/blocked-urls`). The registry renamed the route to align with the `/v1/admin/...` convention; the old path is going away. Affects `releases admin block` / `unblock` and the `releases whoami` admin probe.
+
+  Closes [registry #524](https://github.com/buildinternet/releases/issues/524).
+
+- c0935e7: Add the `bun` ecosystem to the Dependabot config so npm dependency bumps land as weekly grouped PRs (production and dev separated). Pairs with the SHA-pinned GitHub Actions config — bun.lock already pins every package by sha512 integrity hash and CI runs with `--frozen-lockfile`, so this closes the loop on surfacing upstream drift. CI-only; no runtime behavior change.
+
 ## 0.20.0
 
 ### Minor Changes
