@@ -6,7 +6,7 @@ import {
   type FormatSourceDetail,
   type FormatOrgDetail,
 } from "../../src/lib/formatters.js";
-import type { KnowledgePageItem } from "../../src/api/types.js";
+import type { OverviewPageItem } from "../../src/api/types.js";
 
 // ── Fixtures ───────────────────────────────────────────────────────
 
@@ -450,7 +450,7 @@ describe("orgToMarkdown", () => {
 // ── knowledgeToMarkdown ───────────────────────────────────────────
 
 describe("knowledgeToMarkdown", () => {
-  const fullKnowledge: KnowledgePageItem = {
+  const fullKnowledge: OverviewPageItem = {
     scope: "org",
     content: "# Overview\n\nThis org ships fast.",
     releaseCount: 42,
@@ -483,14 +483,14 @@ describe("knowledgeToMarkdown", () => {
   });
 
   it("includes product slug for product-scoped pages", () => {
-    const knowledge: KnowledgePageItem = { ...fullKnowledge, scope: "product" };
+    const knowledge: OverviewPageItem = { ...fullKnowledge, scope: "product" };
     const md = knowledgeToMarkdown(knowledge, { productSlug: "nextjs" });
     expect(md).toContain("scope: product");
     expect(md).toContain("product: nextjs");
   });
 
   it("handles null lastContributingReleaseAt", () => {
-    const knowledge: KnowledgePageItem = { ...fullKnowledge, lastContributingReleaseAt: null };
+    const knowledge: OverviewPageItem = { ...fullKnowledge, lastContributingReleaseAt: null };
     const md = knowledgeToMarkdown(knowledge);
     expect(md).not.toContain("last_release:");
   });

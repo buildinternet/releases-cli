@@ -26,21 +26,29 @@ claude --plugin-dir plugins/claude/releases
 
 ## Available MCP Tools
 
+### search
+
+Unified lexical/semantic search across organizations, the catalog (products + standalone sources), and releases. Returns three sections in one call (`orgs`, `catalog`, `releases`); narrow with `type`. Catalog hits include a `kind: "product" | "source"` discriminator; release hits include `kind: "release" | "changelog_chunk"`. Replaces the older `search_registry` / `search_releases` pair.
+
 ### search_releases
 
-Full-text search across all indexed release notes. Filter by product, organization, or release `type`.
+Releases-only full-text search (back-compat shim — prefer `search`). Filter by product, organization, or release `type`.
 
 ### get_latest_releases
 
 Get the most recent releases, optionally filtered by product, organization, or release `type`.
 
-### list_sources
+### list_catalog
 
-List all indexed changelog sources, optionally scoped to one organization.
+List catalog entries — products and standalone sources combined into one list with a `kind: "product" | "source"` discriminator per row. Replaces `list_products` + `list_sources`.
 
-### get_source
+### get_catalog_entry
 
-Detail for a single source including org/product linkage, release count, last-fetched timestamp, and whether a CHANGELOG file is stored.
+Detail for a single catalog entry (product or standalone source) including org linkage, category, tags, and grouped sources.
+
+### list_sources / get_source
+
+Deprecated — use `list_catalog` / `get_catalog_entry`. Kept as aliases for one release cycle.
 
 ### get_source_changelog
 
@@ -58,13 +66,9 @@ Get detailed information about a single organization. Includes a short preview o
 
 Read the full AI-generated overview for an organization — a short briefing that distills recent changelog activity into themed sections.
 
-### list_products
+### list_products / get_product
 
-List products, optionally scoped to one organization.
-
-### get_product
-
-Detail for a single product with its organization, category, tags, and the sources grouped under it.
+Deprecated — use `list_catalog` / `get_catalog_entry`. Kept as aliases for one release cycle.
 
 ## Usage Examples
 
