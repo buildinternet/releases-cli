@@ -177,7 +177,7 @@ export async function removeIgnoredUrl(url: string, orgId: string): Promise<void
 
 export async function findBlockedUrl(url: string): Promise<BlockedUrl | null> {
   const encoded = encodeURIComponent(url);
-  return apiFetch<BlockedUrl | null>(`/v1/blocked-urls?url=${encoded}&single=true`);
+  return apiFetch<BlockedUrl | null>(`/v1/admin/blocklist?url=${encoded}&single=true`);
 }
 
 export async function addBlockedUrl(
@@ -185,18 +185,18 @@ export async function addBlockedUrl(
   type: "exact" | "domain",
   reason?: string,
 ): Promise<void> {
-  await apiFetch("/v1/blocked-urls", {
+  await apiFetch("/v1/admin/blocklist", {
     method: "POST",
     body: JSON.stringify({ pattern, type, reason }),
   });
 }
 
 export async function listBlockedUrls(): Promise<BlockedUrl[]> {
-  return apiFetch<BlockedUrl[]>("/v1/blocked-urls");
+  return apiFetch<BlockedUrl[]>("/v1/admin/blocklist");
 }
 
 export async function removeBlockedUrl(pattern: string): Promise<void> {
-  await apiFetch(`/v1/blocked-urls/${encodeURIComponent(pattern)}`, { method: "DELETE" });
+  await apiFetch(`/v1/admin/blocklist/${encodeURIComponent(pattern)}`, { method: "DELETE" });
 }
 
 // ── Release CRUD ──
