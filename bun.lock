@@ -22,12 +22,12 @@
         "lint-staged": "^16.4.0",
         "oxlint": "^1.60.0",
         "prettier": "^3.8.3",
-        "typescript": "^5.6.3",
+        "typescript": "^6.0.3",
       },
     },
     "npm/releases": {
       "name": "@buildinternet/releases",
-      "version": "0.19.5",
+      "version": "0.20.0",
       "bin": {
         "releases": "bin/releases",
       },
@@ -40,27 +40,27 @@
     },
     "npm/releases-darwin-arm64": {
       "name": "@buildinternet/releases-darwin-arm64",
-      "version": "0.19.5",
+      "version": "0.20.0",
     },
     "npm/releases-darwin-x64": {
       "name": "@buildinternet/releases-darwin-x64",
-      "version": "0.19.5",
+      "version": "0.20.0",
     },
     "npm/releases-linux-arm64": {
       "name": "@buildinternet/releases-linux-arm64",
-      "version": "0.19.5",
+      "version": "0.20.0",
     },
     "npm/releases-linux-x64": {
       "name": "@buildinternet/releases-linux-x64",
-      "version": "0.19.5",
+      "version": "0.20.0",
     },
     "packages/lib": {
       "name": "@buildinternet/releases-lib",
-      "version": "0.19.5",
+      "version": "0.20.0",
     },
     "packages/skills": {
       "name": "@buildinternet/releases-skills",
-      "version": "0.19.5",
+      "version": "0.20.0",
     },
   },
   "packages": {
@@ -530,7 +530,7 @@
 
     "type-is": ["type-is@2.0.1", "", { "dependencies": { "content-type": "^1.0.5", "media-typer": "^1.1.0", "mime-types": "^3.0.0" } }, "sha512-OZs6gsjF4vMp32qrCbiVSkrFmXtG/AZhY3t0iAMrMBiAZyV9oALtXO8hsrHbMXF9x6L3grlFuwW2oAz7cav+Gw=="],
 
-    "typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
+    "typescript": ["typescript@6.0.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw=="],
 
     "undici-types": ["undici-types@7.19.2", "", {}, "sha512-qYVnV5OEm2AW8cJMCpdV20CDyaN3g0AjDlOGf1OW4iaDEx8MwdtChUp4zu4H0VP3nDRF/8RKWH+IPp9uW0YGZg=="],
 
