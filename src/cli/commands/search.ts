@@ -3,7 +3,7 @@ import chalk from "chalk";
 import { unifiedSearch } from "../../api/client.js";
 import { stripAnsi } from "../../lib/sanitize.js";
 import { logger } from "@releases/lib/logger";
-import type { UnifiedSearchResponse } from "../../api/types.js";
+import type { LookupResultPayload, UnifiedSearchResponse } from "../../api/types.js";
 import { writeJson } from "../../lib/output.js";
 
 const SEARCH_MODES = ["lexical", "semantic", "hybrid"] as const;
@@ -21,6 +21,93 @@ function normalizeType(raw: string): SearchSection {
   if (raw === "products") return "catalog";
   if (raw === "orgs" || raw === "catalog" || raw === "releases") return raw;
   throw new Error(`Invalid --type value: "${raw}". Expected one of: orgs, catalog, releases.`);
+}
+
+const PREVIEW_LIMIT = 5;
+
+function formatShortDate(iso: string | null): string {
+  if (!iso) return "No date";
+  try {
+    return new Date(iso).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      timeZone: "UTC",
+    });
+  } catch {
+    return iso;
+  }
+}
+
+function renderLookup(lookup: LookupResultPayload, query: string): void {
+  console.log(chalk.bold.underline("Lookup"));
+
+  const { status, source, releases, relatedOrg } = lookup;
+
+  // Status label — green for found, dim for not-found variants
+  const isFound = status === "indexed" || status === "existing";
+  const statusLabel = isFound
+    ? chalk.green.bold(status.toUpperCase())
+    : chalk.dim(status.toUpperCase());
+
+  const coordinate = source?.name ?? query;
+  console.log(`  ${statusLabel}  ${chalk.cyan.bold(stripAnsi(coordinate))}`);
+
+  // Status body
+  switch (status) {
+    case "indexed":
+      console.log(`  Just indexed ${stripAnsi(coordinate)}. We pulled this from GitHub on demand.`);
+      break;
+    case "existing":
+      console.log(`  Indexed ${stripAnsi(coordinate)}. (cached)`);
+      break;
+    case "empty":
+      console.log(`  ${stripAnsi(query)}: real repo, but no tagged releases or CHANGELOG yet.`);
+      break;
+    case "not_found":
+      console.log(
+        `  ${stripAnsi(query)}: no public repo found at github.com/${stripAnsi(query)}. May be private, archived, or renamed.`,
+      );
+      break;
+    case "deferred":
+      console.log(`  ${stripAnsi(query)}: indexing in progress. Try again in a moment.`);
+      break;
+  }
+
+  // Source link when available
+  if (source?.slug) {
+    console.log(chalk.dim(`  View source: https://releases.sh/source/${source.slug}`));
+  }
+
+  // Release preview
+  if (releases && releases.length > 0) {
+    console.log();
+    console.log(chalk.dim("  Recent releases:"));
+    const shown = releases.slice(0, PREVIEW_LIMIT);
+    for (const r of shown) {
+      const ver = r.version ? chalk.cyan(r.version) : chalk.dim("(no version)");
+      const date = chalk.dim(formatShortDate(r.publishedAt));
+      console.log(`    ${ver}   ${date}`);
+    }
+    const remaining = releases.length - shown.length;
+    if (remaining > 0) {
+      console.log(chalk.dim(`    (${remaining} more)`));
+    }
+  }
+
+  // Related org rail
+  if (relatedOrg) {
+    console.log();
+    console.log(
+      `  ${chalk.dim("Did you mean:")} ${chalk.cyan.bold(stripAnsi(relatedOrg.org.name))}`,
+    );
+    for (const s of relatedOrg.sources) {
+      const nameCol = stripAnsi(s.name).padEnd(20);
+      console.log(`    ${chalk.bold(nameCol)}  ${chalk.dim(s.url)}`);
+    }
+  }
+
+  console.log();
 }
 
 export function registerSearchCommand(program: Command) {
@@ -77,6 +164,7 @@ export function registerSearchCommand(program: Command) {
           if (response.degraded !== undefined) filtered.degraded = response.degraded;
           if (response.degradedReason !== undefined)
             filtered.degradedReason = response.degradedReason;
+          if (response.lookup != null) filtered.lookup = response.lookup;
           await writeJson(filtered);
           return;
         }
@@ -88,6 +176,12 @@ export function registerSearchCommand(program: Command) {
         }
 
         let totalResults = 0;
+
+        // Lookup rail — always shown when present, regardless of --type filter.
+        if (response.lookup != null) {
+          renderLookup(response.lookup, query);
+          totalResults += 1;
+        }
 
         if (types.includes("orgs") && response.orgs.length > 0) {
           console.log(chalk.bold.underline("Organizations"));
