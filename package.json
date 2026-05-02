@@ -13,6 +13,7 @@
     "build:linux": "bun build --compile src/index.ts --outfile dist/releases --target=bun-linux-x64",
     "build:linux-arm64": "bun build --compile src/index.ts --outfile dist/releases --target=bun-linux-arm64",
     "build:darwin-x64": "bun build --compile src/index.ts --outfile dist/releases --target=bun-darwin-x64",
+    "build:windows-x64": "bun build --compile src/index.ts --outfile dist/releases.exe --target=bun-windows-x64",
     "dev": "bun --watch src/index.ts",
     "sync:plugin-skills": "bun scripts/sync-plugin-skills.ts",
     "sync:version": "bun scripts/sync-version.ts",
