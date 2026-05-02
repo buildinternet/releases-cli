@@ -22,6 +22,17 @@ Flags:
 
 Catalog hits also include the response field `catalog`. Older API deploys will still send the deprecated `products` alias instead — the CLI reads either, but new code should consume `catalog`.
 
+### On-demand GitHub lookup
+
+When the query is a `{org}/{repo}` coordinate (optionally prefixed `github:`) and no entity (org or catalog source) matched, the registry probes GitHub on demand and the CLI prints a **Lookup** section above the regular results. Coordinate matching is case-insensitive — `Shopify/toxiproxy` and `shopify/toxiproxy` resolve to the same source row. The lookup fires even when tangential release hits surface on a single segment token, so a coordinate is treated as a precise question about one repo.
+
+```bash
+releases search "vercel/next.js"             # bare coordinate
+releases search "github:Shopify/toxiproxy"   # explicit provider prefix
+```
+
+Statuses on the Lookup section: `INDEXED` (just materialized), `EXISTING` (already tracked), `EMPTY` (real repo, no releases or CHANGELOG yet), `NOT_FOUND` (private/archived/missing), `DEFERRED` (rate-limited or 5xx — retry shortly).
+
 ## Latest releases
 
 ```bash

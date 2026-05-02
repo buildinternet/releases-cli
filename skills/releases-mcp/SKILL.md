@@ -29,6 +29,7 @@ If the query returns no results, try variations:
 - The company name instead of the product name (e.g., "Vercel" instead of "Next.js")
 - The GitHub org name (e.g., "supabase")
 - A domain (e.g., "tailwindcss.com")
+- A `{org}/{repo}` GitHub coordinate (e.g., "vercel/next.js" or "github:vercel/next.js"). When `search` finds no entity match for a coordinate-shaped query, the registry probes GitHub on demand and the response includes a `lookup` field with status `indexed` / `existing` / `empty` / `not_found` / `deferred`. Coordinate matching is case-insensitive, so `Shopify/toxiproxy` and `shopify/toxiproxy` resolve identically.
 
 ### Step 2: Choose the Right Tool
 
