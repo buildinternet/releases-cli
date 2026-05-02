@@ -52,8 +52,13 @@ export async function verifyWebhookPayload(args: {
   allowStale?: boolean;
   nowMs?: number;
 }): Promise<VerifyResult> {
-  const ts = parseInt(args.timestampHeader, 10);
-  if (!Number.isFinite(ts)) {
+  // Strict integer match — parseInt would silently accept "1700000000junk"
+  // and parse just the prefix, which would let a tampered header pass.
+  if (!/^-?\d+$/.test(args.timestampHeader)) {
+    return { ok: false, reason: "invalid_timestamp" };
+  }
+  const ts = Number(args.timestampHeader);
+  if (!Number.isSafeInteger(ts)) {
     return { ok: false, reason: "invalid_timestamp" };
   }
 
@@ -111,12 +116,16 @@ export function registerWebhookCommand(parent: Command): void {
       "Skip the ±5 minute timestamp-window check (for verifying old captured payloads)",
     )
     .action(async (opts: VerifyOpts) => {
-      // Exactly one of --body or --body-file is required.
-      if (!opts.body && !opts.bodyFile) {
+      // Exactly one of --body or --body-file is required. Use `!== undefined`
+      // rather than truthy checks so an intentional empty payload (--body "")
+      // is accepted and the exclusivity rule still fires.
+      const hasBody = opts.body !== undefined;
+      const hasBodyFile = opts.bodyFile !== undefined;
+      if (!hasBody && !hasBodyFile) {
         console.error(chalk.red("Error: provide --body <string> or --body-file <path>"));
         process.exit(1);
       }
-      if (opts.body && opts.bodyFile) {
+      if (hasBody && hasBodyFile) {
         console.error(chalk.red("Error: --body and --body-file are mutually exclusive"));
         process.exit(1);
       }
@@ -137,13 +146,23 @@ export function registerWebhookCommand(parent: Command): void {
         rawBody = opts.body!;
       }
 
-      const result = await verifyWebhookPayload({
-        signingKeyHex: opts.key,
-        timestampHeader: opts.timestamp,
-        rawBody,
-        signatureHeader: opts.signature,
-        allowStale: opts.allowStale,
-      });
+      let result: VerifyResult;
+      try {
+        result = await verifyWebhookPayload({
+          signingKeyHex: opts.key,
+          timestampHeader: opts.timestamp,
+          rawBody,
+          signatureHeader: opts.signature,
+          allowStale: opts.allowStale,
+        });
+      } catch (err) {
+        // Malformed signing key or other internal error — surface as a clean
+        // CLI failure instead of a stack trace.
+        console.error(
+          chalk.red(`✗ Verification error: ${err instanceof Error ? err.message : String(err)}`),
+        );
+        process.exit(1);
+      }
 
       if (result.ok) {
         console.log(chalk.green("✓ Signature valid"));

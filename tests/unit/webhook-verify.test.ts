@@ -138,4 +138,28 @@ describe("verifyWebhookPayload", () => {
     });
     expect(result).toEqual({ ok: false, reason: "timestamp_outside_window" });
   });
+
+  it("rejects a numeric-prefix timestamp ('<real>junk') that parseInt would silently accept", async () => {
+    const result = await verifyWebhookPayload({
+      signingKeyHex: KEY_HEX,
+      timestampHeader: `${NOW_SEC}junk`,
+      rawBody: BODY,
+      signatureHeader: "sha256=abc",
+      nowMs: NOW_MS,
+    });
+    expect(result).toEqual({ ok: false, reason: "invalid_timestamp" });
+  });
+
+  it('verifies an empty body when --body "" is used (truthy check would have rejected it)', async () => {
+    const ts = NOW_SEC;
+    const sig = await sign(KEY_HEX, ts, "");
+    const result = await verifyWebhookPayload({
+      signingKeyHex: KEY_HEX,
+      timestampHeader: String(ts),
+      rawBody: "",
+      signatureHeader: sig,
+      nowMs: NOW_MS,
+    });
+    expect(result).toEqual({ ok: true });
+  });
 });
