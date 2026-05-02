@@ -209,7 +209,7 @@ export function registerSearchCommand(program: Command) {
         if (types.includes("releases") && response.releases.length > 0) {
           console.log(chalk.bold.underline("Releases"));
           for (const r of response.releases) {
-            const idLabel = r.id ? ` ${chalk.dim(r.id.slice(0, 12))}` : "";
+            const idLabel = r.id ? ` ${chalk.dim(r.id)}` : "";
             console.log(`  ${chalk.cyan.bold(stripAnsi(r.title))}${idLabel}`);
             console.log(
               chalk.dim(
