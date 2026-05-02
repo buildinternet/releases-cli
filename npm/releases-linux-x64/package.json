@@ -1,6 +1,6 @@
 {
   "name": "@buildinternet/releases-linux-x64",
-  "version": "0.22.1",
+  "version": "0.23.0",
   "description": "releases binary for Linux x64",
   "os": [
     "linux"
