@@ -33,7 +33,7 @@ export function renderLatestReleasesTable(rows: LatestRelease[], opts: RenderOpt
       : (row.publishedAt?.slice(0, 10) ?? chalk.dim("—"));
 
     table.push([
-      chalk.dim(row.id.slice(0, 12)),
+      chalk.dim(row.id),
       `${stripAnsi(row.sourceName)} ${chalk.dim(`(${row.sourceSlug})`)}`,
       titleCell,
       row.version ? stripAnsi(row.version) : opts.withSummary ? "-" : chalk.dim("—"),

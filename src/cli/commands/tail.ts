@@ -13,7 +13,7 @@ function renderStreamLine(row: LatestRelease): string {
   const when = row.publishedAt ? chalk.dim(row.publishedAt) : chalk.dim("(no date)");
   const src = `${chalk.cyan(stripAnsi(row.sourceName))} ${chalk.dim(`(${row.sourceSlug})`)}`;
   const title = stripAnsi(row.title);
-  const id = chalk.dim(row.id.slice(0, 12));
+  const id = chalk.dim(row.id);
   return `${when}  ${src}  ${version ? version + "  " : ""}${title}  ${id}`;
 }
 
