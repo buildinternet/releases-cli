@@ -9,6 +9,7 @@
       "@buildinternet/releases-darwin-x64",
       "@buildinternet/releases-linux-arm64",
       "@buildinternet/releases-linux-x64",
+      "@buildinternet/releases-windows-x64",
       "@buildinternet/releases-lib",
       "@buildinternet/releases-skills"
     ]

@@ -47,3 +47,25 @@ jobs:
 
       - name: Test
         run: bun test
+
+  smoke-windows:
+    name: Windows binary smoke test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: canary
+
+      - run: bun install --frozen-lockfile
+
+      # Native compile on Windows — proves the same artifact published via npm
+      # actually starts on a Windows host. Cross-compile from Linux is what
+      # release.yml ships; this catches Bun-on-Windows runtime regressions.
+      - name: Compile for Windows
+        run: bun build --compile src/index.ts --outfile dist/releases.exe
+
+      - name: Run --version
+        shell: bash
+        run: ./dist/releases.exe --version

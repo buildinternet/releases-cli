@@ -16,7 +16,8 @@
     "@buildinternet/releases-darwin-arm64": "0.22.1",
     "@buildinternet/releases-darwin-x64": "0.22.1",
     "@buildinternet/releases-linux-x64": "0.22.1",
-    "@buildinternet/releases-linux-arm64": "0.22.1"
+    "@buildinternet/releases-linux-arm64": "0.22.1",
+    "@buildinternet/releases-windows-x64": "0.22.1"
   },
   "keywords": [
     "changelog",

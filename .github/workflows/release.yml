@@ -36,6 +36,7 @@ jobs:
           bun build --compile src/index.ts --outfile npm/releases-darwin-x64/releases --target=bun-darwin-x64
           bun build --compile src/index.ts --outfile npm/releases-linux-x64/releases --target=bun-linux-x64
           bun build --compile src/index.ts --outfile npm/releases-linux-arm64/releases --target=bun-linux-arm64
+          bun build --compile src/index.ts --outfile npm/releases-windows-x64/releases.exe --target=bun-windows-x64
 
       - name: Configure npm auth
         env:
@@ -69,7 +70,12 @@ jobs:
             gzip -k "dist/release/releases-${target}"
             sha256sum "dist/release/releases-${target}.gz" | awk '{print $1}' > "dist/release/releases-${target}.gz.sha256"
           done
-          sha256sum dist/release/*.gz > dist/release/checksums.txt
+          # Windows ships the .exe inside a .zip (the conventional Windows
+          # archive format) rather than a single-binary .gz like the others.
+          cp "npm/releases-windows-x64/releases.exe" "dist/release/releases-windows-x64.exe"
+          (cd dist/release && zip -q "releases-windows-x64.zip" "releases-windows-x64.exe")
+          sha256sum "dist/release/releases-windows-x64.zip" | awk '{print $1}' > "dist/release/releases-windows-x64.zip.sha256"
+          sha256sum dist/release/*.gz dist/release/*.zip > dist/release/checksums.txt
 
       - name: Publish binaries to GitHub Releases
         if: steps.changesets.outputs.published == 'true'
@@ -99,6 +105,8 @@ jobs:
             dist/release/releases-linux-x64.gz.sha256 \
             dist/release/releases-linux-arm64.gz \
             dist/release/releases-linux-arm64.gz.sha256 \
+            dist/release/releases-windows-x64.zip \
+            dist/release/releases-windows-x64.zip.sha256 \
             dist/release/checksums.txt
 
       - name: Update Homebrew tap

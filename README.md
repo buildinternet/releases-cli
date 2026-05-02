@@ -19,7 +19,7 @@ The CLI talks to the hosted registry at `api.releases.sh`. Reader commands work 
 brew install buildinternet/tap/releases
 ```
 
-### npm
+### npm (macOS, Linux, Windows)
 
 ```bash
 npm install -g @buildinternet/releases
@@ -33,13 +33,17 @@ npx @buildinternet/releases@latest search "react"
 
 Always include the `@latest` tag — bare `npx @buildinternet/releases` caches the first-fetched version forever and won't pick up updates.
 
-### Shell installer
+### Shell installer (macOS, Linux)
 
 ```bash
 curl -fsSL https://releases.sh/install | bash
 ```
 
-Downloads the matching platform binary from npm. Respects `RELEASED_INSTALL_DIR` (default: `/usr/local/bin`).
+Downloads the matching platform binary from npm. Respects `RELEASED_INSTALL_DIR` (default: `/usr/local/bin`). Windows users should use npm or the GitHub Releases archive below.
+
+### Precompiled binaries (GitHub Releases)
+
+Every version publishes signed archives for each platform on the [Releases page](https://github.com/buildinternet/releases-cli/releases) — `releases-{darwin-arm64,darwin-x64,linux-arm64,linux-x64}.gz` and `releases-windows-x64.zip`, each with a matching `.sha256` and a top-level `checksums.txt`. Useful for air-gapped installs, version pinning, or platforms where npm and Homebrew aren't an option.
 
 ## Usage
 

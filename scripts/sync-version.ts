@@ -52,6 +52,7 @@ for (const pkg of [
   "npm/releases-darwin-x64/package.json",
   "npm/releases-linux-x64/package.json",
   "npm/releases-linux-arm64/package.json",
+  "npm/releases-windows-x64/package.json",
 ]) {
   updateJson(pkg, (j) => {
     j.version = newVersion;
