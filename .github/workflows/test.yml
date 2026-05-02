@@ -23,6 +23,16 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
+      # Catches workspace-topology drift (new/renamed/removed packages under
+      # npm/* or packages/*) and version-metadata drift across releases.
+      # `--frozen-lockfile` only enforces the dependency graph; a fresh install
+      # rewrites the workspaces section, and any diff means bun.lock wasn't
+      # committed alongside the change that produced it.
+      - name: Verify lockfile is up to date
+        run: |
+          bun install
+          git diff --exit-code bun.lock
+
       - name: Oxlint
         run: bun run lint
 
