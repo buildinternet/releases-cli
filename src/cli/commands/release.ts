@@ -137,7 +137,7 @@ export function registerReleaseCommand(program: Command) {
           }
           let result: Awaited<ReturnType<typeof deleteReleasesForSource>>;
           try {
-            result = await deleteReleasesForSource(resolvedSource.slug);
+            result = await deleteReleasesForSource(resolvedSource);
           } catch (err) {
             console.error(chalk.red(err instanceof Error ? err.message : String(err)));
             process.exit(1);
