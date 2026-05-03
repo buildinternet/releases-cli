@@ -12,6 +12,26 @@
  */
 export * from "@buildinternet/releases-api-types";
 
+/**
+ * Cascade-scope preview returned by `GET /v1/admin/orgs/:slug/dependents`.
+ * Defined locally until `@buildinternet/releases-api-types` ≥ 0.5.0 ships
+ * the canonical export — bump the pin in `package.json` and drop this block
+ * once the published version is in.
+ */
+export interface OrgDependentsResponse {
+  org: { id: string; slug: string; name: string };
+  counts: {
+    sources: number;
+    releases: number;
+    fetchLog: number;
+    sourceChangelogFiles: number;
+    sourceChangelogChunks: number;
+    releaseSummaries: number;
+    mediaAssets: number;
+    webhookSubscriptions: number;
+  };
+}
+
 export interface EvaluationResult {
   recommendedMethod: "feed" | "github" | "markdown" | "scrape" | "crawl";
   recommendedUrl: string;

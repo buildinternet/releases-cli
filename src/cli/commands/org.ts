@@ -18,7 +18,9 @@ import {
   getAliases,
   setAliases,
   getOverview,
+  getOrgDependents,
 } from "../../api/client.js";
+import { promptConfirm } from "../../lib/confirm.js";
 import { stripAnsi } from "../../lib/sanitize.js";
 import { logger } from "@releases/lib/logger";
 import { orgNotFound } from "../suggest.js";
@@ -369,31 +371,101 @@ Examples:
       },
     );
 
-  // ── org remove ──
+  // ── org remove / delete ──
+  // Defaults to a tombstone soft-delete (reversible). With --hard, the row is
+  // purged and the FK cascade also wipes every source, release, fetch_log,
+  // changelog file/chunk, release summary, media asset, and webhook
+  // subscription tied to the org (#690 Phase C). The command surfaces a
+  // typeback prompt before any cascade runs; --yes / -y bypasses it for
+  // scripted ops, and a piped (non-TTY) stdin without --yes errors out
+  // rather than silently confirming.
   org
     .command("remove")
-    .description("Remove an organization")
+    .alias("delete")
+    .description("Remove an organization (soft-delete by default; --hard purges with cascade)")
     .argument("<identifier>", "Org slug, domain, name, or handle")
     .option("--dry-run", "Show what would be removed without deleting")
+    .option("--hard", "Permanently delete the org and cascade-delete all dependent rows")
+    .option("-y, --yes", "Skip the confirmation prompt (required for non-interactive --hard)")
     .option("--json", "Output as JSON")
-    .action(async (identifier: string, opts: { json?: boolean; dryRun?: boolean }) => {
-      const found = await findOrg(identifier);
-      if (!found) return orgNotFound(identifier);
+    .action(
+      async (
+        identifier: string,
+        opts: { json?: boolean; dryRun?: boolean; hard?: boolean; yes?: boolean },
+      ) => {
+        // Fail fast on the obvious misconfiguration: --hard from a piped
+        // stdin without --yes. Catching this before any network call avoids
+        // a misleading API error and saves a round-trip.
+        if (opts.hard && !opts.yes && !opts.dryRun && !process.stdin.isTTY) {
+          console.error(
+            chalk.red(
+              "No interactive TTY available — pass --yes to confirm a hard delete in scripted contexts.",
+            ),
+          );
+          process.exit(1);
+        }
 
-      if (opts.dryRun) {
-        if (opts.json) await writeJson({ wouldRemove: found.slug, name: found.name });
+        const found = await findOrg(identifier);
+        if (!found) return orgNotFound(identifier);
+
+        if (opts.dryRun) {
+          if (opts.json)
+            await writeJson({ wouldRemove: found.slug, name: found.name, hard: !!opts.hard });
+          else
+            console.log(
+              chalk.yellow(
+                `[dry-run] Would ${opts.hard ? "hard-delete" : "remove"} organization: ${found.name} (${found.slug})`,
+              ),
+            );
+          return;
+        }
+
+        if (opts.hard && !opts.yes) {
+          let dependents;
+          try {
+            dependents = await getOrgDependents(found.slug);
+          } catch (err) {
+            console.error(
+              chalk.red(
+                `Failed to load cascade preview: ${err instanceof Error ? err.message : err}`,
+              ),
+            );
+            process.exit(1);
+          }
+
+          const c = dependents.counts;
+          console.error("");
+          console.error(chalk.bold.red("This will permanently delete:"));
+          console.error(`  - 1 organization (${found.name}, slug: ${found.slug})`);
+          console.error(`  - ${c.sources.toLocaleString()} sources`);
+          console.error(`  - ${c.releases.toLocaleString()} releases`);
+          console.error(`  - ${c.sourceChangelogChunks.toLocaleString()} changelog chunks`);
+          console.error(`  - ${c.sourceChangelogFiles.toLocaleString()} changelog files`);
+          console.error(`  - ${c.fetchLog.toLocaleString()} fetch log entries`);
+          console.error(`  - ${c.releaseSummaries.toLocaleString()} release summaries`);
+          console.error(`  - ${c.mediaAssets.toLocaleString()} media assets`);
+          console.error(`  - ${c.webhookSubscriptions.toLocaleString()} webhook subscriptions`);
+          console.error("");
+          console.error(chalk.red("This is irreversible."));
+
+          const confirmed = await promptConfirm(`Type the org slug to confirm: `, found.slug);
+          if (!confirmed) {
+            console.error(chalk.yellow("Slug did not match. Aborted."));
+            process.exit(1);
+          }
+        }
+
+        await removeOrg(found.slug, { hard: opts.hard });
+
+        if (opts.json) await writeJson({ removed: found.slug, hard: !!opts.hard });
         else
           console.log(
-            chalk.yellow(`[dry-run] Would remove organization: ${found.name} (${found.slug})`),
+            chalk.green(
+              `${opts.hard ? "Hard-deleted" : "Removed"} organization: ${found.name} (${found.slug})`,
+            ),
           );
-        return;
-      }
-
-      await removeOrg(found.slug);
-
-      if (opts.json) await writeJson({ removed: found.slug });
-      else console.log(chalk.green(`Removed organization: ${found.name} (${found.slug})`));
-    });
+      },
+    );
 
   // ── org link ──
   org
