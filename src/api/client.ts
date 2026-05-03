@@ -31,6 +31,7 @@ import type {
   EmbedStatusResponse,
   EvaluationResult,
   MediaItem,
+  OrgDependentsResponse,
 } from "./types.js";
 import type { ListResponse } from "@buildinternet/releases-core/cli-contracts";
 export type {
@@ -48,6 +49,7 @@ export type {
   EvaluationResult,
   Stats,
   SourceListItem,
+  OrgDependentsResponse,
 } from "./types.js";
 
 export async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T> {
@@ -630,8 +632,19 @@ export async function createOrg(
   });
 }
 
-export async function removeOrg(slug: string): Promise<void> {
-  await apiFetch(`/v1/orgs/${slug}`, { method: "DELETE" });
+export async function removeOrg(slug: string, opts?: { hard?: boolean }): Promise<void> {
+  const qs = opts?.hard ? "?hard=true" : "";
+  await apiFetch(`/v1/orgs/${slug}${qs}`, { method: "DELETE" });
+}
+
+export async function getOrgDependents(slug: string): Promise<OrgDependentsResponse> {
+  // apiFetch returns null on GET 404; surface a typed error instead so the
+  // delete flow doesn't dereference `dependents.counts` on a missing org.
+  const result = await apiFetch<OrgDependentsResponse | null>(`/v1/admin/orgs/${slug}/dependents`);
+  if (!result) {
+    throw new Error(`Org dependents preview not available for "${slug}" (org not found).`);
+  }
+  return result;
 }
 
 export async function updateOrg(
