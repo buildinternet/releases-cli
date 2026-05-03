@@ -1,5 +1,29 @@
 # @buildinternet/releases
 
+## 0.24.0
+
+### Minor Changes
+
+- 0c244f3: Adopt the org-scoped API path shape so the CLI keeps working after the monorepo rejects bare-slug source/product paths with 400 (#698).
+  - `findSource(identifier)` and `findProduct(identifier)` now branch on the input shape: typed `src_…`/`prod_…` IDs hit the legacy bare path (still safe — IDs are globally unique), `org/slug` coordinates split into the org-scoped form, and bare slugs round-trip through the new `GET /v1/lookups/{source,product}-by-slug` resolver to pick a canonical home before fetching.
+  - Mutation helpers (`updateSource`, `deleteSource`, `deleteSources`, `deleteReleasesForSource`, `insertReleasesBatch`, `checkContentHash`, `updateSourceMeta`, `updateProduct`) now take a typed-ID-bearing entity object instead of a slug string and target the bare path with `id`, which the API still accepts.
+  - `getKnownReleasesForSource(identifier, …)` accepts the same identifier shapes as `findSource`.
+
+  No CLI command surface changes — operators continue to type slugs, IDs, or `org/slug` coordinates wherever an identifier is accepted. The slug branch costs one extra round-trip to the lookup endpoint per command (cached aggressively at the network layer), which is the price for unambiguous resolution after #690 made slugs per-org.
+
+- 2a775fb: `admin org delete --hard` now shows a cascade-scope preview and requires the user to type the org slug back to confirm. Backs the post-#690 Phase C schema, where hard-deleting an org now cascades into every source, release, fetch_log, changelog file/chunk, release summary, media asset, and webhook subscription tied to it (vs. orphaning sources via SET NULL pre-flip).
+  - `releases admin org delete <slug> --hard` lists exact dependent counts, then waits for slug typeback. Wrong slug aborts with exit 1 and no API call to the destructive endpoint.
+  - `--yes` / `-y` skips the prompt for scripted ops.
+  - A piped (non-TTY) stdin without `--yes` exits 1 with a clear "no interactive TTY" message instead of silently auto-confirming.
+  - Soft-delete (default, no `--hard`) is unchanged — still tombstones via `deleted_at`, no prompt.
+  - `admin org remove` continues to work as an alias of `admin org delete`.
+
+  Counts are pulled from the new `GET /v1/admin/orgs/:slug/dependents` endpoint, so the preview matches whatever the API would actually cascade-delete. Requires `@buildinternet/releases-api-types` ≥ 0.5.0 on the server side.
+
+### Patch Changes
+
+- 57cad43: Bump `@buildinternet/releases-api-types` to `^0.4.0`. Adds the optional `type: "feature" | "rollup"` field to release-shaped wire types (`ReleaseItem`, `ReleaseDetail`, `SearchReleaseHit`) so consumers can render rollup posts (Brex Fall Release, Ramp quarterly editions, etc.) differently from feature releases. Optional on the wire — older API responses degrade gracefully.
+
 ## 0.23.0
 
 ### Minor Changes
