@@ -81,15 +81,63 @@ export async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T> 
 
 // ── Source queries ──
 
+/**
+ * Resolves an operator-supplied source identifier to a `{ orgSlug, sourceSlug }`
+ * pair the API can match without ambiguity. Accepts:
+ *
+ *   - `src_…` typed IDs: pass straight through; the bare API path still
+ *     accepts globally-unique IDs.
+ *   - `org/slug` coordinates: split locally; the API takes the org-scoped
+ *     pair directly.
+ *   - bare slugs: round-trip through `GET /v1/lookups/source-by-slug` to
+ *     pick the canonical org for the slug. The lookup endpoint returns the
+ *     oldest match so repeated calls land on the same row when a slug
+ *     exists under multiple orgs (a side effect of #690 per-org slug
+ *     uniqueness).
+ *
+ * Returns `null` when no matching source exists. Throws on API errors.
+ */
+async function resolveSourceTarget(
+  identifier: string,
+): Promise<{ pathSegment: string; sourceId: string } | null> {
+  if (identifier.startsWith("src_")) {
+    return { pathSegment: `/v1/sources/${encodeURIComponent(identifier)}`, sourceId: identifier };
+  }
+  const slash = identifier.indexOf("/");
+  if (slash > 0 && slash < identifier.length - 1) {
+    const orgSlug = identifier.slice(0, slash);
+    const sourceSlug = identifier.slice(slash + 1);
+    return {
+      pathSegment: `/v1/orgs/${encodeURIComponent(orgSlug)}/sources/${encodeURIComponent(sourceSlug)}`,
+      sourceId: "", // unknown until we hydrate via findSource — callers that need the ID re-read source.id from the result
+    };
+  }
+  // Bare slug — bounce through the lookup resolver to get an unambiguous home.
+  const resolved = await apiFetch<{
+    sourceId: string;
+    sourceSlug: string;
+    orgSlug: string;
+  } | null>(`/v1/lookups/source-by-slug?slug=${encodeURIComponent(identifier)}`);
+  if (!resolved) return null;
+  return {
+    pathSegment: `/v1/orgs/${encodeURIComponent(resolved.orgSlug)}/sources/${encodeURIComponent(resolved.sourceSlug)}`,
+    sourceId: resolved.sourceId,
+  };
+}
+
 export async function findSource(identifier: string): Promise<Source | null> {
   // API returns enriched data — extra fields are harmlessly ignored by callers expecting Source
-  return apiFetch<Source | null>(`/v1/sources/${identifier}`);
+  const target = await resolveSourceTarget(identifier);
+  if (!target) return null;
+  return apiFetch<Source | null>(target.pathSegment);
 }
 
 export async function sourceChangelog(
-  slug: string,
+  identifier: string,
   range?: { path?: string; offset?: number; limit?: number; tokens?: number },
 ): Promise<SourceChangelogResponse | null> {
+  const target = await resolveSourceTarget(identifier);
+  if (!target) return null;
   const params = new URLSearchParams();
   if (range?.path !== undefined) params.set("path", range.path);
   if (range?.offset !== undefined) params.set("offset", String(range.offset));
@@ -97,7 +145,7 @@ export async function sourceChangelog(
   if (range?.tokens !== undefined) params.set("tokens", String(range.tokens));
   const qs = params.toString();
   return apiFetch<SourceChangelogResponse | null>(
-    `/v1/sources/${slug}/changelog${qs ? `?${qs}` : ""}`,
+    `${target.pathSegment}/changelog${qs ? `?${qs}` : ""}`,
   );
 }
 
@@ -244,8 +292,9 @@ export async function unsuppressRelease(releaseId: string): Promise<boolean> {
 // ── Content hash ──
 
 export async function checkContentHash(source: Source, contentHash: string): Promise<boolean> {
+  // Use the stable typed ID — slug-form bare paths return 400 after #698.
   const result = await apiFetch<{ unchanged: boolean } | null>(
-    `/v1/sources/${source.slug}/content-hash`,
+    `/v1/sources/${encodeURIComponent(source.id)}/content-hash`,
     {
       method: "POST",
       body: JSON.stringify({ contentHash }),
@@ -504,12 +553,14 @@ export async function getLatestReleases(opts: {
 // ── Known releases for incremental parsing ──
 
 export async function getKnownReleasesForSource(
-  sourceSlug: string,
+  sourceIdentifier: string,
   limit: number,
 ): Promise<Array<{ version: string | null; title: string; publishedAt: string | null }>> {
+  const target = await resolveSourceTarget(sourceIdentifier);
+  if (!target) return [];
   const data = await apiFetch<
     Array<{ version: string | null; title: string; publishedAt: string | null }>
-  >(`/v1/sources/${sourceSlug}/known-releases?limit=${limit}`);
+  >(`${target.pathSegment}/known-releases?limit=${limit}`);
   return data ?? [];
 }
 
@@ -534,19 +585,22 @@ export async function listSourcesWithChanges(): Promise<Source[]> {
 
 // ── Source CRUD ──
 
-export async function updateSource(slug: string, data: Record<string, unknown>): Promise<Source> {
-  return apiFetch<Source>(`/v1/sources/${slug}`, {
+export async function updateSource(
+  source: Pick<Source, "id">,
+  data: Record<string, unknown>,
+): Promise<Source> {
+  return apiFetch<Source>(`/v1/sources/${encodeURIComponent(source.id)}`, {
     method: "PATCH",
     body: JSON.stringify(data),
   });
 }
 
-export async function deleteSource(slug: string): Promise<void> {
-  await apiFetch(`/v1/sources/${slug}`, { method: "DELETE" });
+export async function deleteSource(source: Pick<Source, "id">): Promise<void> {
+  await apiFetch(`/v1/sources/${encodeURIComponent(source.id)}`, { method: "DELETE" });
 }
 
 export async function insertReleasesBatch(
-  sourceSlug: string,
+  source: Pick<Source, "id">,
   releaseRows: Array<{
     version?: string | null;
     title: string;
@@ -561,9 +615,10 @@ export async function insertReleasesBatch(
   for (let i = 0; i < releaseRows.length; i += 5) {
     chunks.push(releaseRows.slice(i, i + 5));
   }
+  const path = `/v1/sources/${encodeURIComponent(source.id)}/releases/batch`;
   const settled = await Promise.allSettled(
     chunks.map((chunk) =>
-      apiFetch<{ inserted: number; total: number }>(`/v1/sources/${sourceSlug}/releases/batch`, {
+      apiFetch<{ inserted: number; total: number }>(path, {
         method: "POST",
         body: JSON.stringify({ releases: chunk }),
       }),
@@ -579,7 +634,7 @@ export async function insertReleasesBatch(
 
   if (failures.length > 0) {
     logger.warn(
-      `insertReleasesBatch(${sourceSlug}): ${failures.length}/${chunks.length} chunk(s) failed — ${failures.map(String).join("; ")}`,
+      `insertReleasesBatch(${source.id}): ${failures.length}/${chunks.length} chunk(s) failed — ${failures.map(String).join("; ")}`,
     );
   }
 
@@ -588,8 +643,10 @@ export async function insertReleasesBatch(
   return { inserted, total };
 }
 
-export async function deleteReleasesForSource(sourceSlug: string): Promise<{ deleted: number }> {
-  return apiFetch(`/v1/sources/${sourceSlug}/releases`, { method: "DELETE" });
+export async function deleteReleasesForSource(
+  source: Pick<Source, "id">,
+): Promise<{ deleted: number }> {
+  return apiFetch(`/v1/sources/${encodeURIComponent(source.id)}/releases`, { method: "DELETE" });
 }
 
 export async function createSource(data: {
@@ -710,8 +767,41 @@ export async function createProduct(
   });
 }
 
+/** Sibling of `resolveSourceTarget` for products. Same identifier shapes. */
+async function resolveProductTarget(
+  identifier: string,
+): Promise<{ pathSegment: string; productId: string } | null> {
+  if (identifier.startsWith("prod_")) {
+    return {
+      pathSegment: `/v1/products/${encodeURIComponent(identifier)}`,
+      productId: identifier,
+    };
+  }
+  const slash = identifier.indexOf("/");
+  if (slash > 0 && slash < identifier.length - 1) {
+    const orgSlug = identifier.slice(0, slash);
+    const productSlug = identifier.slice(slash + 1);
+    return {
+      pathSegment: `/v1/orgs/${encodeURIComponent(orgSlug)}/products/${encodeURIComponent(productSlug)}`,
+      productId: "",
+    };
+  }
+  const resolved = await apiFetch<{
+    productId: string;
+    productSlug: string;
+    orgSlug: string;
+  } | null>(`/v1/lookups/product-by-slug?slug=${encodeURIComponent(identifier)}`);
+  if (!resolved) return null;
+  return {
+    pathSegment: `/v1/orgs/${encodeURIComponent(resolved.orgSlug)}/products/${encodeURIComponent(resolved.productSlug)}`,
+    productId: resolved.productId,
+  };
+}
+
 export async function findProduct(identifier: string): Promise<Product | null> {
-  return apiFetch<Product | null>(`/v1/products/${identifier}`);
+  const target = await resolveProductTarget(identifier);
+  if (!target) return null;
+  return apiFetch<Product | null>(target.pathSegment);
 }
 
 export async function getProductsByOrg(
@@ -720,8 +810,11 @@ export async function getProductsByOrg(
   return apiFetch<Array<Product & { sourceCount: number }>>(`/v1/products?orgId=${orgId}`);
 }
 
-export async function updateProduct(slug: string, data: Record<string, unknown>): Promise<Product> {
-  return apiFetch<Product>(`/v1/products/${slug}`, {
+export async function updateProduct(
+  product: Pick<Product, "id">,
+  data: Record<string, unknown>,
+): Promise<Product> {
+  return apiFetch<Product>(`/v1/products/${encodeURIComponent(product.id)}`, {
     method: "PATCH",
     body: JSON.stringify(data),
   });
@@ -1052,7 +1145,7 @@ export async function updateSourceMeta(
     else merged[k] = v;
   }
   const serialized = JSON.stringify(merged);
-  await apiFetch(`/v1/sources/${source.slug}`, {
+  await apiFetch(`/v1/sources/${encodeURIComponent(source.id)}`, {
     method: "PATCH",
     body: JSON.stringify({ metadata: serialized }),
   });
@@ -1067,8 +1160,8 @@ export async function findSourcesBySlugs(slugs: string[]): Promise<Source[]> {
   return results.filter((r): r is Source => r !== null);
 }
 
-export async function deleteSources(slugs: string[]): Promise<void> {
-  await Promise.all(slugs.map((s) => deleteSource(s)));
+export async function deleteSources(sources: Array<Pick<Source, "id">>): Promise<void> {
+  await Promise.all(sources.map((s) => deleteSource(s)));
 }
 
 // ── Exclusion check (compose blocked + ignored) ──

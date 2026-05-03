@@ -84,8 +84,7 @@ export function registerRemoveCommand(program: Command) {
         }
 
         if (existing.length > 0) {
-          const foundSlugList = existing.map((s) => s.slug);
-          await deleteSources(foundSlugList);
+          await deleteSources(existing);
 
           for (const source of existing) {
             results.push({

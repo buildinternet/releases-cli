@@ -190,7 +190,7 @@ export function registerProductCommand(program: Command) {
           process.exit(1);
         }
 
-        const updated = await updateProduct(found.slug, updates);
+        const updated = await updateProduct(found, updates);
 
         if (opts.json) await writeJson(updated);
         else console.log(chalk.green(`Product updated: ${updated.name} (${updated.slug})`));
@@ -297,7 +297,7 @@ export function registerProductCommand(program: Command) {
 
         await Promise.all(
           sources.map((source) =>
-            updateSource(source.slug, { orgId: targetOrg.id, productId: created.id }),
+            updateSource(source, { orgId: targetOrg.id, productId: created.id }),
           ),
         );
 

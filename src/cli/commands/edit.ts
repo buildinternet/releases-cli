@@ -237,7 +237,7 @@ export function registerEditCommand(program: Command) {
         }
 
         if (Object.keys(updates).length > 0) {
-          const updated = await updateSource(source.slug, updates);
+          const updated = await updateSource(source, updates);
           if (opts.slug && updated.slug !== opts.slug) {
             const idx = changes.findIndex((c) => c.startsWith("slug →"));
             if (idx !== -1) changes.splice(idx, 1);
