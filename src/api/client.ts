@@ -638,7 +638,13 @@ export async function removeOrg(slug: string, opts?: { hard?: boolean }): Promis
 }
 
 export async function getOrgDependents(slug: string): Promise<OrgDependentsResponse> {
-  return apiFetch<OrgDependentsResponse>(`/v1/admin/orgs/${slug}/dependents`);
+  // apiFetch returns null on GET 404; surface a typed error instead so the
+  // delete flow doesn't dereference `dependents.counts` on a missing org.
+  const result = await apiFetch<OrgDependentsResponse | null>(`/v1/admin/orgs/${slug}/dependents`);
+  if (!result) {
+    throw new Error(`Org dependents preview not available for "${slug}" (org not found).`);
+  }
+  return result;
 }
 
 export async function updateOrg(

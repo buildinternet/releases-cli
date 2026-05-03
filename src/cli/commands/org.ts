@@ -394,9 +394,10 @@ Examples:
         opts: { json?: boolean; dryRun?: boolean; hard?: boolean; yes?: boolean },
       ) => {
         // Fail fast on the obvious misconfiguration: --hard from a piped
-        // stdin without --yes. Catching this before any network call avoids
-        // a misleading API error and saves a round-trip.
-        if (opts.hard && !opts.yes && !opts.dryRun && !process.stdin.isTTY) {
+        // stdin without --yes. Applies to --dry-run too — a scripted hard
+        // delete that "works" in dry-run only to error in the real run is
+        // a worse outcome than a single up-front complaint.
+        if (opts.hard && !opts.yes && !process.stdin.isTTY) {
           console.error(
             chalk.red(
               "No interactive TTY available — pass --yes to confirm a hard delete in scripted contexts.",
