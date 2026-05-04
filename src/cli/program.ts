@@ -119,6 +119,8 @@ function printStyledHelp(): string {
       `Use ${chalk.white('"releases <command> --help"')} for more information about a command.`,
     ),
   );
+  lines.push("");
+  lines.push(chalk.dim("Exit codes: see README.md#exit-codes"));
 
   return lines.join("\n");
 }
