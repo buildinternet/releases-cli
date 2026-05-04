@@ -36,9 +36,12 @@ export function registerTailCommand(program: Command) {
     .command("tail")
     .alias("latest")
     .description("Show the latest releases, optionally tailing a live feed")
-    .argument("[slug]", "Source slug to filter by")
+    .argument("[source]", "Source ID (src_…) or slug to filter by")
     .option("-c, --count <n>", "Number of releases to show", "10")
-    .option("--org <identifier>", "Filter to an organization")
+    .option(
+      "--org <identifier>",
+      "Filter to an organization (org_…, slug, domain, name, or handle)",
+    )
     .option(
       "--include-coverage",
       "Include releases that are coverage of another (hidden by default)",
@@ -60,7 +63,7 @@ Examples:
     )
     .action(
       async (
-        slug: string | undefined,
+        sourceArg: string | undefined,
         opts: {
           count: string;
           org?: string;
@@ -73,9 +76,9 @@ Examples:
         const count = parseInt(opts.count, 10);
         const intervalSeconds = Math.max(5, parseInt(opts.interval, 10) || 60);
 
-        if (slug) {
-          const source = await findSource(slug);
-          if (!source) return sourceNotFound(slug);
+        if (sourceArg) {
+          const source = await findSource(sourceArg);
+          if (!source) return sourceNotFound(sourceArg);
         }
 
         let orgSlug: string | undefined;
@@ -85,7 +88,12 @@ Examples:
           orgSlug = org.slug;
         }
 
-        const fetchOpts = { slug, orgSlug, count, includeCoverage: opts.includeCoverage };
+        const fetchOpts = {
+          source: sourceArg,
+          org: orgSlug,
+          count,
+          includeCoverage: opts.includeCoverage,
+        };
         const rows = await getLatestReleases(fetchOpts);
 
         if (opts.json) {
@@ -100,7 +108,7 @@ Examples:
           console.log(renderLatestReleasesTable(rows, { withSummary: true }));
           console.log(
             chalk.dim(
-              `\n  More: "releases show <rel_id>" for full content · "releases tail <source-slug>" to filter by source`,
+              `\n  More: "releases get <rel_id>" for full content · "releases tail <source>" to filter by source (src_… or slug)`,
             ),
           );
         }

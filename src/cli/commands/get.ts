@@ -123,7 +123,7 @@ async function renderOrg(
   org: { id: string; name: string; slug: string; domain: string | null; category: string | null },
   opts: GetEntityOpts,
 ) {
-  const releases = await getLatestReleases({ orgSlug: org.slug, count: 10 });
+  const releases = await getLatestReleases({ org: org.slug, count: 10 });
 
   if (opts.json) {
     await writeJson({ ...org, releases });

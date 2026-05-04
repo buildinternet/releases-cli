@@ -12,8 +12,8 @@ import { deleteSourceAction, type DeleteSourceOpts } from "./delete.js";
 export function registerRemoveCommand(program: Command) {
   program
     .command("remove")
-    .description("(deprecated — use delete) Remove one or more changelog sources by slug")
-    .argument("<slugs...>", "Slugs of sources to remove")
+    .description("(deprecated — use delete) Remove one or more changelog sources")
+    .argument("<sources...>", "Source IDs (src_…) or slugs to remove")
     .option("--ignore", "Add each source URL to the ignored list before removing")
     .option("--reason <reason>", "Reason for ignoring (used with --ignore)")
     .option("--dry-run", "Show what would be removed without deleting")

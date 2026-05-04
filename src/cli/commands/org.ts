@@ -379,7 +379,7 @@ export function registerOrgCommand(program: Command) {
   org
     .command("list")
     .description("List all organizations")
-    .option("--query <text>", "Filter by name, slug, domain, or handle")
+    .option("--query <text>", "Filter by name, slug, domain, handle, or org_ id")
     .option("--platform <platform>", "Filter to orgs with an account on this platform")
     .option("--json", "Output as JSON")
     .option("--limit <n>", `Limit the number of results (default ${DEFAULT_PAGE_SIZE})`)
@@ -472,14 +472,14 @@ export function registerOrgCommand(program: Command) {
   org
     .command("get")
     .description("Get organization details")
-    .argument("<identifier>", "Org slug, domain, name, or account handle")
+    .argument("<identifier>", "Organization ID (org_…), slug, domain, name, or account handle")
     .option("--json", "Output as JSON")
     .action(orgGetAction);
 
   org
     .command("show")
     .description("(deprecated — use get) Show organization details")
-    .argument("<identifier>", "Org slug, domain, name, or account handle")
+    .argument("<identifier>", "Organization ID (org_…), slug, domain, name, or account handle")
     .option("--json", "Output as JSON")
     .action(warnDeprecatedAlias<[string, OrgGetOpts]>("show", "get", orgGetAction));
 
@@ -487,7 +487,7 @@ export function registerOrgCommand(program: Command) {
   org
     .command("overview")
     .description("Print the full AI-generated overview for an organization")
-    .argument("<identifier>", "Org slug, domain, name, or account handle")
+    .argument("<identifier>", "Organization ID (org_…), slug, domain, name, or account handle")
     .option("--json", "Output as JSON")
     .addHelpText(
       "after",
@@ -558,7 +558,7 @@ Examples:
   org
     .command("update")
     .description("Update an organization")
-    .argument("<identifier>", "Org slug, domain, or name")
+    .argument("<identifier>", "Organization ID (org_…), slug, domain, or name")
     .option("--name <name>", "Update display name")
     .option("--slug <slug>", "Update slug")
     .option("--domain <domain>", "Update domain")
@@ -573,7 +573,7 @@ Examples:
   org
     .command("edit")
     .description("(deprecated — use update) Edit an organization")
-    .argument("<identifier>", "Org slug, domain, or name")
+    .argument("<identifier>", "Organization ID (org_…), slug, domain, or name")
     .option("--name <name>", "Update display name")
     .option("--slug <slug>", "Update slug")
     .option("--domain <domain>", "Update domain")
@@ -589,7 +589,7 @@ Examples:
   org
     .command("delete")
     .description("Delete an organization (soft-delete by default; --hard purges with cascade)")
-    .argument("<identifier>", "Org slug, domain, name, or handle")
+    .argument("<identifier>", "Organization ID (org_…), slug, domain, name, or handle")
     .option("--dry-run", "Show what would be removed without deleting")
     .option("--hard", "Permanently delete the org and cascade-delete all dependent rows")
     .option("-y, --yes", "Skip the confirmation prompt (required for non-interactive --hard)")
@@ -599,7 +599,7 @@ Examples:
   org
     .command("remove")
     .description("(deprecated — use delete) Remove an organization")
-    .argument("<identifier>", "Org slug, domain, name, or handle")
+    .argument("<identifier>", "Organization ID (org_…), slug, domain, name, or handle")
     .option("--dry-run", "Show what would be removed without deleting")
     .option("--hard", "Permanently delete the org and cascade-delete all dependent rows")
     .option("-y, --yes", "Skip the confirmation prompt (required for non-interactive --hard)")
@@ -610,7 +610,7 @@ Examples:
   org
     .command("link")
     .description("Link a platform account to an organization")
-    .argument("<identifier>", "Org slug, domain, name, or handle")
+    .argument("<identifier>", "Organization ID (org_…), slug, domain, name, or handle")
     .requiredOption("--platform <platform>", "Platform name (github, x, etc.)")
     .requiredOption("--handle <handle>", "Account handle on the platform")
     .option("--json", "Output as JSON")
@@ -630,7 +630,7 @@ Examples:
   org
     .command("unlink")
     .description("Remove a platform account from an organization")
-    .argument("<identifier>", "Org slug")
+    .argument("<identifier>", "Organization ID (org_…) or slug")
     .requiredOption("--platform <platform>", "Platform name")
     .requiredOption("--handle <handle>", "Account handle")
     .option("--json", "Output as JSON")
@@ -653,7 +653,7 @@ Examples:
   tag
     .command("add")
     .description("Add tags to an organization")
-    .argument("<identifier>", "Org slug")
+    .argument("<identifier>", "Organization ID (org_…) or slug")
     .argument("<tags...>", "Tag names to add")
     .option("--json", "Output as JSON")
     .action(async (identifier: string, tagNames: string[], opts: { json?: boolean }) => {
@@ -671,7 +671,7 @@ Examples:
   tag
     .command("remove")
     .description("Remove tags from an organization")
-    .argument("<identifier>", "Org slug")
+    .argument("<identifier>", "Organization ID (org_…) or slug")
     .argument("<tags...>", "Tag names to remove")
     .option("--json", "Output as JSON")
     .action(async (identifier: string, tagNames: string[], opts: { json?: boolean }) => {
@@ -689,7 +689,7 @@ Examples:
   tag
     .command("list")
     .description("List tags for an organization")
-    .argument("<identifier>", "Org slug")
+    .argument("<identifier>", "Organization ID (org_…) or slug")
     .option("--json", "Output as JSON")
     .action(async (identifier: string, opts: { json?: boolean }) => {
       const found = await findOrg(identifier);
@@ -706,7 +706,7 @@ Examples:
   alias
     .command("add")
     .description("Add domain aliases to an organization")
-    .argument("<identifier>", "Org slug")
+    .argument("<identifier>", "Organization ID (org_…) or slug")
     .argument("<domains...>", "Domain names to add")
     .option("--json", "Output as JSON")
     .action(async (identifier: string, domains: string[], opts: { json?: boolean }) => {
@@ -740,7 +740,7 @@ Examples:
   alias
     .command("remove")
     .description("Remove domain aliases from an organization")
-    .argument("<identifier>", "Org slug")
+    .argument("<identifier>", "Organization ID (org_…) or slug")
     .argument("<domains...>", "Domain names to remove")
     .option("--json", "Output as JSON")
     .action(async (identifier: string, domains: string[], opts: { json?: boolean }) => {
@@ -763,7 +763,7 @@ Examples:
   alias
     .command("list")
     .description("List domain aliases for an organization")
-    .argument("<identifier>", "Org slug")
+    .argument("<identifier>", "Organization ID (org_…) or slug")
     .option("--json", "Output as JSON")
     .action(async (identifier: string, opts: { json?: boolean }) => {
       const found = await findOrg(identifier);

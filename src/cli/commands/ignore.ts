@@ -17,7 +17,7 @@ export function registerIgnoreCommand(program: Command) {
   ignore
     .command("list")
     .description("List ignored URLs for an organization")
-    .requiredOption("--org <org>", "Organization slug, domain, or name")
+    .requiredOption("--org <org>", "Organization ID (org_…), slug, domain, name, or handle")
     .option("--json", "Output as JSON")
     .option("--limit <n>", `Limit the number of results (default ${DEFAULT_PAGE_SIZE})`)
     .option("--page <n>", "Page number for paginated results")
@@ -93,7 +93,7 @@ Examples:
   ignore
     .command("add <url>")
     .description("Ignore a URL for an organization")
-    .requiredOption("--org <org>", "Organization slug, domain, or name")
+    .requiredOption("--org <org>", "Organization ID (org_…), slug, domain, name, or handle")
     .option("--reason <reason>", "Reason for ignoring this URL")
     .option("--dry-run", "Show what would be ignored without writing")
     .addHelpText(
@@ -129,7 +129,7 @@ Examples:
   ignore
     .command("remove <url>")
     .description("Un-ignore a URL for an organization")
-    .requiredOption("--org <org>", "Organization slug, domain, or name")
+    .requiredOption("--org <org>", "Organization ID (org_…), slug, domain, name, or handle")
     .option("--json", "Output as JSON")
     .addHelpText(
       "after",

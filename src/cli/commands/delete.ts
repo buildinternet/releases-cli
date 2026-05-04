@@ -104,8 +104,8 @@ export async function deleteSourceAction(slugs: string[], opts: DeleteSourceOpts
 export function registerDeleteCommand(program: Command) {
   program
     .command("delete")
-    .description("Delete one or more changelog sources by slug")
-    .argument("<slugs...>", "Slugs of sources to delete")
+    .description("Delete one or more changelog sources")
+    .argument("<sources...>", "Source IDs (src_…) or slugs to delete")
     .option("--ignore", "Add each source URL to the ignored list before deleting")
     .option("--reason <reason>", "Reason for ignoring (used with --ignore)")
     .option("--dry-run", "Show what would be deleted without deleting")
