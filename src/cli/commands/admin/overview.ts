@@ -30,6 +30,7 @@ import {
   type OrgWithOverview,
 } from "../../../lib/overview-stale-filter.js";
 import type { OrgListItem } from "@buildinternet/releases-api-types";
+import { computePagination } from "@buildinternet/releases-core/cli-contracts";
 import { unescapeHtmlEntities } from "./overview/unescape-html.js";
 import { readContentArg } from "../../../lib/input.js";
 import { warnDeprecatedAlias } from "../../../lib/deprecated-alias.js";
@@ -316,7 +317,15 @@ async function overviewListAction(opts: OverviewListOpts): Promise<void> {
       : rows;
 
     if (opts.json) {
-      await writeJson(filtered);
+      await writeJson({
+        items: filtered,
+        pagination: computePagination({
+          page: 1,
+          pageSize: filtered.length,
+          returned: filtered.length,
+          totalItems: filtered.length,
+        }),
+      });
       return;
     }
     if (filtered.length === 0) {
@@ -346,7 +355,11 @@ async function overviewListAction(opts: OverviewListOpts): Promise<void> {
   }
 
   if (orgs.length === 0) {
-    if (opts.json) await writeJson([]);
+    if (opts.json)
+      await writeJson({
+        items: [],
+        pagination: computePagination({ page: 1, pageSize: 0, returned: 0, totalItems: 0 }),
+      });
     else console.log(chalk.yellow("No organizations found."));
     return;
   }
@@ -372,13 +385,17 @@ async function overviewListAction(opts: OverviewListOpts): Promise<void> {
   }
 
   if (candidates.length === 0) {
-    if (opts.json) await writeJson([]);
+    if (opts.json)
+      await writeJson({
+        items: [],
+        pagination: computePagination({ page: 1, pageSize: 0, returned: 0, totalItems: 0 }),
+      });
     else console.log(chalk.green("No stale overviews found."));
     return;
   }
 
   if (opts.json) {
-    const out = candidates.map((o) => ({
+    const items = candidates.map((o) => ({
       slug: o.slug,
       name: o.name,
       recentReleaseCount: o.recentReleaseCount,
@@ -386,7 +403,15 @@ async function overviewListAction(opts: OverviewListOpts): Promise<void> {
       overviewUpdatedAt: o.overview?.updatedAt ?? null,
       overviewMissing: !o.overview,
     }));
-    await writeJson(out);
+    await writeJson({
+      items,
+      pagination: computePagination({
+        page: 1,
+        pageSize: items.length,
+        returned: items.length,
+        totalItems: items.length,
+      }),
+    });
     return;
   }
 
@@ -428,7 +453,15 @@ async function overviewPlanAction(opts: OverviewPlanOpts): Promise<void> {
   });
 
   if (opts.json) {
-    await writeJson(rows);
+    await writeJson({
+      items: rows,
+      pagination: computePagination({
+        page: 1,
+        pageSize: rows.length,
+        returned: rows.length,
+        totalItems: rows.length,
+      }),
+    });
     return;
   }
 
