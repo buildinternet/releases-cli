@@ -23,6 +23,135 @@ import { toSlug } from "@buildinternet/releases-core/slug";
 import { isValidCategory, CATEGORIES } from "@buildinternet/releases-core/categories";
 import { writeJson } from "../../lib/output.js";
 import { computePagination, type ListResponse } from "@buildinternet/releases-core/cli-contracts";
+import { warnDeprecatedAlias } from "../../lib/deprecated-alias.js";
+
+// ── Shared action handlers ────────────────────────────────────────────────────
+
+type ProductCreateOpts = {
+  org: string;
+  slug?: string;
+  url?: string;
+  description?: string;
+  category?: string;
+  tags?: string;
+  json?: boolean;
+};
+
+async function productCreateAction(name: string, opts: ProductCreateOpts): Promise<void> {
+  const org = await findOrg(opts.org);
+  if (!org) {
+    console.error(chalk.red(`Organization not found: ${opts.org}`));
+    process.exit(1);
+  }
+
+  const slug = opts.slug ?? toSlug(name);
+
+  if (opts.category && !isValidCategory(opts.category)) {
+    console.error(
+      chalk.red(`Invalid category: "${opts.category}". Valid: ${CATEGORIES.join(", ")}`),
+    );
+    process.exit(1);
+  }
+
+  let created;
+  try {
+    created = await createProduct(org.id, name, {
+      slug,
+      url: opts.url,
+      description: opts.description,
+      category: opts.category,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (
+      msg.includes("already exists") ||
+      msg.includes("UNIQUE constraint") ||
+      msg.includes("conflict")
+    ) {
+      console.error(chalk.red(`Product with slug "${slug}" already exists.`));
+    } else {
+      console.error(chalk.red(`Failed to create product: ${msg}`));
+    }
+    process.exit(1);
+  }
+
+  if (opts.tags) {
+    const tagList = opts.tags
+      .split(",")
+      .map((t: string) => t.trim())
+      .filter(Boolean);
+    if (tagList.length > 0) await addTagsToProduct(created.id, tagList);
+  }
+
+  if (opts.json) await writeJson(created);
+  else console.log(chalk.green(`Product added: ${name} (${slug}) under ${org.name}`));
+}
+
+type ProductUpdateOpts = {
+  name?: string;
+  url?: string;
+  description?: string;
+  category?: string | boolean;
+  json?: boolean;
+};
+
+async function productUpdateAction(slug: string, opts: ProductUpdateOpts): Promise<void> {
+  const found = await findProduct(slug);
+  if (!found) {
+    console.error(chalk.red(`Product not found: ${slug}`));
+    process.exit(1);
+  }
+
+  const updates: Record<string, unknown> = {};
+  if (opts.name !== undefined) updates.name = opts.name;
+  if (opts.url !== undefined) updates.url = opts.url;
+  if (opts.description !== undefined) updates.description = opts.description;
+
+  if (opts.category === false) {
+    updates.category = null;
+  } else if (typeof opts.category === "string") {
+    if (!isValidCategory(opts.category)) {
+      console.error(
+        chalk.red(`Invalid category: "${opts.category}". Valid: ${CATEGORIES.join(", ")}`),
+      );
+      process.exit(1);
+    }
+    updates.category = opts.category;
+  }
+
+  if (Object.keys(updates).length === 0) {
+    console.error(chalk.yellow("No fields to update."));
+    process.exit(1);
+  }
+
+  const updated = await updateProduct(found, updates);
+
+  if (opts.json) await writeJson(updated);
+  else console.log(chalk.green(`Product updated: ${updated.name} (${updated.slug})`));
+}
+
+type ProductDeleteOpts = { dryRun?: boolean; json?: boolean };
+
+async function productDeleteAction(slug: string, opts: ProductDeleteOpts): Promise<void> {
+  const found = await findProduct(slug);
+  if (!found) {
+    console.error(chalk.red(`Product not found: ${slug}`));
+    process.exit(1);
+  }
+
+  if (opts.dryRun) {
+    if (opts.json) await writeJson({ wouldRemove: found.slug, name: found.name });
+    else console.log(chalk.yellow(`[dry-run] Would remove product: ${found.name} (${found.slug})`));
+    return;
+  }
+
+  await deleteProduct(found.id);
+
+  if (opts.json) await writeJson({ removed: found.slug });
+  else console.log(chalk.green(`Removed product: ${found.name} (${found.slug})`));
+}
+
+// ── Command registration ──────────────────────────────────────────────────────
 
 export function registerProductCommand(program: Command) {
   const product = program.command("product").description("Manage products");
@@ -68,8 +197,9 @@ export function registerProductCommand(program: Command) {
       console.log(table.toString());
     });
 
+  // ── product create (canonical) / product add (deprecated) ──
   product
-    .command("add")
+    .command("create")
     .description("Create a new product under an organization")
     .argument("<name>", "Product name")
     .requiredOption("--org <org-slug>", "Organization slug")
@@ -79,71 +209,24 @@ export function registerProductCommand(program: Command) {
     .option("--category <category>", "Category")
     .option("--tags <tags>", "Comma-separated tags")
     .option("--json", "Output as JSON")
-    .action(
-      async (
-        name: string,
-        opts: {
-          org: string;
-          slug?: string;
-          url?: string;
-          description?: string;
-          category?: string;
-          tags?: string;
-          json?: boolean;
-        },
-      ) => {
-        const org = await findOrg(opts.org);
-        if (!org) {
-          console.error(chalk.red(`Organization not found: ${opts.org}`));
-          process.exit(1);
-        }
-
-        const slug = opts.slug ?? toSlug(name);
-
-        if (opts.category && !isValidCategory(opts.category)) {
-          console.error(
-            chalk.red(`Invalid category: "${opts.category}". Valid: ${CATEGORIES.join(", ")}`),
-          );
-          process.exit(1);
-        }
-
-        let created;
-        try {
-          created = await createProduct(org.id, name, {
-            slug,
-            url: opts.url,
-            description: opts.description,
-            category: opts.category,
-          });
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          if (
-            msg.includes("already exists") ||
-            msg.includes("UNIQUE constraint") ||
-            msg.includes("conflict")
-          ) {
-            console.error(chalk.red(`Product with slug "${slug}" already exists.`));
-          } else {
-            console.error(chalk.red(`Failed to create product: ${msg}`));
-          }
-          process.exit(1);
-        }
-
-        if (opts.tags) {
-          const tagList = opts.tags
-            .split(",")
-            .map((t: string) => t.trim())
-            .filter(Boolean);
-          if (tagList.length > 0) await addTagsToProduct(created.id, tagList);
-        }
-
-        if (opts.json) await writeJson(created);
-        else console.log(chalk.green(`Product added: ${name} (${slug}) under ${org.name}`));
-      },
-    );
+    .action(productCreateAction);
 
   product
-    .command("edit")
+    .command("add")
+    .description("(deprecated — use create) Create a new product under an organization")
+    .argument("<name>", "Product name")
+    .requiredOption("--org <org-slug>", "Organization slug")
+    .option("--slug <slug>", "Custom slug")
+    .option("--url <url>", "Product URL")
+    .option("--description <text>", "Brief product description")
+    .option("--category <category>", "Category")
+    .option("--tags <tags>", "Comma-separated tags")
+    .option("--json", "Output as JSON")
+    .action(warnDeprecatedAlias<[string, ProductCreateOpts]>("add", "create", productCreateAction));
+
+  // ── product update (canonical) / product edit (deprecated) ──
+  product
+    .command("update")
     .description("Update a product")
     .argument("<slug>", "Product slug")
     .option("--name <name>", "New product name")
@@ -152,79 +235,40 @@ export function registerProductCommand(program: Command) {
     .option("--category <category>", "Set category")
     .option("--no-category", "Clear category")
     .option("--json", "Output as JSON")
+    .action(productUpdateAction);
+
+  product
+    .command("edit")
+    .description("(deprecated — use update) Update a product")
+    .argument("<slug>", "Product slug")
+    .option("--name <name>", "New product name")
+    .option("--url <url>", "New product URL")
+    .option("--description <text>", "New product description")
+    .option("--category <category>", "Set category")
+    .option("--no-category", "Clear category")
+    .option("--json", "Output as JSON")
     .action(
-      async (
-        slug: string,
-        opts: {
-          name?: string;
-          url?: string;
-          description?: string;
-          category?: string | boolean;
-          json?: boolean;
-        },
-      ) => {
-        const found = await findProduct(slug);
-        if (!found) {
-          console.error(chalk.red(`Product not found: ${slug}`));
-          process.exit(1);
-        }
-
-        const updates: Record<string, unknown> = {};
-        if (opts.name !== undefined) updates.name = opts.name;
-        if (opts.url !== undefined) updates.url = opts.url;
-        if (opts.description !== undefined) updates.description = opts.description;
-
-        if (opts.category === false) {
-          updates.category = null;
-        } else if (typeof opts.category === "string") {
-          if (!isValidCategory(opts.category)) {
-            console.error(
-              chalk.red(`Invalid category: "${opts.category}". Valid: ${CATEGORIES.join(", ")}`),
-            );
-            process.exit(1);
-          }
-          updates.category = opts.category;
-        }
-
-        if (Object.keys(updates).length === 0) {
-          console.error(chalk.yellow("No fields to update."));
-          process.exit(1);
-        }
-
-        const updated = await updateProduct(found, updates);
-
-        if (opts.json) await writeJson(updated);
-        else console.log(chalk.green(`Product updated: ${updated.name} (${updated.slug})`));
-      },
+      warnDeprecatedAlias<[string, ProductUpdateOpts]>("edit", "update", productUpdateAction),
     );
+
+  // ── product delete (canonical) / product remove (deprecated) ──
+  product
+    .command("delete")
+    .description("Delete a product")
+    .argument("<slug>", "Product slug")
+    .option("--dry-run", "Show what would be deleted without deleting")
+    .option("--json", "Output as JSON")
+    .action(productDeleteAction);
 
   product
     .command("remove")
-    .description("Delete a product")
+    .description("(deprecated — use delete) Delete a product")
     .argument("<slug>", "Product slug")
     .option("--dry-run", "Show what would be removed without deleting")
     .option("--json", "Output as JSON")
-    .action(async (slug: string, opts: { dryRun?: boolean; json?: boolean }) => {
-      const found = await findProduct(slug);
-      if (!found) {
-        console.error(chalk.red(`Product not found: ${slug}`));
-        process.exit(1);
-      }
-
-      if (opts.dryRun) {
-        if (opts.json) await writeJson({ wouldRemove: found.slug, name: found.name });
-        else
-          console.log(
-            chalk.yellow(`[dry-run] Would remove product: ${found.name} (${found.slug})`),
-          );
-        return;
-      }
-
-      await deleteProduct(found.id);
-
-      if (opts.json) await writeJson({ removed: found.slug });
-      else console.log(chalk.green(`Removed product: ${found.name} (${found.slug})`));
-    });
+    .action(
+      warnDeprecatedAlias<[string, ProductDeleteOpts]>("remove", "delete", productDeleteAction),
+    );
 
   product
     .command("adopt")
@@ -340,7 +384,7 @@ export function registerProductCommand(program: Command) {
       },
     );
 
-  // ── product tag ──
+  // ── product tag — membership verbs (add/remove) stay unchanged ──
   const tag = product.command("tag").description("Manage product tags");
 
   tag
@@ -402,7 +446,7 @@ export function registerProductCommand(program: Command) {
       else console.log(allTags.join(", "));
     });
 
-  // ── product alias ──
+  // ── product alias — membership verbs (add/remove) stay unchanged ──
   const alias = product.command("alias").description("Manage domain aliases for a product");
 
   alias

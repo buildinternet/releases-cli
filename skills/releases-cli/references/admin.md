@@ -14,20 +14,20 @@ All admin commands accept an entity ID (`org_…`, `src_…`, `prod_…`, `rel_�
 
 ## Sources
 
-### Add
+### Create
 
 ```bash
-releases admin source add "Next.js" --url https://github.com/vercel/next.js
-releases admin source add "Linear" --url https://linear.app/changelog
-releases admin source add "My Blog" --url https://example.com/changelog
+releases admin source create "Next.js" --url https://github.com/vercel/next.js
+releases admin source create "Linear" --url https://linear.app/changelog
+releases admin source create "My Blog" --url https://example.com/changelog
 ```
 
-By default, `add` runs automated pre-checks (provider detection, feed discovery, markdown probing). Override with `--type github|scrape|feed`. Use `--skip-eval` to bypass evaluation. Batch mode (`--batch`) skips evaluation by default for speed.
+By default, `create` runs automated pre-checks (provider detection, feed discovery, markdown probing). Override with `--type github|scrape|feed`. Use `--skip-eval` to bypass evaluation. Batch mode (`--batch`) skips evaluation by default for speed.
 
 Provide a feed URL explicitly when it isn't easily discoverable:
 
 ```bash
-releases admin source add "Claude Code" --url https://docs.anthropic.com/en/changelog \
+releases admin source create "Claude Code" --url https://docs.anthropic.com/en/changelog \
   --feed-url https://docs.anthropic.com/en/changelog/rss.xml
 ```
 
@@ -37,18 +37,18 @@ Evaluate without adding:
 releases admin discovery evaluate https://linear.app/changelog
 ```
 
-### Edit
+### Update
 
 ```bash
-releases admin source edit src_abc123 --name "New Name"      # by ID (preferred)
-releases admin source edit next-js --url https://github.com/vercel/next.js/releases
-releases admin source edit my-blog --org acme                 # set organization
-releases admin source edit my-blog --no-org                   # remove organization
-releases admin source edit my-blog --type feed                # change adapter type
-releases admin source edit my-blog --no-feed-url              # clear stored feed URL
-releases admin source edit my-blog --markdown-url https://example.com/changelog.md
-releases admin source edit my-blog --primary                  # mark as org's primary changelog
-releases admin source edit my-blog --slug new-slug --confirm-slug-change
+releases admin source update src_abc123 --name "New Name"      # by ID (preferred)
+releases admin source update next-js --url https://github.com/vercel/next.js/releases
+releases admin source update my-blog --org acme                 # set organization
+releases admin source update my-blog --no-org                   # remove organization
+releases admin source update my-blog --type feed                # change adapter type
+releases admin source update my-blog --no-feed-url              # clear stored feed URL
+releases admin source update my-blog --markdown-url https://example.com/changelog.md
+releases admin source update my-blog --primary                  # mark as org's primary changelog
+releases admin source update my-blog --slug new-slug --confirm-slug-change
 ```
 
 Slug renames require `--confirm-slug-change` because they break existing web links.
@@ -102,10 +102,10 @@ releases admin source check next-js     # one source
 ## Organizations
 
 ```bash
-releases admin org add "Vercel" --category developer-tools --tags typescript,edge
+releases admin org create "Vercel" --category developer-tools --tags typescript,edge
 releases admin org list                                   # summary view
-releases admin org show vercel                            # full details (accounts, tags, sources, products, aliases)
-releases admin org edit vercel --category developer-tools
+releases admin org get vercel                             # full details (accounts, tags, sources, products, aliases)
+releases admin org update vercel --category developer-tools
 releases admin org link vercel --platform github --handle vercel
 releases admin org tag add vercel react serverless
 releases admin org alias add anthropic claude.ai claude.com
@@ -119,20 +119,20 @@ releases admin org refresh vercel                         # fetch all sources + 
 Products group sources under multi-product orgs (e.g. Vercel → Next.js, Turborepo, v0):
 
 ```bash
-releases admin product add "Next.js" --org vercel --url https://nextjs.org
+releases admin product create "Next.js" --org vercel --url https://nextjs.org
 releases admin product list vercel
-releases admin product edit nextjs --description "React framework for production"
+releases admin product update nextjs --description "React framework for production"
 releases admin product tag add nextjs react
 releases admin product alias add nextjs nextjs.org
-releases admin product remove nextjs          # sources become unlinked, not deleted
+releases admin product delete nextjs          # sources become unlinked, not deleted
 releases admin product adopt nextjs --into vercel   # convert an org into a product
 ```
 
 ## Releases
 
 ```bash
-releases admin release show rel_abc123
-releases admin release edit rel_abc123 --title "Fixed title" --version "v2.0.1"
+releases admin release get rel_abc123
+releases admin release update rel_abc123 --title "Fixed title" --version "v2.0.1"
 releases admin release delete rel_abc123
 releases admin release suppress rel_abc123 --reason "promotional content"
 releases admin release unsuppress rel_abc123

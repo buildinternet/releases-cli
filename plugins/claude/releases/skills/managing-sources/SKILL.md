@@ -17,19 +17,19 @@ Operations can be performed via CLI commands or typed MCP/agent tools. Use which
 | Operation | CLI | Typed tool |
 |-----------|-----|------------|
 | List sources | `releases list [slug] --json [--org <org>] [--query <text>] [--has-feed] [--category <c>] [--compact] [--limit <n>] [--page <n>]` | `list_catalog` (filter `kind: "source"` to exclude products); `list_sources` is a deprecated alias |
-| Add source | `releases admin source add <name> --url <url> [--type <type>] [--org <org>] [--feed-url <url>] [--primary]` | `manage_source` action "add" with name, url, type, organization, feed_url, **is_primary** (type auto-detected if omitted; only pass is_primary=true when the source is the org's primary changelog — see "Primary Sources") |
-| Edit source | `releases admin source edit <identifier> [--primary] [--priority <p>]` | `manage_source` action "edit" with identifier, is_primary, fetch_priority, name, url, type (use only when changing an already-added source; prefer setting flags on "add") |
-| Remove source | `releases admin source remove <slug> [--ignore --reason <reason>]` | `manage_source` action "remove" with identifier |
+| Add source | `releases admin source create <name> --url <url> [--type <type>] [--org <org>] [--feed-url <url>] [--primary]` | `manage_source` action "add" with name, url, type, organization, feed_url, **is_primary** (type auto-detected if omitted; only pass is_primary=true when the source is the org's primary changelog — see "Primary Sources") |
+| Edit source | `releases admin source update <identifier> [--primary] [--priority <p>]` | `manage_source` action "edit" with identifier, is_primary, fetch_priority, name, url, type (use only when changing an already-added source; prefer setting flags on "add") |
+| Remove source | `releases admin source delete <slug> [--ignore --reason <reason>]` | `manage_source` action "remove" with identifier |
 | Fetch releases | `releases admin source fetch <slug> [--dry-run] [--max <n>]` | `manage_source` action "fetch" with identifier |
 | Get latest releases | `releases tail [slug] --json [--org <org>]` | `get_latest_releases` with source, organization, limit params |
 | Search releases | `releases search <query> --json` | `search` with `type: ["releases"]`; `search_releases` is a deprecated alias |
 | Evaluate URL | `releases admin discovery evaluate <url> --json` | `evaluate_url` with url param |
-| Add org | `releases admin org add <name> [--domain <d>] [--description <t>] [--category <c>] [--tags <t1,t2>]` | `manage_org` action "add" with name, domain, description, category, tags |
-| Edit org | `releases admin org edit <slug> [--category <c>]` | `manage_org` action "edit" with identifier, category |
-| Show org | `releases admin org show <slug> --json` | `get_organization` with identifier |
+| Add org | `releases admin org create <name> [--domain <d>] [--description <t>] [--category <c>] [--tags <t1,t2>]` | `manage_org` action "add" with name, domain, description, category, tags |
+| Edit org | `releases admin org update <slug> [--category <c>]` | `manage_org` action "edit" with identifier, category |
+| Show org | `releases admin org get <slug> --json` | `get_organization` with identifier |
 | Add tags to org | `releases admin org tag add <slug> <tags...>` | `manage_org` action "tag_add" with identifier, tags |
 | Link account | `releases admin org link <slug> --platform <p> --handle <h>` | `manage_org` action "link_account" with identifier, platform, handle |
-| Add product | `releases admin product add <name> --org <org> [--category <c>] [--tags <t>]` | `manage_product` action "add" with name, organization, category, tags |
+| Add product | `releases admin product create <name> --org <org> [--category <c>] [--tags <t>]` | `manage_product` action "add" with name, organization, category, tags |
 | Ignore URL | `releases admin policy ignore add --org <org> <url>` | `exclude_url` action "ignore" with url, organization |
 | Block URL | `releases admin policy block add <url>` | `exclude_url` action "block" with url |
 | Get playbook | `releases admin playbook <org>` | `manage_playbook` action "get" with organization |
@@ -78,7 +78,7 @@ Adding or editing an org, product, or source triggers an entity embedding into t
 
 ## Removing Sources
 
-When removing discovery results, also ignore the URL to prevent re-discovery. In CLI: `releases admin source remove <slug> --ignore --reason "..."`. With typed tools: call `manage_source` action "remove" then `exclude_url` action "ignore".
+When removing discovery results, also ignore the URL to prevent re-discovery. In CLI: `releases admin source delete <slug> --ignore --reason "..."`. With typed tools: call `manage_source` action "remove" then `exclude_url` action "ignore".
 
 ## Ignored URLs (org-scoped)
 
@@ -114,7 +114,7 @@ When it does apply, set it on the `add` call in one step, not via a follow-up ed
 manage_source(action="add", name="Changelog", url="https://example.com/changelog", organization="example-corp", is_primary=true)
 ```
 
-The same applies on CLI: pass `--primary` to `releases admin source add`, not a follow-up `source edit`.
+The same applies on CLI: pass `--primary` to `releases admin source create`, not a follow-up `source update`.
 
 Use `manage_source(action="edit", is_primary=true)` only when promoting a source you added in a prior session — never in the same flow as the add.
 
@@ -127,7 +127,7 @@ Each playbook has two layers:
 - **Header** — auto-generated from source metadata. Shows source types, URLs, priorities, parseInstructions, and product groupings. Regenerates automatically on every source mutation. You never edit this directly.
 - **Agent notes** — free-form markdown that you fully control. This is the most important part of the playbook. Write it like a skill an agent will follow — imperative, action-oriented, concise — not like human documentation.
 
-**Always read the playbook before fetching or working with an org's sources.** Typed tool: `manage_playbook` action "get" with organization param. CLI: `releases admin playbook <org>`. If no playbook exists yet, one will be auto-generated on the next source mutation (add/edit/remove).
+**Always read the playbook before fetching or working with an org's sources.** Typed tool: `manage_playbook` action "get" with organization param. CLI: `releases admin playbook <org>`. If no playbook exists yet, one will be auto-generated on the next source mutation (create/update/delete).
 
 ### Writing good agent notes
 
@@ -184,8 +184,8 @@ Write notes during onboarding after you've fetched and validated sources. Update
 The scrape adapter can fetch pages with or without a headless browser. Static-site providers (Docusaurus, VitePress, WordPress, Ghost, Mintlify) are fetched without rendering by default — this is ~10-30x faster.
 
 To override the default for a specific source:
-- `releases admin source edit <identifier> --no-render` — force fast fetch (no headless browser)
-- `releases admin source edit <identifier> --render` — force headless browser rendering
+- `releases admin source update <identifier> --no-render` — force fast fetch (no headless browser)
+- `releases admin source update <identifier> --render` — force headless browser rendering
 
 Use `--render` when you know a source needs JavaScript execution. Use `--no-render` when you've verified the content is in the initial HTML for a provider not yet in the static list.
 

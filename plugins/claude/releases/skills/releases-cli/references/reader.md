@@ -61,16 +61,16 @@ releases list --json --limit 20 --page 2  # pagination (server-side)
 
 Aliased as `releases admin source list` for discoverability within admin workflows.
 
-## Show any entity
+## Get any entity
 
-Top-level `show` dispatches by ID prefix, and falls back to slug lookup:
+Top-level `get` dispatches by ID prefix, and falls back to slug lookup:
 
 ```bash
-releases show rel_XqbzLaOqBFz7VSAIqx2zs   # release (rel_)
-releases show src_abc123                   # source (src_)
-releases show org_abc123                   # organization (org_)
-releases show prod_abc123                  # product (prod_)
-releases show vercel                       # slug fallthrough (org → product → source)
+releases get rel_XqbzLaOqBFz7VSAIqx2zs   # release (rel_)
+releases get src_abc123                   # source (src_)
+releases get org_abc123                   # organization (org_)
+releases get prod_abc123                  # product (prod_)
+releases get vercel                       # slug fallthrough (org → product → source)
 ```
 
 Use this when you have an ID from another tool output (search results, MCP tool responses, etc.) and want to inspect it without caring what kind of entity it is.

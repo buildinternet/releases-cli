@@ -51,12 +51,12 @@ Every version publishes signed archives for each platform on the [Releases page]
 releases search "authentication"
 releases tail next-js            # or `releases tail -f` to follow new releases
 releases list --category ai
-releases show vercel            # org, product, or source
+releases get vercel             # org, product, or source
 releases org overview vercel    # full AI-generated overview for an org
 releases stats
 ```
 
-Every reader command supports `--json` for machine-readable output. List commands emit a `{ items, pagination }` envelope — parse with `jq '.items[]'`, and check `.pagination.hasMore` before assuming you've seen every row. Nested `metadata` fields are returned as parsed objects (no `fromjson` needed). `org show` includes a short overview preview (with a stale warning when more than 30 days old); `org overview <slug>` prints the full body.
+Every reader command supports `--json` for machine-readable output. List commands emit a `{ items, pagination }` envelope — parse with `jq '.items[]'`, and check `.pagination.hasMore` before assuming you've seen every row. Nested `metadata` fields are returned as parsed objects (no `fromjson` needed). `org get` includes a short overview preview (with a stale warning when more than 30 days old); `org overview <slug>` prints the full body.
 
 ### MCP
 
