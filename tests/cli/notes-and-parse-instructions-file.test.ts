@@ -23,8 +23,8 @@ describe("admin playbook --notes-file (#103 ws3)", () => {
   it("keeps --notes documented but marks it deprecated", () => {
     const { stdout, exitCode } = runCli(["admin", "playbook", "--help"], { env: adminEnv });
     expect(exitCode).toBe(0);
-    expect(stdout).toContain("--notes");
-    expect(stdout).toContain("deprecated");
+    expect(stdout).toContain("--notes <text>");
+    expect(stdout).toContain("(deprecated — use --notes-file)");
   });
 
   it("errors when --notes and --notes-file are passed together", () => {
@@ -55,8 +55,8 @@ describe("source update --parse-instructions-file (#103 ws3)", () => {
   it("keeps --parse-instructions documented but marks it deprecated", () => {
     const { stdout, exitCode } = runCli(["admin", "source", "update", "--help"], { env: adminEnv });
     expect(exitCode).toBe(0);
-    expect(stdout).toContain("--parse-instructions");
-    expect(stdout).toContain("deprecated");
+    expect(stdout).toContain("--parse-instructions <text>");
+    expect(stdout).toContain("(deprecated — use --parse-instructions-file)");
   });
 
   it("errors when --parse-instructions and --parse-instructions-file are passed together", () => {
