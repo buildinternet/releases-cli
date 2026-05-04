@@ -143,6 +143,17 @@ bun run changeset:publish   # publish to npm (runs in CI)
 
 Seven `@buildinternet/releases*` packages (5 binaries + `-lib` + `-skills`) live in a fixed group so they bump together. `@buildinternet/releases-core` is published independently from the monorepo.
 
+## Exit codes
+
+| Code  | Meaning                                                                          |
+| ----- | -------------------------------------------------------------------------------- |
+| `0`   | Success — session completed or command finished cleanly                          |
+| `1`   | Application error — our-side failure (network, API, unexpected state)            |
+| `2`   | Usage / provider error — bad arguments or upstream provider rejected the request |
+| `130` | Cancellation — session was cancelled (mirrors the SIGINT convention)             |
+
+Defined in [`src/cli/commands/fetch-wait.ts`](./src/cli/commands/fetch-wait.ts) (`TerminalSummary.exitCode`).
+
 ## License
 
 MIT
