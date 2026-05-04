@@ -53,14 +53,12 @@ async function orgCreateAction(name: string, opts: OrgCreateOpts): Promise<void>
 
   const existing = await findOrg(slug);
   if (existing) {
-    console.error(chalk.red(`Organization with slug "${slug}" already exists.`));
+    logger.error(`Organization with slug "${slug}" already exists.`);
     process.exit(1);
   }
 
   if (opts.category && !isValidCategory(opts.category)) {
-    console.error(
-      chalk.red(`Invalid category: "${opts.category}". Valid: ${CATEGORIES.join(", ")}`),
-    );
+    logger.error(`Invalid category: "${opts.category}". Valid: ${CATEGORIES.join(", ")}`);
     process.exit(1);
   }
 
@@ -82,7 +80,7 @@ async function orgCreateAction(name: string, opts: OrgCreateOpts): Promise<void>
   }
 
   if (opts.json) await writeJson(created);
-  else console.log(chalk.green(`Organization added: ${name} (${slug})`));
+  else logger.info(chalk.green(`Organization created: ${name} (${slug})`));
 }
 
 type OrgGetOpts = { json?: boolean };
@@ -101,21 +99,15 @@ async function orgGetAction(identifier: string, opts: OrgGetOpts): Promise<void>
   ]);
 
   if (opts.json) {
-    console.log(
-      JSON.stringify(
-        {
-          ...found,
-          accounts,
-          products: orgProducts,
-          sources: linkedSources,
-          tags: orgTags,
-          aliases,
-          overview: overview?.content ?? null,
-        },
-        null,
-        2,
-      ),
-    );
+    await writeJson({
+      ...found,
+      accounts,
+      products: orgProducts,
+      sources: linkedSources,
+      tags: orgTags,
+      aliases,
+      overview: overview?.content ?? null,
+    });
     return;
   }
 
@@ -208,9 +200,7 @@ async function orgUpdateAction(identifier: string, opts: OrgUpdateOpts): Promise
     updates.category = null;
   } else if (typeof opts.category === "string") {
     if (!isValidCategory(opts.category)) {
-      console.error(
-        chalk.red(`Invalid category: "${opts.category}". Valid: ${CATEGORIES.join(", ")}`),
-      );
+      logger.error(`Invalid category: "${opts.category}". Valid: ${CATEGORIES.join(", ")}`);
       process.exit(1);
     }
     updates.category = opts.category;
@@ -220,14 +210,14 @@ async function orgUpdateAction(identifier: string, opts: OrgUpdateOpts): Promise
   else if (typeof opts.avatar === "string") updates.avatarUrl = opts.avatar;
 
   if (Object.keys(updates).length === 0) {
-    console.error(chalk.yellow("No fields to update."));
+    logger.warn("No fields to update.");
     process.exit(1);
   }
 
   const updated = await updateOrg(found.slug, updates);
 
   if (opts.json) await writeJson(updated);
-  else console.log(chalk.green(`Updated organization: ${updated.name} (${updated.slug})`));
+  else logger.info(chalk.green(`Updated organization: ${updated.name} (${updated.slug})`));
 }
 
 type OrgDeleteOpts = { json?: boolean; dryRun?: boolean; hard?: boolean; yes?: boolean };
@@ -245,10 +235,8 @@ async function orgDeleteAction(identifier: string, opts: OrgDeleteOpts): Promise
   // delete that "works" in dry-run only to error in the real run is
   // a worse outcome than a single up-front complaint.
   if (opts.hard && !opts.yes && !process.stdin.isTTY) {
-    console.error(
-      chalk.red(
-        "No interactive TTY available — pass --yes to confirm a hard delete in scripted contexts.",
-      ),
+    logger.error(
+      "No interactive TTY available — pass --yes to confirm a hard delete in scripted contexts.",
     );
     process.exit(1);
   }
@@ -260,10 +248,8 @@ async function orgDeleteAction(identifier: string, opts: OrgDeleteOpts): Promise
     if (opts.json)
       await writeJson({ wouldRemove: found.slug, name: found.name, hard: !!opts.hard });
     else
-      console.log(
-        chalk.yellow(
-          `[dry-run] Would ${opts.hard ? "hard-delete" : "remove"} organization: ${found.name} (${found.slug})`,
-        ),
+      logger.warn(
+        `[dry-run] Would ${opts.hard ? "hard-delete" : "delete"} organization: ${found.name} (${found.slug})`,
       );
     return;
   }
@@ -273,9 +259,7 @@ async function orgDeleteAction(identifier: string, opts: OrgDeleteOpts): Promise
     try {
       dependents = await getOrgDependents(found.slug);
     } catch (err) {
-      console.error(
-        chalk.red(`Failed to load cascade preview: ${err instanceof Error ? err.message : err}`),
-      );
+      logger.error(`Failed to load cascade preview: ${err instanceof Error ? err.message : err}`);
       process.exit(1);
     }
 
@@ -296,7 +280,7 @@ async function orgDeleteAction(identifier: string, opts: OrgDeleteOpts): Promise
 
     const confirmed = await promptConfirm(`Type the org slug to confirm: `, found.slug);
     if (!confirmed) {
-      console.error(chalk.yellow("Slug did not match. Aborted."));
+      logger.warn("Slug did not match. Aborted.");
       process.exit(1);
     }
   }
@@ -305,9 +289,9 @@ async function orgDeleteAction(identifier: string, opts: OrgDeleteOpts): Promise
 
   if (opts.json) await writeJson({ removed: found.slug, hard: !!opts.hard });
   else
-    console.log(
+    logger.info(
       chalk.green(
-        `${opts.hard ? "Hard-deleted" : "Removed"} organization: ${found.name} (${found.slug})`,
+        `${opts.hard ? "Hard-deleted" : "Deleted"} organization: ${found.name} (${found.slug})`,
       ),
     );
 }

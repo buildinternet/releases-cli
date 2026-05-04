@@ -209,8 +209,9 @@ export async function updateSourceAction(
     await updateSourceMeta(source, metaUpdates);
   }
 
+  let updated: Awaited<ReturnType<typeof updateSource>> | undefined;
   if (Object.keys(updates).length > 0) {
-    const updated = await updateSource(source, updates);
+    updated = await updateSource(source, updates);
     if (opts.slug && updated.slug !== opts.slug) {
       const idx = changes.findIndex((c) => c.startsWith("slug →"));
       if (idx !== -1) changes.splice(idx, 1);
@@ -219,18 +220,18 @@ export async function updateSourceAction(
   }
 
   if (changes.length === 0) {
-    console.log(chalk.yellow("No changes specified. Use --help to see options."));
+    if (!opts.json) logger.warn("No changes specified. Use --help to see options.");
     return;
   }
 
-  const displaySlug = opts.slug ?? source.slug;
+  const displaySlug = updated?.slug ?? source.slug;
 
   if (opts.json) {
     const refreshed = await findSource(displaySlug);
     await writeJson(refreshed);
   } else {
-    console.log(chalk.green(`Updated ${source.name} (${displaySlug}):`));
-    for (const change of changes) console.log(`  ${change}`);
+    logger.info(chalk.green(`Updated ${source.name} (${displaySlug}):`));
+    for (const change of changes) logger.info(`  ${change}`);
   }
 }
 

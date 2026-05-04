@@ -8,6 +8,7 @@ import {
   getLatestReleases,
 } from "../../api/client.js";
 import { stripAnsi } from "../../lib/sanitize.js";
+import { logger } from "@releases/lib/logger";
 import { renderLatestReleasesTable } from "../render/releases-table.js";
 import { getEntityType, normalizeReleaseId, isLikelyBareId } from "@buildinternet/releases-core/id";
 import { writeJson } from "../../lib/output.js";
@@ -32,14 +33,14 @@ export async function getEntityAction(identifier: string, opts: GetEntityOpts): 
   const source = await findSource(identifier);
   if (source) return await renderSource(source, opts);
 
-  console.error(chalk.red(`Not found: ${identifier}`));
+  logger.error(`Not found: ${identifier}`);
   process.exit(1);
 }
 
 async function getRelease_(id: string, opts: GetEntityOpts) {
   const result = await getRelease(id);
   if (!result) {
-    console.error(chalk.red(`Release not found: ${id}`));
+    logger.error(`Release not found: ${id}`);
     process.exit(1);
   }
   const rel = result;
@@ -70,7 +71,7 @@ async function getRelease_(id: string, opts: GetEntityOpts) {
 async function getSource(identifier: string, opts: GetEntityOpts) {
   const source = await findSource(identifier);
   if (!source) {
-    console.error(chalk.red(`Source not found: ${identifier}`));
+    logger.error(`Source not found: ${identifier}`);
     process.exit(1);
   }
   await renderSource(source, opts);
@@ -79,7 +80,7 @@ async function getSource(identifier: string, opts: GetEntityOpts) {
 async function getOrg(identifier: string, opts: GetEntityOpts) {
   const org = await findOrg(identifier);
   if (!org) {
-    console.error(chalk.red(`Organization not found: ${identifier}`));
+    logger.error(`Organization not found: ${identifier}`);
     process.exit(1);
   }
   await renderOrg(org, opts);
@@ -88,7 +89,7 @@ async function getOrg(identifier: string, opts: GetEntityOpts) {
 async function getProduct(identifier: string, opts: GetEntityOpts) {
   const product = await findProduct(identifier);
   if (!product) {
-    console.error(chalk.red(`Product not found: ${identifier}`));
+    logger.error(`Product not found: ${identifier}`);
     process.exit(1);
   }
   await renderProduct(product, opts);

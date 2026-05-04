@@ -116,7 +116,7 @@ manage_source(action="add", name="Changelog", url="https://example.com/changelog
 
 The same applies on CLI: pass `--primary` to `releases admin source create`, not a follow-up `source update`.
 
-Use `manage_source(action="edit", is_primary=true)` only when promoting a source you added in a prior session — never in the same flow as the add.
+Use `manage_source(action="edit", is_primary=true)` (or `releases admin source update <slug> --primary` on the CLI) only when promoting a source you added in a prior session — never in the same flow as the add.
 
 ## Playbooks
 

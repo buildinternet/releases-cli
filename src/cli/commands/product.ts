@@ -84,7 +84,7 @@ async function productCreateAction(name: string, opts: ProductCreateOpts): Promi
   }
 
   if (opts.json) await writeJson(created);
-  else console.log(chalk.green(`Product added: ${name} (${slug}) under ${org.name}`));
+  else console.log(chalk.green(`Product created: ${name} (${slug}) under ${org.name}`));
 }
 
 type ProductUpdateOpts = {
@@ -141,14 +141,14 @@ async function productDeleteAction(slug: string, opts: ProductDeleteOpts): Promi
 
   if (opts.dryRun) {
     if (opts.json) await writeJson({ wouldRemove: found.slug, name: found.name });
-    else console.log(chalk.yellow(`[dry-run] Would remove product: ${found.name} (${found.slug})`));
+    else console.log(chalk.yellow(`[dry-run] Would delete product: ${found.name} (${found.slug})`));
     return;
   }
 
   await deleteProduct(found.id);
 
   if (opts.json) await writeJson({ removed: found.slug });
-  else console.log(chalk.green(`Removed product: ${found.name} (${found.slug})`));
+  else console.log(chalk.green(`Deleted product: ${found.name} (${found.slug})`));
 }
 
 // ── Command registration ──────────────────────────────────────────────────────

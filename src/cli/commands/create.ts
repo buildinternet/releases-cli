@@ -84,23 +84,6 @@ async function createSingleSource(input: CreateSourceInput): Promise<CreateSourc
     if (!orgId) orgId = prod.orgId;
   }
 
-  const exclusion = await isUrlExcluded(url, orgId ?? undefined);
-  if (exclusion.excluded) {
-    const scopeLabel = exclusion.scope === "blocked" ? "blocked" : "ignored";
-    logger.warn(
-      `Skipping ${scopeLabel} URL: ${url}${exclusion.reason ? ` (${exclusion.reason})` : ""}`,
-    );
-    return {
-      name,
-      slug,
-      type: "scrape",
-      url,
-      org: orgName ?? undefined,
-      status: "ignored",
-      reason: exclusion.reason,
-    };
-  }
-
   let sourceType: SourceType;
   const metadata: Record<string, unknown> = {};
 
@@ -130,6 +113,23 @@ async function createSingleSource(input: CreateSourceInput): Promise<CreateSourc
         logger.info(`Auto-linked to organization "${orgName}"`);
       }
     }
+  }
+
+  const exclusion = await isUrlExcluded(url, orgId ?? undefined);
+  if (exclusion.excluded) {
+    const scopeLabel = exclusion.scope === "blocked" ? "blocked" : "ignored";
+    logger.warn(
+      `Skipping ${scopeLabel} URL: ${url}${exclusion.reason ? ` (${exclusion.reason})` : ""}`,
+    );
+    return {
+      name,
+      slug,
+      type: "scrape",
+      url,
+      org: orgName ?? undefined,
+      status: "ignored",
+      reason: exclusion.reason,
+    };
   }
 
   try {
@@ -268,8 +268,8 @@ export async function createSourceAction(
   } else {
     const orgLabel = result.org ? ` [org: ${result.org}]` : "";
     const typeLabel = !opts.type ? ` (auto-detected: ${result.type})` : "";
-    console.log(
-      chalk.green(`Source added: ${result.name} (${result.slug})${typeLabel}${orgLabel}`),
+    logger.info(
+      chalk.green(`Source created: ${result.name} (${result.slug})${typeLabel}${orgLabel}`),
     );
   }
 }

@@ -1,3 +1,5 @@
+import { logger } from "@releases/lib/logger";
+
 /**
  * Wrap a Commander action with a deprecation warning emitted to stderr.
  *
@@ -14,7 +16,7 @@ export function warnDeprecatedAlias<T extends unknown[]>(
   action: (...args: T) => void | Promise<void>,
 ): (...args: T) => void | Promise<void> {
   return (...args: T) => {
-    process.stderr.write(`[releases] WARN: "${oldVerb}" is deprecated, use "${newVerb}"\n`);
+    logger.warn(`"${oldVerb}" is deprecated, use "${newVerb}"`);
     return action(...args);
   };
 }

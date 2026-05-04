@@ -54,6 +54,7 @@ export async function deleteSourceAction(slugs: string[], opts: DeleteSourceOpts
     }
   }
 
+  const ignoredUrlSet = new Set<string>();
   if (opts.ignore && existing.length > 0) {
     const ignorable = existing.filter((source) => {
       if (source.orgId) return true;
@@ -69,8 +70,9 @@ export async function deleteSourceAction(slugs: string[], opts: DeleteSourceOpts
     await Promise.all(
       ignorable.map((source) => addIgnoredUrl(source.url, source.orgId!, opts.reason)),
     );
-    if (!opts.json) {
-      for (const source of ignorable) {
+    for (const source of ignorable) {
+      ignoredUrlSet.add(source.url);
+      if (!opts.json) {
         logger.info(
           chalk.yellow(`Ignored URL: ${source.url}${opts.reason ? ` (${opts.reason})` : ""}`),
         );
@@ -87,7 +89,7 @@ export async function deleteSourceAction(slugs: string[], opts: DeleteSourceOpts
         name: source.name,
         url: source.url,
         status: "removed",
-        ...(opts.ignore ? { ignored: true } : {}),
+        ...(opts.ignore && ignoredUrlSet.has(source.url) ? { ignored: true } : {}),
       });
       if (!opts.json) {
         logger.info(chalk.green(`Removed source: ${source.name} (${source.slug})`));
