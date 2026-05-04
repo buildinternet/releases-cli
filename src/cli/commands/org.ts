@@ -51,15 +51,24 @@ type OrgCreateOpts = {
   category?: string;
   tags?: string;
   json?: boolean;
+  strict?: boolean;
 };
 
 async function orgCreateAction(name: string, opts: OrgCreateOpts): Promise<void> {
   const slug = opts.slug ?? toSlug(name);
 
+  // Guard against findOrg() resolving via domain alias rather than slug:
+  // /v1/orgs/:id matches by ID, slug, or domain alias, so an exact slug match
+  // is the only safe signal that we'd actually collide on slug uniqueness.
   const existing = await findOrg(slug);
-  if (existing) {
-    logger.error(`Organization with slug "${slug}" already exists.`);
-    process.exit(1);
+  if (existing && existing.slug === slug) {
+    if (opts.strict) {
+      logger.error(`Organization with slug "${slug}" already exists.`);
+      process.exit(1);
+    }
+    logger.info(`Organization already exists: ${existing.name} (${slug}) — returning existing`);
+    if (opts.json) await writeJson({ ...existing, existed: true });
+    return;
   }
 
   if (opts.category && !isValidCategory(opts.category)) {
@@ -67,12 +76,40 @@ async function orgCreateAction(name: string, opts: OrgCreateOpts): Promise<void>
     process.exit(1);
   }
 
-  const created = await createOrg(name, {
-    slug,
-    domain: opts.domain,
-    description: opts.description,
-    category: opts.category,
-  });
+  // Race window: another process may have created this slug between our
+  // findOrg() call above and the createOrg() below. Catch a uniqueness
+  // conflict and re-read instead of erroring out — the second writer should
+  // observe the same idempotent semantics as the first.
+  let created;
+  try {
+    created = await createOrg(name, {
+      slug,
+      domain: opts.domain,
+      description: opts.description,
+      category: opts.category,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (
+      msg.includes("already exists") ||
+      msg.includes("UNIQUE constraint") ||
+      msg.includes("conflict")
+    ) {
+      const racedExisting = await findOrg(slug);
+      if (racedExisting && racedExisting.slug === slug) {
+        if (opts.strict) {
+          logger.error(`Organization with slug "${slug}" already exists.`);
+          process.exit(1);
+        }
+        logger.info(
+          `Organization already exists: ${racedExisting.name} (${slug}) — returning existing`,
+        );
+        if (opts.json) await writeJson({ ...racedExisting, existed: true });
+        return;
+      }
+    }
+    throw err;
+  }
 
   if (opts.tags) {
     const tagList = opts.tags
@@ -84,7 +121,7 @@ async function orgCreateAction(name: string, opts: OrgCreateOpts): Promise<void>
     }
   }
 
-  if (opts.json) await writeJson(created);
+  if (opts.json) await writeJson({ ...created, existed: false });
   else logger.info(chalk.green(`Organization created: ${name} (${slug})`));
 }
 
@@ -317,6 +354,7 @@ export function registerOrgCommand(program: Command) {
     .option("--category <category>", "Category")
     .option("--tags <tags>", "Comma-separated tags")
     .option("--json", "Output as JSON")
+    .option("--strict", "Exit 1 if the organization already exists (default: return existing)")
     .action(orgCreateAction);
 
   org
@@ -329,6 +367,7 @@ export function registerOrgCommand(program: Command) {
     .option("--category <category>", "Category")
     .option("--tags <tags>", "Comma-separated tags")
     .option("--json", "Output as JSON")
+    .option("--strict", "Exit 1 if the organization already exists (default: return existing)")
     .action(warnDeprecatedAlias<[string, OrgCreateOpts]>("add", "create", orgCreateAction));
 
   // ── org list ──
