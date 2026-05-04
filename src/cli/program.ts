@@ -1,8 +1,11 @@
 import { Command, Help } from "commander";
 import chalk from "chalk";
 import { registerAddCommand } from "./commands/add.js";
+import { registerCreateCommand } from "./commands/create.js";
 import { registerEditCommand } from "./commands/edit.js";
+import { registerUpdateCommand } from "./commands/update.js";
 import { registerRemoveCommand } from "./commands/remove.js";
+import { registerDeleteCommand } from "./commands/delete.js";
 import { registerListCommand } from "./commands/list.js";
 import { registerFetchCommand } from "./commands/fetch.js";
 import { registerSearchCommand } from "./commands/search.js";
@@ -20,6 +23,7 @@ import { registerBlockCommand } from "./commands/block.js";
 import { registerImportCommand } from "./commands/import.js";
 import { registerTaskCommand } from "./commands/task.js";
 import { registerChangelogCommand } from "./commands/changelog.js";
+import { registerGetCommand } from "./commands/get.js";
 import { registerShowCommand } from "./commands/show.js";
 import { registerEmbedCommand } from "./commands/admin/embed.js";
 import { registerEvaluateCommand } from "./commands/admin/evaluate.js";
@@ -101,7 +105,7 @@ function printStyledHelp(): string {
   lines.push(row("search <query>", "Full-text search across releases"));
   lines.push(row("latest [slug]", "Show latest releases"));
   lines.push(row("list [slug]", "List sources or inspect one"));
-  lines.push(row("show <id|slug>", "Show any entity by ID or slug"));
+  lines.push(row("get <id|slug>", "Get any entity by ID or slug"));
   lines.push(row("stats", "Show database statistics"));
   lines.push(row("categories", "List valid category values"));
   lines.push(row("admin", "Operator workflows"));
@@ -158,6 +162,8 @@ registerSearchCommand(program);
 registerTailCommand(program);
 registerStatsCommand(program);
 registerListCommand(program);
+// Canonical verb: get. Deprecated alias: show (emits a warning).
+registerGetCommand(program);
 registerShowCommand(program);
 registerTelemetryCommand(program);
 registerWhoamiCommand(program);
@@ -180,8 +186,12 @@ const sourceAdmin = admin
   .description("Manage sources and source ingestion")
   .showSuggestionAfterError(true);
 registerListCommand(sourceAdmin);
+// Canonical verbs: create, update, delete. Deprecated aliases: add, edit, remove (each emits a warning).
+registerCreateCommand(sourceAdmin);
 registerAddCommand(sourceAdmin);
+registerUpdateCommand(sourceAdmin);
 registerEditCommand(sourceAdmin);
+registerDeleteCommand(sourceAdmin);
 registerRemoveCommand(sourceAdmin);
 registerImportCommand(sourceAdmin);
 registerFetchCommand(sourceAdmin);

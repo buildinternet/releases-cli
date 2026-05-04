@@ -38,22 +38,22 @@ releases search "breaking change"            # hybrid FTS + semantic search
 releases tail next-js                      # latest releases from one source
 releases tail --org vercel --count 20      # latest from a whole org
 releases list --category ai                  # browse sources
-releases show vercel                         # dispatch by id or slug
+releases get vercel                          # dispatch by id or slug
 releases stats                               # registry overview
 releases categories                          # list valid category values
 
 # Admin (requires RELEASED_API_KEY)
-releases admin source add "Linear" --url https://linear.app/changelog
+releases admin source create "Linear" --url https://linear.app/changelog
 releases admin source fetch <slug> --max 50
-releases admin org add "Acme" --category cloud
-releases admin product add "CLI" --org acme
+releases admin org create "Acme" --category cloud
+releases admin product create "CLI" --org acme
 releases admin discovery onboard "Stripe"    # AI-powered discovery agent
 
 # Local stdio MCP bridge (proxies to api.releases.sh)
 releases admin mcp serve
 ```
 
-Every reader command accepts `--json` for machine-readable output. IDs (`org_…`, `src_…`, `prod_…`, `rel_…`) are accepted anywhere a slug is.
+Every reader command accepts `--json` for machine-readable output. IDs (`org_…`, `src_…`, `prod_…`, `rel_…`) are accepted anywhere a slug is. Source and product commands also accept an `org/slug` coordinate (e.g. `vercel/vercel-ai-sdk`); coordinates and typed IDs are unambiguous and skip an extra resolver round-trip that bare slugs require.
 
 ## Authentication
 
@@ -73,7 +73,7 @@ These can also go in a `.env` file — Bun auto-loads it when running from sourc
 ## Common Mistakes
 
 - `releases admin …` without `RELEASED_API_KEY` set fails fast with a clear error — don't retry the same command. Note that keys are not self-serve yet (see Authentication).
-- Slug renames (`admin source edit <slug> --slug new-slug`) require `--confirm-slug-change` because they break web links.
+- Slug renames (`admin source update <slug> --slug new-slug`) require `--confirm-slug-change` because they break web links.
 - `releases admin source fetch` with no slug or filter is blocked in remote mode. Use `--stale`, `--unfetched`, `--retry-errors`, `--changed`, or a source slug.
 - Default fetch cap is 200 releases per source (GitHub pagination limits). Use `--max <n>` or `--all` to override.
 - `summary` and `compare` are *not* in this CLI. Those commands require AI provider calls and live in the private maintainer tooling. Use the hosted MCP tools `summarize_changes` / `compare_products` at `mcp.releases.sh` instead.

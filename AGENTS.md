@@ -44,7 +44,7 @@ bun test                      # bun test
 - `--json` supported on every reader command. Admin commands support it where it makes sense.
 - `--json` list responses return `{ items, pagination }` via the shared `ListResponse<T>` contract in `@buildinternet/releases-core/cli-contracts`. Pagination carries `{ page, pageSize, returned, hasMore }` plus `totalItems`/`totalPages` once the tail has been seen. When a default call returns a full page and more exists, the CLI also emits a stderr truncation warning so scripts don't silently miss rows. `metadata` fields are parsed into nested objects — don't call `JSON.parse` again. Use `parseMetadataField()` from the same module when adding new commands that surface metadata.
 - `daysAgoIso()` from `@buildinternet/releases-core/dates` for cutoff math. Don't roll your own.
-- Org overviews: `releases org show <slug>` includes a short overview preview; `releases org overview <slug>` is the unauthenticated public reader for the full body. Both surfaces add a `⚠ older than 30 days` warning past `OVERVIEW_STALE_DAYS` (from `@buildinternet/releases-core/overview`).
+- Org overviews: `releases org get <slug>` includes a short overview preview; `releases org overview <slug>` is the unauthenticated public reader for the full body. Both surfaces add a `⚠ older than 30 days` warning past `OVERVIEW_STALE_DAYS` (from `@buildinternet/releases-core/overview`).
 
 ## Telemetry
 
