@@ -50,7 +50,7 @@ releases admin discovery onboard "Stripe"    # AI-powered discovery agent
 releases admin mcp serve
 ```
 
-Every reader command accepts `--json` for machine-readable output. IDs (`org_…`, `src_…`, `prod_…`, `rel_…`) are accepted anywhere a slug is.
+Every reader command accepts `--json` for machine-readable output. IDs (`org_…`, `src_…`, `prod_…`, `rel_…`) are accepted anywhere a slug is. Source and product commands also accept an `org/slug` coordinate (e.g. `vercel/vercel-ai-sdk`); coordinates and typed IDs are unambiguous and skip an extra resolver round-trip that bare slugs require.
 
 ## Authentication
 
