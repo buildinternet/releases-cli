@@ -12,7 +12,7 @@ import { sourceNotFound } from "../suggest.js";
 import { toSlug } from "@buildinternet/releases-core/slug";
 import { logger } from "@releases/lib/logger";
 import { writeJson } from "../../lib/output.js";
-import { readContentArg } from "../../lib/input.js";
+import { resolveInlineOrFile } from "../../lib/input.js";
 
 const VALID_TYPES = ["github", "scrape", "feed", "agent"] as const;
 
@@ -50,20 +50,23 @@ export async function updateSourceAction(
   identifier: string,
   opts: UpdateSourceOpts,
 ): Promise<void> {
+  // `--no-parse-instructions` produces `false` and is mutually exclusive with
+  // any other parse-instructions flag (mirrors the inline-vs-file mutex below).
+  // The string and file forms collapse via the shared resolver: file contents
+  // become the value, and an empty file clears (matches `--parse-instructions ""`).
   if (opts.parseInstructions !== undefined && opts.parseInstructionsFile !== undefined) {
     logger.error("--parse-instructions and --parse-instructions-file are mutually exclusive");
     process.exit(1);
   }
-
-  if (opts.parseInstructionsFile !== undefined) {
-    // File contents become the inline value; an empty file clears, matching
-    // the existing `--parse-instructions ""` semantics.
-    opts.parseInstructions = await readContentArg(opts.parseInstructionsFile);
-  } else if (typeof opts.parseInstructions === "string") {
-    logger.warn(
-      '"--parse-instructions" is deprecated, use "--parse-instructions-file <path>" (use - for stdin); the inline form will be removed in a future release.',
-    );
-  }
+  const parseInstructions: string | false | undefined =
+    opts.parseInstructions === false
+      ? false
+      : await resolveInlineOrFile({
+          inline: typeof opts.parseInstructions === "string" ? opts.parseInstructions : undefined,
+          file: opts.parseInstructionsFile,
+          inlineName: "--parse-instructions",
+          fileName: "--parse-instructions-file",
+        });
 
   const source = await findSource(identifier);
   if (!source) return sourceNotFound(identifier);
@@ -204,14 +207,14 @@ export async function updateSourceAction(
     changes.push(`fetch method → ${opts.fetchMethod}`);
   }
 
-  if (opts.parseInstructions === false || opts.parseInstructions === "") {
+  if (parseInstructions === false || parseInstructions === "") {
     metaUpdates.parseInstructions = undefined;
     changes.push("parse instructions removed");
-  } else if (typeof opts.parseInstructions === "string") {
-    metaUpdates.parseInstructions = opts.parseInstructions;
-    changes.push(
-      `parse instructions → "${opts.parseInstructions.slice(0, 60)}${opts.parseInstructions.length > 60 ? "..." : ""}"`,
-    );
+  } else if (typeof parseInstructions === "string") {
+    metaUpdates.parseInstructions = parseInstructions;
+    const preview =
+      parseInstructions.length > 60 ? `${parseInstructions.slice(0, 60)}...` : parseInstructions;
+    changes.push(`parse instructions → "${preview}"`);
   }
 
   if (opts.render === true) {
@@ -252,7 +255,7 @@ export async function updateSourceAction(
   }
 }
 
-function attachUpdateOptions(cmd: Command): Command {
+export function attachUpdateOptions(cmd: Command): Command {
   return cmd
     .argument("<identifier>", "Source ID (src_...) or slug")
     .option("--name <name>", "Update display name")

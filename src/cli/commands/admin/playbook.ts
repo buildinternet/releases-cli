@@ -3,8 +3,7 @@ import chalk from "chalk";
 import { findOrg, getPlaybook, updatePlaybookNotes } from "../../../api/client.js";
 import { orgNotFound } from "../../suggest.js";
 import { writeJson } from "../../../lib/output.js";
-import { readContentArg } from "../../../lib/input.js";
-import { logger } from "@releases/lib/logger";
+import { resolveInlineOrFile } from "../../../lib/input.js";
 import { timeAgo } from "@buildinternet/releases-core/dates";
 
 interface PlaybookOpts {
@@ -44,25 +43,15 @@ run by --notes-file also seeds a fresh header on first write.
 Quoting markdown across newlines is fragile; prefer --notes-file.`,
     )
     .action(async (orgIdentifier: string, opts: PlaybookOpts) => {
-      if (opts.notes !== undefined && opts.notesFile !== undefined) {
-        logger.error("--notes and --notes-file are mutually exclusive");
-        process.exit(1);
-      }
-      if (opts.notes !== undefined) {
-        logger.warn(
-          '"--notes" is deprecated, use "--notes-file <path>" (use - for stdin); the inline form will be removed in a future release.',
-        );
-      }
+      const notesPayload = await resolveInlineOrFile({
+        inline: opts.notes,
+        file: opts.notesFile,
+        inlineName: "--notes",
+        fileName: "--notes-file",
+      });
 
       const org = await findOrg(orgIdentifier);
       if (!org) return orgNotFound(orgIdentifier);
-
-      let notesPayload: string | undefined;
-      if (opts.notesFile !== undefined) {
-        notesPayload = await readContentArg(opts.notesFile);
-      } else if (opts.notes !== undefined) {
-        notesPayload = opts.notes;
-      }
 
       if (notesPayload !== undefined) {
         await updatePlaybookNotes(org.slug, notesPayload);
