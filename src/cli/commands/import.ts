@@ -1,12 +1,11 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import { readFileSync } from "fs";
-import { existsSync } from "fs";
 import { toSlug } from "@buildinternet/releases-core/slug";
 import { logger } from "@releases/lib/logger";
 import { isGitHubUrl } from "./add.js";
 import { isValidCategory } from "@buildinternet/releases-core/categories";
 import { writeJson } from "../../lib/output.js";
+import { readContentArg } from "../../lib/input.js";
 import {
   findOrg,
   createOrg,
@@ -167,24 +166,20 @@ export function registerImportCommand(program: Command) {
   program
     .command("import")
     .description("Import organizations and sources from a manifest file")
-    .argument("<file>", "Path to JSON manifest file")
+    .argument("<file>", 'Path to JSON manifest file, or "-" to read from stdin')
     .option("--dry-run", "Show what would be created without writing")
     .option("--json", "Output as JSON")
     .option("--skip-existing", "Skip sources that already exist (default: error)")
+    .addHelpText(
+      "after",
+      `
+Examples:
+  releases import manifest.json
+  cat manifest.json | releases import -`,
+    )
     .action(
       async (file: string, opts: { dryRun?: boolean; json?: boolean; skipExisting?: boolean }) => {
-        if (!existsSync(file)) {
-          logger.error(`File not found: ${file}`);
-          process.exit(1);
-        }
-
-        let raw: string;
-        try {
-          raw = readFileSync(file, "utf-8");
-        } catch (err) {
-          logger.error(`Failed to read file: ${err instanceof Error ? err.message : String(err)}`);
-          process.exit(1);
-        }
+        const raw = await readContentArg(file);
 
         let data: unknown;
         try {

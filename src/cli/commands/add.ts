@@ -3,8 +3,8 @@ import chalk from "chalk";
 import { findOrg, createOrg, createSource, isUrlExcluded, findProduct } from "../../api/client.js";
 import { toSlug } from "@buildinternet/releases-core/slug";
 import { logger } from "@releases/lib/logger";
-import { readFileSync } from "fs";
 import { writeJson } from "../../lib/output.js";
+import { readContentArg } from "../../lib/input.js";
 
 const VALID_TYPES = ["github", "scrape", "feed", "agent"] as const;
 type SourceType = (typeof VALID_TYPES)[number];
@@ -199,12 +199,7 @@ Examples:
         },
       ) => {
         if (opts.batch) {
-          let raw: string;
-          if (opts.batch === "-") {
-            raw = await Bun.stdin.text();
-          } else {
-            raw = readFileSync(opts.batch, "utf-8");
-          }
+          const raw = await readContentArg(opts.batch);
 
           let entries: AddSourceInput[];
           try {
