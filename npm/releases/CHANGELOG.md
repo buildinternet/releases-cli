@@ -1,5 +1,44 @@
 # @buildinternet/releases
 
+## 0.25.0
+
+### Minor Changes
+
+- b2938c0: Add `releases agent-context` command that emits a versioned JSON document describing every command, argument, option, and exit code in the CLI.
+
+  This is the L2 introspection layer described in the [10-principle agent-native CLI guide](https://trevinsays.com/p/10-principles-for-agent-native-clis): agents driving the CLI can answer questions like "does this flag accept stdin?" or "what commands are deprecated?" without spawning `--help` per command and parsing prose.
+
+  The schema is generated at runtime by walking Commander's program tree — it stays automatically in sync with the implementation. `schemaVersion` is a string that bumps only on breaking field renames or removals; additive changes (new commands, new options, new fields) are silent.
+
+- b94319a: Make `org create` and `source create` idempotent on retry. When a duplicate slug (org) or duplicate URL (source) is detected, the existing record is returned instead of erroring — exit code 0, JSON output gains an `existed: true` field. Pass `--strict` to restore the previous exit-1 behavior for callers that require hard failure on conflict.
+- 3971251: Add `--limit <n>` / `--page <n>` pagination to four list commands and consume the
+  `{ items, pagination }` envelope the API now returns for `/v1/orgs`,
+  `/v1/admin/blocklist`, `/v1/orgs/:slug/ignored-urls`, and `/v1/sessions`
+  (monorepo PR #723):
+  - `releases org list`
+  - `releases admin discovery task list`
+  - `releases admin policy block list`
+  - `releases admin policy ignore list`
+
+  All four pass `?limit=&page=` through to the API and read the server's
+  pagination metadata directly — no more client-side `Array.slice()`. Each prints
+  a `warning: results may be truncated` message to stderr when more pages are
+  available and no explicit `--limit` was supplied, mirroring `releases list`.
+  Closes #105.
+
+- a27f459: Adopt the `-` stdin convention in two more commands and tighten `--json` output safety on alias listings.
+  - `releases import <file>` now accepts `-` for stdin (`cat manifest.json | releases import -`). Removes the temp-file dance for callers that generate manifests from another command.
+  - `releases admin webhook verify --body-file <path>` now accepts `-` for stdin (`curl ... | releases admin webhook verify --secret ... --signature ... --body-file -`). Mirrors the convention already in `add --batch -` and `admin overview-write --content-file -`.
+  - `org alias list --json` and `product alias list --json` now route through the drain-safe `writeJson()` helper instead of `console.log(JSON.stringify(...))`. Closes the small remaining surface area of the 96 KB pipe-truncation class first fixed in #33.
+
+  Shared internal helper `readContentArg(pathOrDash)` lives in `src/lib/input.ts` for use by future file-or-stdin commands. No breaking changes — existing `--content-file <path>` / positional `<file>` invocations continue to work unchanged.
+
+- 1821835: Rename CRUD verbs to standard create/get/update/delete equivalents. The old verb names (add, show, edit, remove) are retained as deprecated aliases that continue to work but print a deprecation warning to stderr. This affects top-level commands and all `org`, `product`, `source`, and `release` subcommands.
+
+### Patch Changes
+
+- f9eb1e2: Documents the exit-code taxonomy in README and root help output.
+
 ## 0.24.0
 
 ### Minor Changes
