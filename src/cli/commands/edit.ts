@@ -26,7 +26,14 @@ export function registerEditCommand(program: Command) {
     .option("--feed-url <feedUrl>", "Set or update the feed URL")
     .option("--no-feed-url", "Remove stored feed URL")
     .option("--markdown-url <markdownUrl>", "Set the raw markdown URL for this source")
-    .option("--parse-instructions <text>", "Set AI parsing instructions for this source")
+    .option(
+      "--parse-instructions <text>",
+      "(deprecated — use --parse-instructions-file) Set AI parsing instructions inline; quote-hostile, prefer the file form",
+    )
+    .option(
+      "--parse-instructions-file <path>",
+      "Path to file with AI parsing instructions (use - for stdin; empty file clears)",
+    )
     .option("--no-parse-instructions", "Remove AI parsing instructions")
     .option("--render", "Force headless browser rendering for this source")
     .option("--no-render", "Allow fast fetch without headless browser rendering")
