@@ -57,9 +57,19 @@ Staleness check (--stale):
       const graceDays = parsePositiveIntFlag("stale-grace-days", opts.staleGraceDays);
 
       // listOrgs returns OrgListItem[] at runtime (includes recentReleaseCount + lastActivity)
-      // The client types it as Organization[] — cast here until upstream type is updated.
-      const rawOrgs = await listOrgs({ query: opts.query });
-      const orgs = rawOrgs as unknown as OrgListItem[];
+      // but the API types model the row as Organization. Cast through unknown
+      // here until upstream type is updated. Pull every page so the
+      // overview-stale scan doesn't miss orgs past the default page.
+      const orgs: OrgListItem[] = [];
+      let page = 1;
+      let hasMore = true;
+      while (hasMore) {
+        // eslint-disable-next-line no-await-in-loop
+        const result = await listOrgs({ query: opts.query, page, limit: 200 });
+        orgs.push(...(result.items as unknown as OrgListItem[]));
+        hasMore = result.pagination.hasMore;
+        page += 1;
+      }
 
       if (orgs.length === 0) {
         if (opts.json) await writeJson([]);

@@ -28,7 +28,12 @@ import { toSlug } from "@buildinternet/releases-core/slug";
 import { isValidCategory, CATEGORIES } from "@buildinternet/releases-core/categories";
 import { timeAgo } from "@buildinternet/releases-core/dates";
 import { writeJson } from "../../lib/output.js";
-import { computePagination, type ListResponse } from "@buildinternet/releases-core/cli-contracts";
+import {
+  DEFAULT_PAGE_SIZE,
+  computePagination,
+  formatTruncationWarning,
+  type ListResponse,
+} from "@buildinternet/releases-core/cli-contracts";
 import {
   OVERVIEW_STALE_DAYS,
   overviewAgeDays,
@@ -333,30 +338,91 @@ export function registerOrgCommand(program: Command) {
     .option("--query <text>", "Filter by name, slug, domain, or handle")
     .option("--platform <platform>", "Filter to orgs with an account on this platform")
     .option("--json", "Output as JSON")
-    .action(async (opts: { query?: string; platform?: string; json?: boolean }) => {
-      const allOrgs = await listOrgs({ query: opts.query, platform: opts.platform });
+    .option("--limit <n>", `Limit the number of results (default ${DEFAULT_PAGE_SIZE})`)
+    .option("--page <n>", "Page number for paginated results")
+    .action(
+      async (opts: {
+        query?: string;
+        platform?: string;
+        json?: boolean;
+        limit?: string;
+        page?: string;
+      }) => {
+        const parsedLimit = opts.limit === undefined ? undefined : Number(opts.limit);
+        if (parsedLimit !== undefined && (!Number.isInteger(parsedLimit) || parsedLimit <= 0)) {
+          logger.error("--limit must be a positive integer");
+          process.exit(1);
+        }
+        const explicitLimit = parsedLimit !== undefined;
+        const pageSize = explicitLimit ? parsedLimit : DEFAULT_PAGE_SIZE;
 
-      if (allOrgs.length === 0) {
-        if (opts.json) await writeJson([]);
-        else console.log(chalk.yellow("No organizations found."));
-        return;
-      }
+        const parsedPage = opts.page === undefined ? 1 : Number(opts.page);
+        if (!Number.isInteger(parsedPage) || parsedPage <= 0) {
+          logger.error("--page must be a positive integer");
+          process.exit(1);
+        }
+        const page = parsedPage;
 
-      if (opts.json) {
-        await writeJson(allOrgs);
-        return;
-      }
+        const { items: pageItems, pagination } = await listOrgs({
+          query: opts.query,
+          platform: opts.platform,
+          limit: pageSize,
+          page,
+        });
 
-      const table = new Table({
-        head: [chalk.cyan("Name"), chalk.cyan("Slug"), chalk.cyan("Domain"), chalk.cyan("Updated")],
-      });
+        if (pageItems.length === 0) {
+          if (opts.json) {
+            const response: ListResponse<(typeof pageItems)[number]> = { items: [], pagination };
+            await writeJson(response);
+          } else {
+            logger.info(chalk.yellow("No organizations found."));
+          }
+          return;
+        }
 
-      for (const o of allOrgs) {
-        table.push([o.name, o.slug, o.domain ?? chalk.dim("—"), o.updatedAt]);
-      }
+        if (opts.json) {
+          const response: ListResponse<(typeof pageItems)[number]> = {
+            items: pageItems,
+            pagination,
+          };
+          await writeJson(response);
+          if (!explicitLimit && pagination.hasMore) {
+            logger.warn(
+              formatTruncationWarning({
+                returned: pageItems.length,
+                pageSize,
+                commandExample: `releases org list --json --limit <n> --page <p>`,
+              }),
+            );
+          }
+          return;
+        }
 
-      console.log(table.toString());
-    });
+        const table = new Table({
+          head: [
+            chalk.cyan("Name"),
+            chalk.cyan("Slug"),
+            chalk.cyan("Domain"),
+            chalk.cyan("Updated"),
+          ],
+        });
+
+        for (const o of pageItems) {
+          table.push([o.name, o.slug, o.domain ?? chalk.dim("—"), o.updatedAt]);
+        }
+
+        console.log(table.toString());
+        if (!explicitLimit && pagination.hasMore) {
+          logger.warn(
+            formatTruncationWarning({
+              returned: pageItems.length,
+              pageSize,
+              commandExample: `releases org list --limit <n> --page <p>`,
+            }),
+          );
+        }
+      },
+    );
 
   // ── org get (canonical) / org show (deprecated) ──
   org

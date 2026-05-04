@@ -3,6 +3,11 @@ import chalk from "chalk";
 import { findOrg, listIgnoredUrls, addIgnoredUrl, removeIgnoredUrl } from "../../api/client.js";
 import { logger } from "@releases/lib/logger";
 import { writeJson } from "../../lib/output.js";
+import {
+  DEFAULT_PAGE_SIZE,
+  formatTruncationWarning,
+  type ListResponse,
+} from "@buildinternet/releases-core/cli-contracts";
 
 export function registerIgnoreCommand(program: Command) {
   const ignore = program
@@ -14,6 +19,8 @@ export function registerIgnoreCommand(program: Command) {
     .description("List ignored URLs for an organization")
     .requiredOption("--org <org>", "Organization slug, domain, or name")
     .option("--json", "Output as JSON")
+    .option("--limit <n>", `Limit the number of results (default ${DEFAULT_PAGE_SIZE})`)
+    .option("--page <n>", "Page number for paginated results")
     .addHelpText(
       "after",
       `
@@ -21,17 +28,45 @@ Examples:
   releases admin policy ignore list --org acme
   releases admin policy ignore list --org acme --json`,
     )
-    .action(async (opts: { org: string; json?: boolean }) => {
+    .action(async (opts: { org: string; json?: boolean; limit?: string; page?: string }) => {
       const org = await findOrg(opts.org);
       if (!org) {
         logger.error(`Organization not found: ${opts.org}`);
         process.exit(1);
       }
 
-      const rows = await listIgnoredUrls(org.id);
+      const parsedLimit = opts.limit === undefined ? undefined : Number(opts.limit);
+      if (parsedLimit !== undefined && (!Number.isInteger(parsedLimit) || parsedLimit <= 0)) {
+        logger.error("--limit must be a positive integer");
+        process.exit(1);
+      }
+      const explicitLimit = parsedLimit !== undefined;
+      const pageSize = explicitLimit ? parsedLimit : DEFAULT_PAGE_SIZE;
+
+      const parsedPage = opts.page === undefined ? 1 : Number(opts.page);
+      if (!Number.isInteger(parsedPage) || parsedPage <= 0) {
+        logger.error("--page must be a positive integer");
+        process.exit(1);
+      }
+      const page = parsedPage;
+
+      const { items: rows, pagination } = await listIgnoredUrls(org.id, {
+        limit: pageSize,
+        page,
+      });
 
       if (opts.json) {
-        await writeJson(rows);
+        const response: ListResponse<(typeof rows)[number]> = { items: rows, pagination };
+        await writeJson(response);
+        if (!explicitLimit && pagination.hasMore) {
+          logger.warn(
+            formatTruncationWarning({
+              returned: rows.length,
+              pageSize,
+              commandExample: `releases admin policy ignore list --org ${opts.org} --json --limit <n> --page <p>`,
+            }),
+          );
+        }
         return;
       }
 
@@ -43,6 +78,15 @@ Examples:
       for (const row of rows) {
         const reasonLabel = row.reason ? chalk.gray(` — ${row.reason}`) : "";
         logger.info(`${chalk.yellow(row.url)}${reasonLabel}`);
+      }
+      if (!explicitLimit && pagination.hasMore) {
+        logger.warn(
+          formatTruncationWarning({
+            returned: rows.length,
+            pageSize,
+            commandExample: `releases admin policy ignore list --org ${opts.org} --limit <n> --page <p>`,
+          }),
+        );
       }
     });
 

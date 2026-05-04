@@ -2,6 +2,11 @@ import { Command } from "commander";
 import chalk from "chalk";
 import * as apiClient from "../../api/client.js";
 import { writeJson } from "../../lib/output.js";
+import { logger } from "@releases/lib/logger";
+import {
+  DEFAULT_PAGE_SIZE,
+  formatTruncationWarning,
+} from "@buildinternet/releases-core/cli-contracts";
 
 export function registerTaskCommand(program: Command) {
   const task = program.command("task").description("Manage remote fetch and discovery sessions");
@@ -10,11 +15,40 @@ export function registerTaskCommand(program: Command) {
     .command("list")
     .description("List active and recent sessions")
     .option("--json", "Output as JSON")
-    .action(async (opts: { json?: boolean }) => {
-      const sessions = await apiClient.listSessions();
+    .option("--limit <n>", `Limit the number of results (default ${DEFAULT_PAGE_SIZE})`)
+    .option("--page <n>", "Page number for paginated results")
+    .action(async (opts: { json?: boolean; limit?: string; page?: string }) => {
+      const parsedLimit = opts.limit === undefined ? undefined : Number(opts.limit);
+      if (parsedLimit !== undefined && (!Number.isInteger(parsedLimit) || parsedLimit <= 0)) {
+        logger.error("--limit must be a positive integer");
+        process.exit(1);
+      }
+      const explicitLimit = parsedLimit !== undefined;
+      const pageSize = explicitLimit ? parsedLimit : DEFAULT_PAGE_SIZE;
+
+      const parsedPage = opts.page === undefined ? 1 : Number(opts.page);
+      if (!Number.isInteger(parsedPage) || parsedPage <= 0) {
+        logger.error("--page must be a positive integer");
+        process.exit(1);
+      }
+      const page = parsedPage;
+
+      const { items: sessions, pagination } = await apiClient.listSessions({
+        limit: pageSize,
+        page,
+      });
 
       if (opts.json) {
-        await writeJson(sessions);
+        await writeJson({ items: sessions, pagination });
+        if (!explicitLimit && pagination.hasMore) {
+          logger.warn(
+            formatTruncationWarning({
+              returned: sessions.length,
+              pageSize,
+              commandExample: `releases admin discovery task list --json --limit <n> --page <p>`,
+            }),
+          );
+        }
         return;
       }
 
@@ -48,6 +82,15 @@ export function registerTaskCommand(program: Command) {
           `  ${statusColor(s.status.padEnd(10))} ${s.company.padEnd(30)} ${chalk.gray(s.sessionId.slice(0, 8))}  ${chalk.gray(ageStr + " ago")}${detailStr}`,
         );
       }
+      if (!explicitLimit && pagination.hasMore) {
+        logger.warn(
+          formatTruncationWarning({
+            returned: sessions.length,
+            pageSize,
+            commandExample: `releases admin discovery task list --limit <n> --page <p>`,
+          }),
+        );
+      }
     });
 
   task
@@ -57,7 +100,7 @@ export function registerTaskCommand(program: Command) {
     .action(async (sessionIdArg: string) => {
       let sessionId = sessionIdArg;
       if (sessionId.length < 36) {
-        const sessions = await apiClient.listSessions();
+        const { items: sessions } = await apiClient.listSessions();
         const matches = sessions.filter((s) => s.sessionId.startsWith(sessionId));
         if (matches.length === 0) {
           console.error(chalk.red(`No session found matching "${sessionId}".`));

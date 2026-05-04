@@ -166,8 +166,12 @@ async function suggestEntities(
   term: string,
   limit: number,
 ): Promise<Array<{ slug: string; name: string }>> {
-  const all =
-    (await apiFetch<Array<{ slug: string; name: string }>>(`${endpoint}?limit=200`)) ?? [];
+  type Row = { slug: string; name: string };
+  // /v1/orgs always returns a paginated envelope (#723); /v1/sources is bare
+  // unless ?envelope=true. Accept either shape so this helper stays valid as
+  // more list endpoints adopt always-envelope.
+  const raw = (await apiFetch<Row[] | ListResponse<Row>>(`${endpoint}?limit=200`)) ?? ([] as Row[]);
+  const all: Row[] = Array.isArray(raw) ? raw : raw.items;
   const lower = term.toLowerCase();
   return all
     .filter((e) => e.slug.includes(lower) || e.name.toLowerCase().includes(lower))
@@ -186,12 +190,16 @@ export async function getSourcesByOrg(orgId: string): Promise<Source[]> {
 export async function listOrgs(opts?: {
   query?: string;
   platform?: string;
-}): Promise<Organization[]> {
+  limit?: number;
+  page?: number;
+}): Promise<ListResponse<Organization>> {
   const params = new URLSearchParams();
   if (opts?.query) params.set("q", opts.query);
   if (opts?.platform) params.set("platform", opts.platform);
+  if (opts?.limit != null) params.set("limit", String(opts.limit));
+  if (opts?.page != null) params.set("page", String(opts.page));
   const qs = params.toString();
-  return apiFetch<Organization[]>(`/v1/orgs${qs ? `?${qs}` : ""}`);
+  return apiFetch<ListResponse<Organization>>(`/v1/orgs${qs ? `?${qs}` : ""}`);
 }
 
 export async function getOrgAccountByPlatform(
@@ -215,8 +223,15 @@ export async function addIgnoredUrl(url: string, orgId: string, reason?: string)
   });
 }
 
-export async function listIgnoredUrls(orgId: string): Promise<IgnoredUrl[]> {
-  return apiFetch<IgnoredUrl[]>(`/v1/orgs/${orgId}/ignored-urls`);
+export async function listIgnoredUrls(
+  orgId: string,
+  opts?: { limit?: number; page?: number },
+): Promise<ListResponse<IgnoredUrl>> {
+  const params = new URLSearchParams();
+  if (opts?.limit != null) params.set("limit", String(opts.limit));
+  if (opts?.page != null) params.set("page", String(opts.page));
+  const qs = params.toString();
+  return apiFetch<ListResponse<IgnoredUrl>>(`/v1/orgs/${orgId}/ignored-urls${qs ? `?${qs}` : ""}`);
 }
 
 export async function removeIgnoredUrl(url: string, orgId: string): Promise<void> {
@@ -241,8 +256,15 @@ export async function addBlockedUrl(
   });
 }
 
-export async function listBlockedUrls(): Promise<BlockedUrl[]> {
-  return apiFetch<BlockedUrl[]>("/v1/admin/blocklist");
+export async function listBlockedUrls(opts?: {
+  limit?: number;
+  page?: number;
+}): Promise<ListResponse<BlockedUrl>> {
+  const params = new URLSearchParams();
+  if (opts?.limit != null) params.set("limit", String(opts.limit));
+  if (opts?.page != null) params.set("page", String(opts.page));
+  const qs = params.toString();
+  return apiFetch<ListResponse<BlockedUrl>>(`/v1/admin/blocklist${qs ? `?${qs}` : ""}`);
 }
 
 export async function removeBlockedUrl(pattern: string): Promise<void> {
@@ -1029,8 +1051,21 @@ export async function queryReleasesWithMedia(): Promise<
 
 // ── Sessions ──
 
-export async function listSessions(): Promise<Session[]> {
-  return apiFetch<Session[]>("/v1/sessions");
+export async function listSessions(opts?: {
+  limit?: number;
+  page?: number;
+  type?: string;
+  status?: string;
+  recentMinutes?: number;
+}): Promise<ListResponse<Session>> {
+  const params = new URLSearchParams();
+  if (opts?.limit != null) params.set("limit", String(opts.limit));
+  if (opts?.page != null) params.set("page", String(opts.page));
+  if (opts?.type) params.set("type", opts.type);
+  if (opts?.status) params.set("status", opts.status);
+  if (opts?.recentMinutes != null) params.set("recent_minutes", String(opts.recentMinutes));
+  const qs = params.toString();
+  return apiFetch<ListResponse<Session>>(`/v1/sessions${qs ? `?${qs}` : ""}`);
 }
 
 export async function getSession(sessionId: string): Promise<Session | null> {
