@@ -12,6 +12,7 @@ import { sourceNotFound } from "../suggest.js";
 import { toSlug } from "@buildinternet/releases-core/slug";
 import { logger } from "@releases/lib/logger";
 import { writeJson } from "../../lib/output.js";
+import { resolveInlineOrFile } from "../../lib/input.js";
 
 const VALID_TYPES = ["github", "scrape", "feed", "agent"] as const;
 
@@ -36,6 +37,7 @@ export type UpdateSourceOpts = {
   provider?: string;
   fetchMethod?: string;
   parseInstructions?: string | boolean;
+  parseInstructionsFile?: string;
   render?: boolean;
   primary?: boolean;
   priority?: string;
@@ -48,6 +50,24 @@ export async function updateSourceAction(
   identifier: string,
   opts: UpdateSourceOpts,
 ): Promise<void> {
+  // `--no-parse-instructions` produces `false` and is mutually exclusive with
+  // any other parse-instructions flag (mirrors the inline-vs-file mutex below).
+  // The string and file forms collapse via the shared resolver: file contents
+  // become the value, and an empty file clears (matches `--parse-instructions ""`).
+  if (opts.parseInstructions !== undefined && opts.parseInstructionsFile !== undefined) {
+    logger.error("--parse-instructions and --parse-instructions-file are mutually exclusive");
+    process.exit(1);
+  }
+  const parseInstructions: string | false | undefined =
+    opts.parseInstructions === false
+      ? false
+      : await resolveInlineOrFile({
+          inline: typeof opts.parseInstructions === "string" ? opts.parseInstructions : undefined,
+          file: opts.parseInstructionsFile,
+          inlineName: "--parse-instructions",
+          fileName: "--parse-instructions-file",
+        });
+
   const source = await findSource(identifier);
   if (!source) return sourceNotFound(identifier);
 
@@ -187,14 +207,14 @@ export async function updateSourceAction(
     changes.push(`fetch method → ${opts.fetchMethod}`);
   }
 
-  if (opts.parseInstructions === false || opts.parseInstructions === "") {
+  if (parseInstructions === false || parseInstructions === "") {
     metaUpdates.parseInstructions = undefined;
     changes.push("parse instructions removed");
-  } else if (typeof opts.parseInstructions === "string") {
-    metaUpdates.parseInstructions = opts.parseInstructions;
-    changes.push(
-      `parse instructions → "${opts.parseInstructions.slice(0, 60)}${opts.parseInstructions.length > 60 ? "..." : ""}"`,
-    );
+  } else if (typeof parseInstructions === "string") {
+    metaUpdates.parseInstructions = parseInstructions;
+    const preview =
+      parseInstructions.length > 60 ? `${parseInstructions.slice(0, 60)}...` : parseInstructions;
+    changes.push(`parse instructions → "${preview}"`);
   }
 
   if (opts.render === true) {
@@ -235,7 +255,7 @@ export async function updateSourceAction(
   }
 }
 
-function attachUpdateOptions(cmd: Command): Command {
+export function attachUpdateOptions(cmd: Command): Command {
   return cmd
     .argument("<identifier>", "Source ID (src_...) or slug")
     .option("--name <name>", "Update display name")
@@ -250,7 +270,14 @@ function attachUpdateOptions(cmd: Command): Command {
     .option("--feed-url <feedUrl>", "Set or update the feed URL")
     .option("--no-feed-url", "Remove stored feed URL")
     .option("--markdown-url <markdownUrl>", "Set the raw markdown URL for this source")
-    .option("--parse-instructions <text>", "Set AI parsing instructions for this source")
+    .option(
+      "--parse-instructions <text>",
+      "(deprecated — use --parse-instructions-file) Set AI parsing instructions inline; quote-hostile, prefer the file form",
+    )
+    .option(
+      "--parse-instructions-file <path>",
+      "Path to file with AI parsing instructions (use - for stdin; empty file clears)",
+    )
     .option("--no-parse-instructions", "Remove AI parsing instructions")
     .option("--render", "Force headless browser rendering for this source")
     .option("--no-render", "Allow fast fetch without headless browser rendering")
@@ -265,7 +292,18 @@ function attachUpdateOptions(cmd: Command): Command {
 }
 
 export function registerUpdateCommand(program: Command) {
-  attachUpdateOptions(
-    program.command("update").description("Update an existing changelog source"),
-  ).action(updateSourceAction);
+  attachUpdateOptions(program.command("update").description("Update an existing changelog source"))
+    .addHelpText(
+      "after",
+      `
+Examples:
+  releases update src_abc123 --primary
+  releases update src_abc123 --parse-instructions-file parse.md
+  cat parse.md | releases update src_abc123 --parse-instructions-file -
+
+--parse-instructions (inline) is deprecated and will be removed in a future
+minor release. Quoting markdown across newlines is fragile; prefer
+--parse-instructions-file.`,
+    )
+    .action(updateSourceAction);
 }
