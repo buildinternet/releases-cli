@@ -28,10 +28,7 @@ import { registerShowCommand } from "./commands/show.js";
 import { registerEmbedCommand } from "./commands/admin/embed.js";
 import { registerEvaluateCommand } from "./commands/admin/evaluate.js";
 import { registerPlaybookCommand } from "./commands/admin/playbook.js";
-import { registerOverviewReadCommand } from "./commands/admin/overview/read.js";
-import { registerOverviewInputsCommand } from "./commands/admin/overview/inputs.js";
-import { registerOverviewWriteCommand } from "./commands/admin/overview/write.js";
-import { registerOverviewListCommand } from "./commands/admin/overview/list.js";
+import { registerOverviewCommands } from "./commands/admin/overview.js";
 import { registerTelemetryCommand } from "./commands/telemetry.js";
 import { registerServeCommand } from "./commands/serve.js";
 import { registerWhoamiCommand } from "./commands/whoami.js";
@@ -223,10 +220,7 @@ registerUsageCommand(statsAdmin);
 
 registerEmbedCommand(admin);
 registerPlaybookCommand(admin);
-registerOverviewListCommand(admin);
-registerOverviewReadCommand(admin);
-registerOverviewInputsCommand(admin);
-registerOverviewWriteCommand(admin);
+registerOverviewCommands(admin);
 
 const mcpAdmin = admin.command("mcp").description("MCP server management");
 registerServeCommand(mcpAdmin);
