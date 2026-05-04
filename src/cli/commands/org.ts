@@ -54,12 +54,13 @@ type OrgCreateOpts = {
   strict?: boolean;
 };
 
-function parseTagList(raw: string | undefined): string[] {
-  if (!raw) return [];
-  return raw
+async function applyTagsToOrg(orgId: string, raw: string | undefined): Promise<void> {
+  if (!raw) return;
+  const tagList = raw
     .split(",")
     .map((t) => t.trim())
     .filter(Boolean);
+  if (tagList.length > 0) await addTagsToOrg(orgId, tagList);
 }
 
 async function orgCreateAction(name: string, opts: OrgCreateOpts): Promise<void> {
@@ -76,10 +77,7 @@ async function orgCreateAction(name: string, opts: OrgCreateOpts): Promise<void>
       logger.error(`Organization with slug "${slug}" already exists.`);
       process.exit(1);
     }
-    const tagList = parseTagList(opts.tags);
-    if (tagList.length > 0) {
-      await addTagsToOrg(existing.id, tagList);
-    }
+    await applyTagsToOrg(existing.id, opts.tags);
     logger.info(`Organization already exists: ${existing.name} (${slug}) — returning existing`);
     if (opts.json) await writeJson({ ...existing, existed: true });
     return;
@@ -115,10 +113,7 @@ async function orgCreateAction(name: string, opts: OrgCreateOpts): Promise<void>
           logger.error(`Organization with slug "${slug}" already exists.`);
           process.exit(1);
         }
-        const tagList = parseTagList(opts.tags);
-        if (tagList.length > 0) {
-          await addTagsToOrg(racedExisting.id, tagList);
-        }
+        await applyTagsToOrg(racedExisting.id, opts.tags);
         logger.info(
           `Organization already exists: ${racedExisting.name} (${slug}) — returning existing`,
         );
@@ -129,10 +124,7 @@ async function orgCreateAction(name: string, opts: OrgCreateOpts): Promise<void>
     throw err;
   }
 
-  const tagList = parseTagList(opts.tags);
-  if (tagList.length > 0) {
-    await addTagsToOrg(created.id, tagList);
-  }
+  await applyTagsToOrg(created.id, opts.tags);
 
   if (opts.json) await writeJson({ ...created, existed: false });
   else logger.info(chalk.green(`Organization created: ${name} (${slug})`));
