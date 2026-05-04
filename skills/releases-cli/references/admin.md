@@ -10,7 +10,7 @@ export RELEASED_API_KEY=your_key
 
 Missing or invalid keys fail fast at CLI startup with a clear error; don't retry the same command without fixing the env var.
 
-All admin commands accept an entity ID (`org_…`, `src_…`, `prod_…`, `rel_…`) or a slug wherever an identifier is expected. Prefer IDs — slugs can change, IDs cannot.
+All admin commands accept an entity ID (`org_…`, `src_…`, `prod_…`, `rel_…`) or a slug wherever an identifier is expected. Source and product commands also accept an `org/slug` coordinate (e.g. `vercel/vercel-ai-sdk`). Prefer IDs or coordinates — slugs can change, IDs cannot, and coordinates skip an extra resolver round-trip that bare slugs require under the hood (#698).
 
 ## Sources
 
