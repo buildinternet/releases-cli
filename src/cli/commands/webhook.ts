@@ -133,7 +133,7 @@ export function registerWebhookCommand(parent: Command): void {
         process.exit(1);
       }
 
-      const rawBody = opts.bodyFile ? await readContentArg(opts.bodyFile) : opts.body!;
+      const rawBody = hasBodyFile ? await readContentArg(opts.bodyFile!) : opts.body!;
 
       let result: VerifyResult;
       try {

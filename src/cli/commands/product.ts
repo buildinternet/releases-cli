@@ -22,6 +22,7 @@ import {
 import { toSlug } from "@buildinternet/releases-core/slug";
 import { isValidCategory, CATEGORIES } from "@buildinternet/releases-core/categories";
 import { writeJson } from "../../lib/output.js";
+import { computePagination, type ListResponse } from "@buildinternet/releases-core/cli-contracts";
 
 export function registerProductCommand(program: Command) {
   const product = program.command("product").description("Manage products");
@@ -481,8 +482,18 @@ export function registerProductCommand(program: Command) {
 
       const aliases = await getAliases("product", found.slug);
 
-      if (opts.json) await writeJson(aliases);
-      else if (aliases.length === 0)
+      if (opts.json) {
+        const response: ListResponse<string> = {
+          items: aliases,
+          pagination: computePagination({
+            page: 1,
+            pageSize: aliases.length,
+            returned: aliases.length,
+            totalItems: aliases.length,
+          }),
+        };
+        await writeJson(response);
+      } else if (aliases.length === 0)
         console.log(chalk.yellow(`No domain aliases for ${found.name}`));
       else for (const d of aliases) console.log(d);
     });

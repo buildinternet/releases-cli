@@ -1,6 +1,5 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import { existsSync } from "fs";
 import { toSlug } from "@buildinternet/releases-core/slug";
 import { logger } from "@releases/lib/logger";
 import { isGitHubUrl } from "./add.js";
@@ -180,11 +179,6 @@ Examples:
     )
     .action(
       async (file: string, opts: { dryRun?: boolean; json?: boolean; skipExisting?: boolean }) => {
-        if (file !== "-" && !existsSync(file)) {
-          logger.error(`File not found: ${file}`);
-          process.exit(1);
-        }
-
         const raw = await readContentArg(file);
 
         let data: unknown;

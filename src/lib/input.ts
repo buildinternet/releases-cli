@@ -1,4 +1,4 @@
-import chalk from "chalk";
+import { logger } from "@releases/lib/logger";
 
 /**
  * Read content from a file path or stdin.
@@ -11,10 +11,8 @@ export async function readContentArg(pathOrDash: string): Promise<string> {
   try {
     return await Bun.file(pathOrDash).text();
   } catch (err) {
-    console.error(
-      chalk.red(
-        `Error: cannot read file "${pathOrDash}": ${err instanceof Error ? err.message : String(err)}`,
-      ),
+    logger.error(
+      `cannot read file "${pathOrDash}": ${err instanceof Error ? err.message : String(err)}`,
     );
     process.exit(1);
   }
