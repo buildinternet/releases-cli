@@ -106,16 +106,16 @@ async function checkSource(source: SourceLite): Promise<CheckResult> {
 
 export function registerCheckCommand(program: Command) {
   program
-    .command("check [slug]")
-    .description("Check health and availability of changelog sources")
+    .command("check [source]")
+    .description("Check health and availability of changelog sources (accepts src_… or slug)")
     .option("--json", "Output as JSON")
-    .action(async (slug: string | undefined, opts: { json?: boolean }) => {
+    .action(async (identifier: string | undefined, opts: { json?: boolean }) => {
       let sourcesToCheck: SourceLite[];
 
-      if (slug) {
-        const source = await findSource(slug);
+      if (identifier) {
+        const source = await findSource(identifier);
         if (!source) {
-          console.error(`Source not found: ${slug}`);
+          console.error(`Source not found: ${identifier}`);
           process.exit(1);
         }
         sourcesToCheck = [

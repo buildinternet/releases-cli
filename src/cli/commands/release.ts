@@ -132,7 +132,7 @@ export function registerReleaseCommand(program: Command) {
     .command("delete")
     .description("Delete a release by ID, or all releases for a source")
     .argument("[id]", "Release ID to delete")
-    .option("--source <slug>", "Delete all releases for a source")
+    .option("--source <identifier>", "Delete all releases for a source (src_… or slug)")
     .option("--dry-run", "Show what would be deleted without deleting")
     .option("--json", "Output as JSON")
     .action(

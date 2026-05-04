@@ -1,14 +1,15 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import Table from "cli-table3";
-import { getFetchLogs } from "../../api/client.js";
+import { findSource, getFetchLogs } from "../../api/client.js";
 import { timeAgo } from "@buildinternet/releases-core/dates";
 import { stripAnsi } from "../../lib/sanitize.js";
 import { writeJson } from "../../lib/output.js";
+import { sourceNotFound } from "../suggest.js";
 
 export function registerFetchLogCommand(program: Command) {
   program
-    .command("fetch-log [slug]")
+    .command("fetch-log [source]")
     .description("Show fetch history for sources")
     .option("--limit <n>", "Number of log entries", "20")
     .option("--json", "Output as JSON")
@@ -17,13 +18,23 @@ export function registerFetchLogCommand(program: Command) {
       `
 Examples:
   releases admin source fetch-log                 Show recent fetch history
-  releases admin source fetch-log my-source       Show history for one source
+  releases admin source fetch-log my-source       Show history for one source (slug or src_…)
   releases admin source fetch-log --limit 50
   releases admin source fetch-log --json`,
     )
-    .action(async (slug: string | undefined, opts: { limit?: string; json?: boolean }) => {
+    .action(async (source: string | undefined, opts: { limit?: string; json?: boolean }) => {
       const limit = parseInt(opts.limit ?? "20", 10);
-      const logs = await getFetchLogs({ sourceSlug: slug, limit });
+      // The /v1/admin/logs/fetch query param resolves typed IDs and bare slugs
+      // only — `org/slug` coordinates 404 there. Round-trip through findSource
+      // first so every shape the CLI advertises lands cleanly. Pass the
+      // canonical typed ID downstream to short-circuit ambiguous-slug cases.
+      let resolvedSource: string | undefined;
+      if (source) {
+        const found = await findSource(source);
+        if (!found) return sourceNotFound(source);
+        resolvedSource = found.id;
+      }
+      const logs = await getFetchLogs({ source: resolvedSource, limit });
 
       if (logs.length === 0) {
         if (opts.json) {
@@ -80,9 +91,9 @@ Examples:
       }
 
       console.log(table.toString());
-      const hint = slug
-        ? `  More: "releases show ${slug}" for source details · "releases admin source fetch ${slug}" to re-fetch`
-        : `  More: "releases admin source fetch-log <slug>" to filter by source · "releases show <slug>" for source details`;
+      const hint = source
+        ? `  More: "releases get ${source}" for source details · "releases admin source fetch ${source}" to re-fetch`
+        : `  More: "releases admin source fetch-log <source>" to filter by source (slug or src_…) · "releases get <source>" for source details`;
       console.log(chalk.dim(`\n${hint}`));
     });
 }

@@ -29,10 +29,10 @@ export function registerListCommand(program: Command) {
   program
     .command("list")
     .description("List all configured changelog sources, or show details for a single source")
-    .argument("[slug]", "Show details for a specific source by slug")
+    .argument("[source]", "Show details for a specific source (src_… or slug)")
     .option("--json", "Output as JSON")
-    .option("--org <org>", "Filter by organization slug")
-    .option("--product <product>", "Filter by product slug")
+    .option("--org <org>", "Filter by organization (org_…, slug, domain, name, or handle)")
+    .option("--product <product>", "Filter by product (prod_… or slug)")
     .option("--has-feed", "Only show sources that have a discovered feed URL")
     .option("--query <text>", "Filter by name, slug, or URL")
     .option("--category <category>", "Filter by organization or product category")

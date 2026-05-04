@@ -158,7 +158,7 @@ export async function findSourcesByUrls(urls: string[]): Promise<Source[]> {
 // ── Org queries ──
 
 export async function findOrg(identifier: string): Promise<Organization | null> {
-  return apiFetch<Organization | null>(`/v1/orgs/${identifier}`);
+  return apiFetch<Organization | null>(`/v1/orgs/${encodeURIComponent(identifier)}`);
 }
 
 async function suggestEntities(
@@ -485,11 +485,12 @@ export async function postFetchLog(entry: {
 // ── Fetch log read ──
 
 export async function getFetchLogs(opts: {
-  sourceSlug?: string;
+  /** Source identifier (src_… or slug). */
+  source?: string;
   limit: number;
 }): Promise<FetchLogEntry[]> {
   const params = new URLSearchParams({ limit: String(opts.limit) });
-  if (opts.sourceSlug) params.set("source", opts.sourceSlug);
+  if (opts.source) params.set("source", opts.source);
   const logs = await apiFetch<
     Array<{
       id: string;
@@ -547,15 +548,17 @@ type LatestReleasesResponse = {
 };
 
 export async function getLatestReleases(opts: {
-  slug?: string;
-  orgSlug?: string;
+  /** Source identifier (src_… or slug). */
+  source?: string;
+  /** Organization identifier (org_… or slug). */
+  org?: string;
   count: number;
   includeCoverage?: boolean;
 }): Promise<LatestRelease[]> {
   const qs = new URLSearchParams();
   qs.set("count", String(opts.count));
-  if (opts.slug) qs.set("source", opts.slug);
-  if (opts.orgSlug) qs.set("org", opts.orgSlug);
+  if (opts.source) qs.set("source", opts.source);
+  if (opts.org) qs.set("org", opts.org);
   if (opts.includeCoverage) qs.set("include_coverage", "true");
 
   const data = await apiFetch<LatestReleasesResponse>(`/v1/releases/latest?${qs.toString()}`);
@@ -711,26 +714,28 @@ export async function createOrg(
   });
 }
 
-export async function removeOrg(slug: string, opts?: { hard?: boolean }): Promise<void> {
+export async function removeOrg(identifier: string, opts?: { hard?: boolean }): Promise<void> {
   const qs = opts?.hard ? "?hard=true" : "";
-  await apiFetch(`/v1/orgs/${slug}${qs}`, { method: "DELETE" });
+  await apiFetch(`/v1/orgs/${encodeURIComponent(identifier)}${qs}`, { method: "DELETE" });
 }
 
-export async function getOrgDependents(slug: string): Promise<OrgDependentsResponse> {
+export async function getOrgDependents(identifier: string): Promise<OrgDependentsResponse> {
   // apiFetch returns null on GET 404; surface a typed error instead so the
   // delete flow doesn't dereference `dependents.counts` on a missing org.
-  const result = await apiFetch<OrgDependentsResponse | null>(`/v1/admin/orgs/${slug}/dependents`);
+  const result = await apiFetch<OrgDependentsResponse | null>(
+    `/v1/admin/orgs/${encodeURIComponent(identifier)}/dependents`,
+  );
   if (!result) {
-    throw new Error(`Org dependents preview not available for "${slug}" (org not found).`);
+    throw new Error(`Org dependents preview not available for "${identifier}" (org not found).`);
   }
   return result;
 }
 
 export async function updateOrg(
-  slug: string,
+  identifier: string,
   data: Record<string, unknown>,
 ): Promise<Organization> {
-  return apiFetch<Organization>(`/v1/orgs/${slug}`, {
+  return apiFetch<Organization>(`/v1/orgs/${encodeURIComponent(identifier)}`, {
     method: "PATCH",
     body: JSON.stringify(data),
   });
@@ -912,8 +917,13 @@ export async function postStatusEvent(event: {
 
 // ── Recent releases ──
 
-export async function getRecentReleases(sourceSlug: string, cutoffIso: string): Promise<Release[]> {
-  return apiFetch<Release[]>(`/v1/sources/${sourceSlug}/recent-releases?cutoff=${cutoffIso}`);
+export async function getRecentReleases(
+  sourceIdentifier: string,
+  cutoffIso: string,
+): Promise<Release[]> {
+  return apiFetch<Release[]>(
+    `/v1/sources/${encodeURIComponent(sourceIdentifier)}/recent-releases?cutoff=${cutoffIso}`,
+  );
 }
 
 // ── Release summaries ──
@@ -949,15 +959,15 @@ const SCOPE_RESOURCE = { org: "orgs", product: "products" } as const;
 
 export async function getOverview(
   scope: keyof typeof SCOPE_RESOURCE,
-  slug: string,
+  identifier: string,
 ): Promise<KnowledgePage | null> {
   return apiFetch<KnowledgePage | null>(
-    `/v1/${SCOPE_RESOURCE[scope]}/${encodeURIComponent(slug)}/overview`,
+    `/v1/${SCOPE_RESOURCE[scope]}/${encodeURIComponent(identifier)}/overview`,
   );
 }
 
-export async function getPlaybook(slug: string): Promise<KnowledgePage | null> {
-  return apiFetch<KnowledgePage | null>(`/v1/orgs/${encodeURIComponent(slug)}/playbook`);
+export async function getPlaybook(identifier: string): Promise<KnowledgePage | null> {
+  return apiFetch<KnowledgePage | null>(`/v1/orgs/${encodeURIComponent(identifier)}/playbook`);
 }
 
 export async function upsertOverview(
@@ -1136,20 +1146,20 @@ export async function getEmbedStatus(): Promise<EmbedStatusResponse> {
 
 export async function getAliases(
   scope: keyof typeof SCOPE_RESOURCE,
-  slug: string,
+  identifier: string,
 ): Promise<string[]> {
   const row = await apiFetch<{ aliases?: string[] } | null>(
-    `/v1/${SCOPE_RESOURCE[scope]}/${encodeURIComponent(slug)}`,
+    `/v1/${SCOPE_RESOURCE[scope]}/${encodeURIComponent(identifier)}`,
   );
   return row?.aliases ?? [];
 }
 
 export async function setAliases(
   scope: keyof typeof SCOPE_RESOURCE,
-  slug: string,
+  identifier: string,
   aliases: string[],
 ): Promise<void> {
-  await apiFetch(`/v1/${SCOPE_RESOURCE[scope]}/${encodeURIComponent(slug)}`, {
+  await apiFetch(`/v1/${SCOPE_RESOURCE[scope]}/${encodeURIComponent(identifier)}`, {
     method: "PATCH",
     body: JSON.stringify({ aliases }),
   });

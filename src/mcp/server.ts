@@ -138,8 +138,8 @@ server.registerTool(
     const maxCount = count ?? 10;
 
     let releases = await getLatestReleases({
-      slug: product,
-      orgSlug: organization,
+      source: product,
+      org: organization,
       count: maxCount,
     });
 

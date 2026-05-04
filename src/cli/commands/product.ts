@@ -159,17 +159,17 @@ export function registerProductCommand(program: Command) {
   product
     .command("list")
     .description("List products for an organization")
-    .argument("[org-slug]", "Organization slug")
+    .argument("[org]", "Organization (org_…, slug, domain, name, or handle)")
     .option("--json", "Output as JSON")
-    .action(async (orgSlug: string | undefined, opts: { json?: boolean }) => {
-      if (!orgSlug) {
-        console.error(chalk.red("Please specify an org slug"));
+    .action(async (orgIdentifier: string | undefined, opts: { json?: boolean }) => {
+      if (!orgIdentifier) {
+        console.error(chalk.red("Please specify an organization"));
         process.exit(1);
       }
 
-      const org = await findOrg(orgSlug);
+      const org = await findOrg(orgIdentifier);
       if (!org) {
-        console.error(chalk.red(`Organization not found: ${orgSlug}`));
+        console.error(chalk.red(`Organization not found: ${orgIdentifier}`));
         process.exit(1);
       }
 
@@ -202,7 +202,7 @@ export function registerProductCommand(program: Command) {
     .command("create")
     .description("Create a new product under an organization")
     .argument("<name>", "Product name")
-    .requiredOption("--org <org-slug>", "Organization slug")
+    .requiredOption("--org <org>", "Organization (org_…, slug, domain, name, or handle)")
     .option("--slug <slug>", "Custom slug")
     .option("--url <url>", "Product URL")
     .option("--description <text>", "Brief product description")
@@ -215,7 +215,7 @@ export function registerProductCommand(program: Command) {
     .command("add")
     .description("(deprecated — use create) Create a new product under an organization")
     .argument("<name>", "Product name")
-    .requiredOption("--org <org-slug>", "Organization slug")
+    .requiredOption("--org <org>", "Organization (org_…, slug, domain, name, or handle)")
     .option("--slug <slug>", "Custom slug")
     .option("--url <url>", "Product URL")
     .option("--description <text>", "Brief product description")
@@ -228,7 +228,7 @@ export function registerProductCommand(program: Command) {
   product
     .command("update")
     .description("Update a product")
-    .argument("<slug>", "Product slug")
+    .argument("<product>", "Product ID (prod_…) or slug")
     .option("--name <name>", "New product name")
     .option("--url <url>", "New product URL")
     .option("--description <text>", "New product description")
@@ -240,7 +240,7 @@ export function registerProductCommand(program: Command) {
   product
     .command("edit")
     .description("(deprecated — use update) Update a product")
-    .argument("<slug>", "Product slug")
+    .argument("<product>", "Product ID (prod_…) or slug")
     .option("--name <name>", "New product name")
     .option("--url <url>", "New product URL")
     .option("--description <text>", "New product description")
@@ -255,7 +255,7 @@ export function registerProductCommand(program: Command) {
   product
     .command("delete")
     .description("Delete a product")
-    .argument("<slug>", "Product slug")
+    .argument("<product>", "Product ID (prod_…) or slug")
     .option("--dry-run", "Show what would be deleted without deleting")
     .option("--json", "Output as JSON")
     .action(productDeleteAction);
@@ -263,7 +263,7 @@ export function registerProductCommand(program: Command) {
   product
     .command("remove")
     .description("(deprecated — use delete) Delete a product")
-    .argument("<slug>", "Product slug")
+    .argument("<product>", "Product ID (prod_…) or slug")
     .option("--dry-run", "Show what would be removed without deleting")
     .option("--json", "Output as JSON")
     .action(
@@ -273,8 +273,14 @@ export function registerProductCommand(program: Command) {
   product
     .command("adopt")
     .description("Convert an organization into a product under another organization")
-    .argument("<source-org-slug>", "Org to convert into a product")
-    .requiredOption("--into <target-org-slug>", "Target org that will own the new product")
+    .argument(
+      "<source-org>",
+      "Org to convert into a product (org_…, slug, domain, name, or handle)",
+    )
+    .requiredOption(
+      "--into <target-org>",
+      "Target org that will own the new product (org_…, slug, domain, name, or handle)",
+    )
     .option("--slug <slug>", "Custom slug for the new product")
     .option("--url <url>", "URL for the new product")
     .option("--dry-run", "Show what would happen")
@@ -390,7 +396,7 @@ export function registerProductCommand(program: Command) {
   tag
     .command("add")
     .description("Add tags to a product")
-    .argument("<slug>", "Product slug")
+    .argument("<product>", "Product ID (prod_…) or slug")
     .argument("<tags...>", "Tag names to add")
     .option("--json", "Output as JSON")
     .action(async (slug: string, tagNames: string[], opts: { json?: boolean }) => {
@@ -411,7 +417,7 @@ export function registerProductCommand(program: Command) {
   tag
     .command("remove")
     .description("Remove tags from a product")
-    .argument("<slug>", "Product slug")
+    .argument("<product>", "Product ID (prod_…) or slug")
     .argument("<tags...>", "Tag names to remove")
     .option("--json", "Output as JSON")
     .action(async (slug: string, tagNames: string[], opts: { json?: boolean }) => {
@@ -432,7 +438,7 @@ export function registerProductCommand(program: Command) {
   tag
     .command("list")
     .description("List tags for a product")
-    .argument("<slug>", "Product slug")
+    .argument("<product>", "Product ID (prod_…) or slug")
     .option("--json", "Output as JSON")
     .action(async (slug: string, opts: { json?: boolean }) => {
       const found = await findProduct(slug);
@@ -452,7 +458,7 @@ export function registerProductCommand(program: Command) {
   alias
     .command("add")
     .description("Add domain aliases to a product")
-    .argument("<identifier>", "Product slug")
+    .argument("<identifier>", "Product ID (prod_…) or slug")
     .argument("<domains...>", "Domain names to add")
     .option("--json", "Output as JSON")
     .action(async (identifier: string, domains: string[], opts: { json?: boolean }) => {
@@ -489,7 +495,7 @@ export function registerProductCommand(program: Command) {
   alias
     .command("remove")
     .description("Remove domain aliases from a product")
-    .argument("<identifier>", "Product slug")
+    .argument("<identifier>", "Product ID (prod_…) or slug")
     .argument("<domains...>", "Domain names to remove")
     .option("--json", "Output as JSON")
     .action(async (identifier: string, domains: string[], opts: { json?: boolean }) => {
@@ -515,7 +521,7 @@ export function registerProductCommand(program: Command) {
   alias
     .command("list")
     .description("List domain aliases for a product")
-    .argument("<identifier>", "Product slug")
+    .argument("<identifier>", "Product ID (prod_…) or slug")
     .option("--json", "Output as JSON")
     .action(async (identifier: string, opts: { json?: boolean }) => {
       const found = await findProduct(identifier);

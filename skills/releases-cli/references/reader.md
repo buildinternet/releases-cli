@@ -37,9 +37,10 @@ Statuses on the Lookup section: `INDEXED` (just materialized), `EXISTING` (alrea
 
 ```bash
 releases tail                          # across all sources
-releases tail next-js                  # one source (by slug)
-releases tail --org vercel --count 20  # whole org
-releases tail --product nextjs         # one product
+releases tail next-js                  # one source (slug)
+releases tail src_abc123               # one source (typed id)
+releases tail --org vercel --count 20  # whole org (org_…, slug, domain, name, or handle)
+releases tail --product nextjs         # one product (prod_… or slug)
 releases tail --type feature           # filter by release type
 releases tail --json
 ```
@@ -48,9 +49,9 @@ releases tail --json
 
 ```bash
 releases list                          # all sources
-releases list next-js                  # detail for one source (by slug or id)
-releases list --org sentry             # filter by organization
-releases list --product nextjs         # filter by product
+releases list next-js                  # detail for one source (src_… or slug)
+releases list --org sentry             # filter by organization (org_…, slug, domain, name, or handle)
+releases list --product nextjs         # filter by product (prod_… or slug)
 releases list --query shadcn           # name / slug / url substring
 releases list --has-feed               # sources with a discovered feed URL
 releases list --category ai            # filter by category

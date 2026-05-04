@@ -36,15 +36,14 @@ If the query returns no results, try variations:
 
 ### Step 2: Choose the Right Tool
 
-- **"What's new?" / "Latest releases"** → Use `get_latest_releases` with the organization or product slug
+- **"What's new?" / "Latest releases"** → Use `get_latest_releases` with the organization or product identifier (typed ID like `org_…` / `prod_…` / `src_…`, slug, or `org/slug` coordinate)
 - **Specific feature or keyword across orgs + catalog + releases** → Use `search` (unified) with a descriptive query; narrow via `type: ["releases"]` etc.
 - **Releases-only search** → Use `search_releases` (kept for back-compat) when you only want release rows
 - **Single release by id** → Use `get_release` when you already have a `rel_` id (search results include ids)
 - **Catalog deep-dive (product or standalone source)** → Use `get_catalog_entry` for metadata, tags, and linkage
 - **Organization detail** → Use `get_organization`
-- **Canonical CHANGELOG.md from a GitHub repo** → Use `get_source_changelog` when the user wants the full maintained file, not just the tagged releases (refreshed on every fetch). For large files, pass `tokens` (cl100k_base budget, e.g. 5000 or 10000) to get a heading-aligned slice that fits a known context window; chain via the returned `nextOffset`. Every response reports `totalTokens` so you can plan how many calls you need upfront.
-- **Compare two products** → Use `compare_products` with an array of two product slugs
-- **Summarize recent activity** → Use `summarize_changes` with the product slug
+- **Canonical CHANGELOG.md from a GitHub repo** → Use `get_catalog_entry` with `include_changelog: true` when the user wants the full maintained file, not just the tagged releases (refreshed on every fetch). For large files, pass `changelog_tokens` (cl100k_base budget, e.g. 5000 or 10000) to get a heading-aligned slice that fits a known context window; chain via the returned `nextOffset`. Every response reports `totalTokens` so you can plan how many calls you need upfront.
+- **Compare two products** → Fetch each product separately with `get_catalog_entry` (and `get_latest_releases` for recent activity), then synthesize the comparison from the returned data. The hosted MCP server does not expose AI summarization tools.
 
 ### Step 3: Present Results
 
@@ -56,6 +55,6 @@ If the query returns no results, try variations:
 ## Guidelines
 
 - Pass the user's full question context into query parameters for better relevance
-- When the user mentions a time range ("last month", "since v4"), use the `days` parameter on `get_latest_releases` or `summarize_changes`
+- When the user mentions a time range ("last month", "since v4"), use the `days` parameter on `get_latest_releases`
 - If a product isn't found, say so clearly — don't fabricate release information
 - For comparison questions, both products must be indexed; if one isn't found, explain which is missing

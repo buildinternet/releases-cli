@@ -125,6 +125,11 @@ async function createSingleSource(input: CreateSourceInput): Promise<CreateSourc
   if (input.org) {
     let org = await findOrg(input.org);
     if (!org) {
+      // Don't auto-create when the operator passed a typed ID — an unresolved
+      // `org_…` is a typo, not a request to spin up a new org.
+      if (input.org.startsWith("org_") || input.org.includes("/")) {
+        throw new Error(`Organization not found: ${input.org}`);
+      }
       org = await createOrg(input.org, { slug: toSlug(input.org) });
       logger.info(`Created organization: ${org.name} (${org.slug})`);
     }

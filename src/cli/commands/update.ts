@@ -122,6 +122,13 @@ export async function updateSourceAction(
   } else if (typeof opts.org === "string") {
     let org = await findOrg(opts.org);
     if (!org) {
+      // Don't auto-create when the operator passed a typed ID — an unresolved
+      // `org_…` is a typo, not a request to spin up a new org. Same logic for
+      // an `org/slug` coordinate fragment, which can't sensibly be a new name.
+      if (opts.org.startsWith("org_") || opts.org.includes("/")) {
+        console.error(chalk.red(`Organization not found: ${opts.org}`));
+        process.exit(1);
+      }
       org = await createOrg(opts.org, { slug: toSlug(opts.org) });
       logger.info(`Created organization: ${org.name} (${org.slug})`);
     }
@@ -263,9 +270,9 @@ export function attachUpdateOptions(cmd: Command): Command {
     .option("--type <type>", "Update source type (github, scrape, feed, agent)")
     .option("--slug <newSlug>", "Update slug (requires --confirm-slug-change; breaks web links)")
     .option("--confirm-slug-change", "Confirm slug rename")
-    .option("--org <org>", "Set organization")
+    .option("--org <org>", "Set organization (org_…, slug, domain, name, or handle)")
     .option("--no-org", "Remove organization association")
-    .option("--product <product>", "Set product (slug)")
+    .option("--product <product>", "Set product (prod_… or slug)")
     .option("--no-product", "Remove product association")
     .option("--feed-url <feedUrl>", "Set or update the feed URL")
     .option("--no-feed-url", "Remove stored feed URL")

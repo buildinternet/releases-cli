@@ -34,26 +34,28 @@ The CLI talks to `api.releases.sh` by default — no configuration needed for re
 
 ```bash
 # Reader (no auth required)
-releases search "breaking change"            # hybrid FTS + semantic search
-releases tail next-js                      # latest releases from one source
-releases tail --org vercel --count 20      # latest from a whole org
-releases list --category ai                  # browse sources
-releases get vercel                          # dispatch by id or slug
-releases stats                               # registry overview
-releases categories                          # list valid category values
+releases search "breaking change"               # hybrid FTS + semantic search
+releases tail next-js                           # latest releases from one source
+releases tail src_abc123                        # IDs work anywhere a slug does
+releases tail --org vercel --count 20           # latest from a whole org
+releases list --category ai                     # browse sources
+releases get vercel                             # dispatch by id or slug
+releases get org_abc123                         # typed IDs are accepted
+releases stats                                  # registry overview
+releases categories                             # list valid category values
 
 # Admin (requires RELEASED_API_KEY)
 releases admin source create "Linear" --url https://linear.app/changelog
-releases admin source fetch <slug> --max 50
+releases admin source fetch <source> --max 50   # source = src_… or slug
 releases admin org create "Acme" --category cloud
-releases admin product create "CLI" --org acme
-releases admin discovery onboard "Stripe"    # AI-powered discovery agent
+releases admin product create "CLI" --org acme  # --org accepts org_…, slug, domain, name, or handle
+releases admin discovery onboard "Stripe"       # AI-powered discovery agent
 
 # Local stdio MCP bridge (proxies to api.releases.sh)
 releases admin mcp serve
 ```
 
-Every reader command accepts `--json` for machine-readable output. IDs (`org_…`, `src_…`, `prod_…`, `rel_…`) are accepted anywhere a slug is. Source and product commands also accept an `org/slug` coordinate (e.g. `vercel/vercel-ai-sdk`); coordinates and typed IDs are unambiguous and skip an extra resolver round-trip that bare slugs require.
+Every command that takes an org / product / source / release identifier accepts the typed ID (`org_…`, `prod_…`, `src_…`, `rel_…`) interchangeably with the slug — including `--org`, `--product`, `--source` flags. IDs are stable across renames; slugs are friendlier to type. Source and product commands also accept an `org/slug` coordinate (e.g. `vercel/vercel-ai-sdk`); coordinates and typed IDs are unambiguous and skip an extra resolver round-trip that bare slugs require. Every reader command accepts `--json` for machine-readable output.
 
 ## Authentication
 
@@ -73,7 +75,7 @@ These can also go in a `.env` file — Bun auto-loads it when running from sourc
 ## Common Mistakes
 
 - `releases admin …` without `RELEASED_API_KEY` set fails fast with a clear error — don't retry the same command. Note that keys are not self-serve yet (see Authentication).
-- Slug renames (`admin source update <slug> --slug new-slug`) require `--confirm-slug-change` because they break web links.
-- `releases admin source fetch` with no slug or filter is blocked in remote mode. Use `--stale`, `--unfetched`, `--retry-errors`, `--changed`, or a source slug.
+- Slug renames (`admin source update <identifier> --slug new-slug`) require `--confirm-slug-change` because they break web links.
+- `releases admin source fetch` with no source or filter is blocked in remote mode. Use `--stale`, `--unfetched`, `--retry-errors`, `--changed`, or a source identifier (src_… or slug).
 - Default fetch cap is 200 releases per source (GitHub pagination limits). Use `--max <n>` or `--all` to override.
 - `summary` and `compare` are *not* in this CLI. Those commands require AI provider calls and live in the private maintainer tooling. Use the hosted MCP tools `summarize_changes` / `compare_products` at `mcp.releases.sh` instead.

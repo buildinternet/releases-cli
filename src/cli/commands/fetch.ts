@@ -36,7 +36,10 @@ export function registerFetchCommand(program: Command) {
     .option("--stale <hours>", "Only fetch sources older than N hours")
     .option("--changed", "Only fetch sources where poll detected upstream changes")
     .option("--retry-errors", "Only fetch sources whose last fetch was an error")
-    .option("--org <slug>", "Fetch all active sources for an organization")
+    .option(
+      "--org <org>",
+      "Fetch all active sources for an organization (org_…, slug, domain, name, or handle)",
+    )
     .option(
       "--wait [seconds]",
       `Block until the session reaches a terminal state (default: ${DEFAULT_WAIT_SECONDS}s). ` +
@@ -129,7 +132,7 @@ Examples:
           label = `${entries.length} errored sources`;
         } else {
           logger.error(
-            "fetch requires a source slug or filter (--stale, --unfetched, --changed, --retry-errors, --org)",
+            "fetch requires a source identifier (src_… or slug) or filter (--stale, --unfetched, --changed, --retry-errors, --org)",
           );
           process.exit(1);
         }

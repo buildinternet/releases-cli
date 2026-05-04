@@ -13,9 +13,9 @@ export async function orgNotFound(identifier: string): Promise<never> {
   process.exit(1);
 }
 
-export async function sourceNotFound(slug: string): Promise<never> {
-  console.error(chalk.red(`Source not found: ${slug}`));
-  const suggestions = await suggestSources(slug, 5);
+export async function sourceNotFound(identifier: string): Promise<never> {
+  console.error(chalk.red(`Source not found: ${identifier}`));
+  const suggestions = await suggestSources(identifier, 5);
   if (suggestions.length > 0) {
     console.error(chalk.dim("\nDid you mean?"));
     for (const s of suggestions) {
