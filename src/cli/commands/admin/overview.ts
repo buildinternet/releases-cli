@@ -127,14 +127,12 @@ async function overviewUpdateAction(
   }
 
   let releaseCount = parsePositiveIntFlag("release-count", opts.releaseCount);
-  let lastContributingAt = opts.lastContributingAt ?? undefined;
+  let lastContributingAt = opts.lastContributingAt;
 
   if (releaseCount === undefined || lastContributingAt === undefined) {
     const inputs = await getOverviewInputs(org.slug);
-    if (releaseCount === undefined) releaseCount = inputs.totalAvailable;
-    if (lastContributingAt === undefined) {
-      lastContributingAt = inputs.selected[0]?.publishedAt ?? undefined;
-    }
+    releaseCount ??= inputs.totalAvailable;
+    lastContributingAt ??= inputs.selected[0]?.publishedAt ?? undefined;
   }
 
   await upsertOverview(org.slug, {
@@ -262,12 +260,17 @@ function renderManifestTable(rows: OverviewManifestRow[], plan: boolean): void {
   });
 
   for (const r of rows) {
-    const stalenessLabel =
-      r.staleness === "missing"
-        ? chalk.yellow("missing")
-        : r.staleness === "behind"
-          ? chalk.red("behind")
-          : chalk.green("fresh");
+    let stalenessLabel: string;
+    switch (r.staleness) {
+      case "missing":
+        stalenessLabel = chalk.yellow("missing");
+        break;
+      case "behind":
+        stalenessLabel = chalk.red("behind");
+        break;
+      default:
+        stalenessLabel = chalk.green("fresh");
+    }
     const lastAct = r.orgLastActivity
       ? (timeAgo(r.orgLastActivity) ?? r.orgLastActivity)
       : chalk.dim("—");
