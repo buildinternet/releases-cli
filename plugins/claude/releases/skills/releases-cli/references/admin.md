@@ -22,7 +22,7 @@ releases admin source create "Linear" --url https://linear.app/changelog
 releases admin source create "My Blog" --url https://example.com/changelog
 ```
 
-By default, `create` runs automated pre-checks (provider detection, feed discovery, markdown probing). Override with `--type github|scrape|feed`. Use `--skip-eval` to bypass evaluation. Batch mode (`--batch`) skips evaluation by default for speed.
+By default, `create` runs automated pre-checks (provider detection, feed discovery, markdown probing). Override with `--type github|scrape|feed|agent`. Batch mode (`--batch`) skips evaluation by default for speed.
 
 Provide a feed URL explicitly when it isn't easily discoverable:
 

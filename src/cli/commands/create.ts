@@ -124,7 +124,7 @@ async function createSingleSource(input: CreateSourceInput): Promise<CreateSourc
     return {
       name,
       slug,
-      type: "scrape",
+      type: sourceType,
       url,
       org: orgName ?? undefined,
       status: "ignored",
@@ -210,7 +210,7 @@ export async function createSourceAction(
 
       if (result.status === "error") {
         hasError = true;
-        if (!opts.json) logger.error(chalk.red(`Failed to add ${result.name}: ${result.error}`));
+        if (!opts.json) logger.error(chalk.red(`Failed to create ${result.name}: ${result.error}`));
       } else if (result.status === "ignored") {
         if (!opts.json)
           logger.info(
@@ -221,7 +221,9 @@ export async function createSourceAction(
       } else if (!opts.json) {
         const orgLabel = result.org ? ` [org: ${result.org}]` : "";
         logger.info(
-          chalk.green(`Source added: ${result.name} (${result.slug}) [${result.type}]${orgLabel}`),
+          chalk.green(
+            `Source created: ${result.name} (${result.slug}) [${result.type}]${orgLabel}`,
+          ),
         );
       }
     }
@@ -233,12 +235,13 @@ export async function createSourceAction(
 
   const effectiveName = name ?? opts.name;
   if (!effectiveName) {
-    console.error("Error: missing required argument: name\n");
-    console.error('  releases admin source create "My Source" --url https://example.com/changelog');
+    logger.error(
+      'missing required argument: name\n\n  releases admin source create "My Source" --url https://example.com/changelog',
+    );
     process.exit(1);
   }
   if (!opts.url) {
-    console.error("Error: missing required option: --url\n");
+    logger.error("missing required option: --url");
     process.exit(1);
   }
 
