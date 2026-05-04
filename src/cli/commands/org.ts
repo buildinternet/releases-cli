@@ -633,7 +633,7 @@ Examples:
 
       const aliases = await getAliases("org", found.slug);
 
-      if (opts.json) console.log(JSON.stringify(aliases, null, 2));
+      if (opts.json) await writeJson(aliases);
       else if (aliases.length === 0)
         console.log(chalk.yellow(`No domain aliases for ${found.name}`));
       else for (const d of aliases) console.log(d);

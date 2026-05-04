@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import { readFileSync } from "fs";
+import { readContentArg } from "../../lib/input.js";
 
 // Web Crypto only — no node:crypto dependency.
 const enc = new TextEncoder();
@@ -110,7 +110,10 @@ export function registerWebhookCommand(parent: Command): void {
     .requiredOption("--signature <value>", "X-Releases-Signature header value (sha256=<hex>)")
     .requiredOption("--timestamp <value>", "X-Releases-Timestamp header value (Unix seconds)")
     .option("--body <string>", "Raw request body as a string")
-    .option("--body-file <path>", "Path to a file containing the raw request body")
+    .option(
+      "--body-file <path>",
+      'Path to a file containing the raw request body, or "-" to read from stdin',
+    )
     .option(
       "--allow-stale",
       "Skip the ±5 minute timestamp-window check (for verifying old captured payloads)",
@@ -130,21 +133,7 @@ export function registerWebhookCommand(parent: Command): void {
         process.exit(1);
       }
 
-      let rawBody: string;
-      if (opts.bodyFile) {
-        try {
-          rawBody = readFileSync(opts.bodyFile, "utf-8");
-        } catch (err) {
-          console.error(
-            chalk.red(
-              `Error: cannot read body file: ${err instanceof Error ? err.message : String(err)}`,
-            ),
-          );
-          process.exit(1);
-        }
-      } else {
-        rawBody = opts.body!;
-      }
+      const rawBody = opts.bodyFile ? await readContentArg(opts.bodyFile) : opts.body!;
 
       let result: VerifyResult;
       try {

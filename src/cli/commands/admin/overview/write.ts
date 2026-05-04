@@ -5,6 +5,7 @@ import { orgNotFound } from "../../../suggest.js";
 import { writeJson } from "../../../../lib/output.js";
 import { parsePositiveIntFlag } from "../../../../lib/flags.js";
 import { unescapeHtmlEntities } from "./unescape-html.js";
+import { readContentArg } from "../../../../lib/input.js";
 
 interface OverviewWriteOpts {
   contentFile: string;
@@ -45,7 +46,7 @@ overview-inputs to derive them.`,
       const org = await findOrg(orgIdentifier);
       if (!org) return orgNotFound(orgIdentifier);
 
-      let content = await readContent(opts.contentFile);
+      let content = await readContentArg(opts.contentFile);
       if (opts.unescapeHtml) content = unescapeHtmlEntities(content);
       if (!content.trim()) {
         console.error(chalk.red("Content is empty — refusing to write."));
@@ -84,9 +85,4 @@ overview-inputs to derive them.`,
         );
       }
     });
-}
-
-async function readContent(path: string): Promise<string> {
-  if (path === "-") return Bun.stdin.text();
-  return Bun.file(path).text();
 }
