@@ -54,6 +54,14 @@ type OrgCreateOpts = {
   strict?: boolean;
 };
 
+function parseTagList(raw: string | undefined): string[] {
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+}
+
 async function orgCreateAction(name: string, opts: OrgCreateOpts): Promise<void> {
   const slug = opts.slug ?? toSlug(name);
 
@@ -62,9 +70,15 @@ async function orgCreateAction(name: string, opts: OrgCreateOpts): Promise<void>
   // is the only safe signal that we'd actually collide on slug uniqueness.
   const existing = await findOrg(slug);
   if (existing && existing.slug === slug) {
+    // --strict bails before any reconciliation runs, preserving its original
+    // "fail on duplicate" semantics. Tag reconciliation is a non-strict thing.
     if (opts.strict) {
       logger.error(`Organization with slug "${slug}" already exists.`);
       process.exit(1);
+    }
+    const tagList = parseTagList(opts.tags);
+    if (tagList.length > 0) {
+      await addTagsToOrg(existing.id, tagList);
     }
     logger.info(`Organization already exists: ${existing.name} (${slug}) — returning existing`);
     if (opts.json) await writeJson({ ...existing, existed: true });
@@ -101,6 +115,10 @@ async function orgCreateAction(name: string, opts: OrgCreateOpts): Promise<void>
           logger.error(`Organization with slug "${slug}" already exists.`);
           process.exit(1);
         }
+        const tagList = parseTagList(opts.tags);
+        if (tagList.length > 0) {
+          await addTagsToOrg(racedExisting.id, tagList);
+        }
         logger.info(
           `Organization already exists: ${racedExisting.name} (${slug}) — returning existing`,
         );
@@ -111,14 +129,9 @@ async function orgCreateAction(name: string, opts: OrgCreateOpts): Promise<void>
     throw err;
   }
 
-  if (opts.tags) {
-    const tagList = opts.tags
-      .split(",")
-      .map((t: string) => t.trim())
-      .filter(Boolean);
-    if (tagList.length > 0) {
-      await addTagsToOrg(created.id, tagList);
-    }
+  const tagList = parseTagList(opts.tags);
+  if (tagList.length > 0) {
+    await addTagsToOrg(created.id, tagList);
   }
 
   if (opts.json) await writeJson({ ...created, existed: false });

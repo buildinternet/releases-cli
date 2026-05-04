@@ -23,6 +23,12 @@ describe("idempotent org create (--strict flag)", () => {
     expect(exitCode).toBe(0);
     expect(stdout).toContain("--strict");
   });
+
+  it("documents --tags on org create --help (reconciled on retry, see #116)", () => {
+    const { stdout, exitCode } = runCli(["admin", "org", "create", "--help"]);
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("--tags");
+  });
 });
 
 describe("idempotent source create (--strict flag)", () => {
