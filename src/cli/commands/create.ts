@@ -1,6 +1,13 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import { findOrg, createOrg, createSource, isUrlExcluded, findProduct } from "../../api/client.js";
+import {
+  findOrg,
+  createOrg,
+  createSource,
+  findSourcesByUrls,
+  isUrlExcluded,
+  findProduct,
+} from "../../api/client.js";
 import { toSlug } from "@buildinternet/releases-core/slug";
 import { logger } from "@releases/lib/logger";
 import { writeJson } from "../../lib/output.js";
@@ -26,6 +33,7 @@ interface CreateSourceInput {
   product?: string;
   feedUrl?: string;
   batch?: boolean;
+  strict?: boolean;
 }
 
 interface CreateSourceResult {
@@ -35,6 +43,7 @@ interface CreateSourceResult {
   url: string;
   org?: string;
   status: "added" | "error" | "ignored";
+  existed?: boolean;
   error?: string;
   reason?: string;
 }
@@ -54,6 +63,62 @@ async function createSingleSource(input: CreateSourceInput): Promise<CreateSourc
   }
 
   const slug = input.slug ?? toSlug(name);
+
+  // Resolve source type early so the dedup pre-check can run before any
+  // org/product side effects. Type detection is pure (only depends on input).
+  let sourceType: SourceType;
+  const metadata: Record<string, unknown> = {};
+
+  if (input.feedUrl) {
+    sourceType = (input.type as SourceType) ?? "feed";
+    metadata.feedUrl = input.feedUrl;
+    metadata.feedType = "unknown";
+    metadata.feedDiscoveredAt = new Date().toISOString();
+    metadata.noFeedFound = false;
+    logger.info(`Using provided feed URL — ${sourceType} adapter`);
+  } else if (input.type) {
+    sourceType = input.type as SourceType;
+  } else {
+    sourceType = isGitHubUrl(url) ? "github" : "scrape";
+    if (sourceType === "github") {
+      logger.info("Detected GitHub URL — using github adapter");
+    }
+  }
+
+  // Pre-check for duplicate URL BEFORE any side-effecting calls (createOrg,
+  // findProduct). The API does not reject duplicate source URLs — it
+  // auto-suffixes the slug and creates a new row. Running this first also
+  // prevents a wasted createOrg() if the caller's --org doesn't exist yet but
+  // the source already does.
+  const existingByUrl = await findSourcesByUrls([url]);
+  if (existingByUrl.length > 0) {
+    if (input.strict) {
+      return {
+        name,
+        slug,
+        type: sourceType,
+        url,
+        status: "error",
+        error: `Source URL already exists: ${url}`,
+      };
+    }
+    const src = existingByUrl[0];
+    // Report the org actually attached to the existing record, not the one the
+    // caller passed in — passing --org=wrong-org should not relabel a source
+    // that already belongs to right-org in the response payload.
+    const existingOrg = src.orgId ? await findOrg(src.orgId) : null;
+    logger.info(`Source already exists: ${src.name} (${src.slug}) — returning existing`);
+    return {
+      name: src.name,
+      slug: src.slug,
+      type: src.type,
+      url: src.url,
+      org: existingOrg?.name ?? undefined,
+      status: "added",
+      existed: true,
+    };
+  }
+
   let orgId: string | null = null;
   let orgName: string | null = null;
 
@@ -74,7 +139,7 @@ async function createSingleSource(input: CreateSourceInput): Promise<CreateSourc
       return {
         name,
         slug,
-        type: "scrape",
+        type: sourceType,
         url,
         status: "error",
         error: `Product not found: "${input.product}"`,
@@ -82,25 +147,6 @@ async function createSingleSource(input: CreateSourceInput): Promise<CreateSourc
     }
     productId = prod.id;
     if (!orgId) orgId = prod.orgId;
-  }
-
-  let sourceType: SourceType;
-  const metadata: Record<string, unknown> = {};
-
-  if (input.feedUrl) {
-    sourceType = (input.type as SourceType) ?? "feed";
-    metadata.feedUrl = input.feedUrl;
-    metadata.feedType = "unknown";
-    metadata.feedDiscoveredAt = new Date().toISOString();
-    metadata.noFeedFound = false;
-    logger.info(`Using provided feed URL — ${sourceType} adapter`);
-  } else if (input.type) {
-    sourceType = input.type as SourceType;
-  } else {
-    sourceType = isGitHubUrl(url) ? "github" : "scrape";
-    if (sourceType === "github") {
-      logger.info("Detected GitHub URL — using github adapter");
-    }
   }
 
   if (!input.org && sourceType === "github") {
@@ -155,7 +201,15 @@ async function createSingleSource(input: CreateSourceInput): Promise<CreateSourc
     };
   }
 
-  return { name, slug, type: sourceType, url, org: orgName ?? undefined, status: "added" };
+  return {
+    name,
+    slug,
+    type: sourceType,
+    url,
+    org: orgName ?? undefined,
+    status: "added",
+    existed: false,
+  };
 }
 
 export type CreateSourceOpts = {
@@ -168,6 +222,7 @@ export type CreateSourceOpts = {
   feedUrl?: string;
   batch?: string;
   json?: boolean;
+  strict?: boolean;
 };
 
 /** Shared action for both the canonical `create` command and the deprecated `add` alias. */
@@ -205,7 +260,7 @@ export async function createSourceAction(
     // referencing the same org.
     for (const entry of entries) {
       // eslint-disable-next-line no-await-in-loop
-      const result = await createSingleSource({ ...entry, batch: true });
+      const result = await createSingleSource({ ...entry, batch: true, strict: opts.strict });
       results.push(result);
 
       if (result.status === "error") {
@@ -220,11 +275,19 @@ export async function createSourceAction(
           );
       } else if (!opts.json) {
         const orgLabel = result.org ? ` [org: ${result.org}]` : "";
-        logger.info(
-          chalk.green(
-            `Source created: ${result.name} (${result.slug}) [${result.type}]${orgLabel}`,
-          ),
-        );
+        if (result.existed) {
+          logger.info(
+            chalk.yellow(
+              `Source already exists: ${result.name} (${result.slug}) [${result.type}]${orgLabel} — returning existing`,
+            ),
+          );
+        } else {
+          logger.info(
+            chalk.green(
+              `Source created: ${result.name} (${result.slug}) [${result.type}]${orgLabel}`,
+            ),
+          );
+        }
       }
     }
 
@@ -253,6 +316,7 @@ export async function createSourceAction(
     org: opts.org,
     product: opts.product,
     feedUrl: opts.feedUrl,
+    strict: opts.strict,
   });
 
   if (result.status === "error") {
@@ -271,9 +335,17 @@ export async function createSourceAction(
   } else {
     const orgLabel = result.org ? ` [org: ${result.org}]` : "";
     const typeLabel = !opts.type ? ` (auto-detected: ${result.type})` : "";
-    logger.info(
-      chalk.green(`Source created: ${result.name} (${result.slug})${typeLabel}${orgLabel}`),
-    );
+    if (result.existed) {
+      logger.info(
+        chalk.yellow(
+          `Source already exists: ${result.name} (${result.slug})${typeLabel}${orgLabel} — returning existing`,
+        ),
+      );
+    } else {
+      logger.info(
+        chalk.green(`Source created: ${result.name} (${result.slug})${typeLabel}${orgLabel}`),
+      );
+    }
   }
 }
 
@@ -291,7 +363,8 @@ function attachCreateOptions(cmd: Command): Command {
     .option("--name <name>", "Display name for the source (alternative to positional argument)")
     .option("--feed-url <feedUrl>", "Explicit feed URL")
     .option("--batch <file>", "JSON file with sources to add (use - for stdin)")
-    .option("--json", "Output as JSON");
+    .option("--json", "Output as JSON")
+    .option("--strict", "Exit 1 if the source URL already exists (default: return existing)");
 }
 
 export function registerCreateCommand(program: Command) {

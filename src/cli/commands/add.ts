@@ -29,6 +29,7 @@ export function registerAddCommand(program: Command) {
     .option("--feed-url <feedUrl>", "Explicit feed URL")
     .option("--batch <file>", "JSON file with sources to add (use - for stdin)")
     .option("--json", "Output as JSON")
+    .option("--strict", "Exit 1 if the source URL already exists (default: return existing)")
     .action(
       warnDeprecatedAlias<[string | undefined, CreateSourceOpts]>(
         "add",
