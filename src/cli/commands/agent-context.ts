@@ -56,7 +56,9 @@ const STDIN_FLAGS: Array<{ pathSuffix: string[]; flagName: string }> = [
   { pathSuffix: ["create"], flagName: "--batch" },
   // releases admin webhook verify --body-file <path>
   { pathSuffix: ["verify"], flagName: "--body-file" },
-  // releases admin overview-write --content-file <path>
+  // releases admin overview update --content-file <path> (canonical)
+  { pathSuffix: ["overview", "update"], flagName: "--content-file" },
+  // releases admin overview-write --content-file <path> (deprecated alias)
   { pathSuffix: ["overview-write"], flagName: "--content-file" },
 ];
 

@@ -34,6 +34,20 @@ import type {
   OrgDependentsResponse,
 } from "./types.js";
 import type { ListResponse } from "@buildinternet/releases-core/cli-contracts";
+import type {
+  OverviewInputsCheck,
+  OverviewManifestResponse,
+  OverviewManifestRow,
+  OverviewPlanAction,
+  OverviewStaleness,
+} from "@buildinternet/releases-api-types";
+export type {
+  OverviewInputsCheck,
+  OverviewManifestResponse,
+  OverviewManifestRow,
+  OverviewPlanAction,
+  OverviewStaleness,
+};
 export type {
   SourceWithOrg,
   SourcePatchInput,
@@ -1027,6 +1041,44 @@ export async function getOverviewInputs(
   return apiFetch<OverviewInputs>(
     `/v1/orgs/${encodeURIComponent(slug)}/overview/inputs${qs ? `?${qs}` : ""}`,
   );
+}
+
+export async function getOverviewInputsCheck(
+  slug: string,
+  opts: { window?: number; limit?: number } = {},
+): Promise<OverviewInputsCheck> {
+  const params = new URLSearchParams();
+  params.set("check", "true");
+  if (opts.window !== undefined) params.set("window", String(opts.window));
+  if (opts.limit !== undefined) params.set("limit", String(opts.limit));
+  return apiFetch<OverviewInputsCheck>(
+    `/v1/orgs/${encodeURIComponent(slug)}/overview/inputs?${params.toString()}`,
+  );
+}
+
+// ── Overview manifest (cross-org admin planning) ──
+
+export interface OverviewManifestQueryOpts {
+  staleDays?: number;
+  missing?: boolean;
+  hasActivity?: boolean;
+  plan?: boolean;
+  page?: number;
+  limit?: number;
+}
+
+export async function getOverviewManifest(
+  opts: OverviewManifestQueryOpts = {},
+): Promise<OverviewManifestResponse> {
+  const params = new URLSearchParams();
+  if (opts.staleDays !== undefined) params.set("staleDays", String(opts.staleDays));
+  if (opts.missing) params.set("missing", "true");
+  if (opts.hasActivity) params.set("hasActivity", "true");
+  if (opts.plan) params.set("format", "plan");
+  if (opts.page !== undefined) params.set("page", String(opts.page));
+  if (opts.limit !== undefined) params.set("limit", String(opts.limit));
+  const qs = params.toString();
+  return apiFetch<OverviewManifestResponse>(`/v1/admin/overviews${qs ? `?${qs}` : ""}`);
 }
 
 // ── Media Assets ──
