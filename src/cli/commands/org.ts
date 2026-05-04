@@ -54,6 +54,15 @@ type OrgCreateOpts = {
   strict?: boolean;
 };
 
+async function applyTagsToOrg(orgId: string, raw: string | undefined): Promise<void> {
+  if (!raw) return;
+  const tagList = raw
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+  if (tagList.length > 0) await addTagsToOrg(orgId, tagList);
+}
+
 async function orgCreateAction(name: string, opts: OrgCreateOpts): Promise<void> {
   const slug = opts.slug ?? toSlug(name);
 
@@ -62,10 +71,13 @@ async function orgCreateAction(name: string, opts: OrgCreateOpts): Promise<void>
   // is the only safe signal that we'd actually collide on slug uniqueness.
   const existing = await findOrg(slug);
   if (existing && existing.slug === slug) {
+    // --strict bails before any reconciliation runs, preserving its original
+    // "fail on duplicate" semantics. Tag reconciliation is a non-strict thing.
     if (opts.strict) {
       logger.error(`Organization with slug "${slug}" already exists.`);
       process.exit(1);
     }
+    await applyTagsToOrg(existing.id, opts.tags);
     logger.info(`Organization already exists: ${existing.name} (${slug}) — returning existing`);
     if (opts.json) await writeJson({ ...existing, existed: true });
     return;
@@ -101,6 +113,7 @@ async function orgCreateAction(name: string, opts: OrgCreateOpts): Promise<void>
           logger.error(`Organization with slug "${slug}" already exists.`);
           process.exit(1);
         }
+        await applyTagsToOrg(racedExisting.id, opts.tags);
         logger.info(
           `Organization already exists: ${racedExisting.name} (${slug}) — returning existing`,
         );
@@ -111,15 +124,7 @@ async function orgCreateAction(name: string, opts: OrgCreateOpts): Promise<void>
     throw err;
   }
 
-  if (opts.tags) {
-    const tagList = opts.tags
-      .split(",")
-      .map((t: string) => t.trim())
-      .filter(Boolean);
-    if (tagList.length > 0) {
-      await addTagsToOrg(created.id, tagList);
-    }
-  }
+  await applyTagsToOrg(created.id, opts.tags);
 
   if (opts.json) await writeJson({ ...created, existed: false });
   else logger.info(chalk.green(`Organization created: ${name} (${slug})`));
