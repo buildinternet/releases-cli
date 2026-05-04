@@ -321,7 +321,18 @@ server.registerTool(
     },
   },
   async ({ query, platform }) => {
-    const allOrgs = await listOrgs({ query, platform });
+    // /v1/orgs is paginated server-side post-#723; page through every result so
+    // the tool truly lists all indexed organizations, not just the first page.
+    const allOrgs: Awaited<ReturnType<typeof listOrgs>>["items"] = [];
+    let page = 1;
+    let hasMore = true;
+    while (hasMore) {
+      // eslint-disable-next-line no-await-in-loop
+      const result = await listOrgs({ query, platform, page, limit: 200 });
+      allOrgs.push(...result.items);
+      hasMore = result.pagination.hasMore;
+      page += 1;
+    }
 
     if (allOrgs.length === 0) {
       return textResult("No organizations found.");

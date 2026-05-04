@@ -33,3 +33,5 @@ npm/releases/README.md
 .context
 .superpowers
 .worktrees
+.claude/skills
+.claude/worktrees/

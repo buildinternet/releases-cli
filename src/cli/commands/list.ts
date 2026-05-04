@@ -5,6 +5,7 @@ import { listSourcesWithOrg, findSource } from "../../api/client.js";
 import { sourceNotFound } from "../suggest.js";
 import { stripAnsi } from "../../lib/sanitize.js";
 import { writeJson } from "../../lib/output.js";
+import { logger } from "@releases/lib/logger";
 import {
   DEFAULT_PAGE_SIZE,
   parseMetadataObject,
@@ -57,6 +58,24 @@ export function registerListCommand(program: Command) {
           flat?: boolean;
         },
       ) => {
+        // Validate pagination flags before the slug fast path so malformed
+        // --limit / --page still error consistently, even when ignored by the
+        // single-source branch.
+        const parsedLimit = opts.limit === undefined ? undefined : Number(opts.limit);
+        if (parsedLimit !== undefined && (!Number.isInteger(parsedLimit) || parsedLimit <= 0)) {
+          logger.error("--limit must be a positive integer");
+          process.exit(1);
+        }
+        const explicitLimit = parsedLimit !== undefined;
+        const pageSize = explicitLimit ? parsedLimit : DEFAULT_PAGE_SIZE;
+
+        const parsedPage = opts.page === undefined ? 1 : Number(opts.page);
+        if (!Number.isInteger(parsedPage) || parsedPage <= 0) {
+          logger.error("--page must be a positive integer");
+          process.exit(1);
+        }
+        const page = parsedPage;
+
         if (slug) {
           const source = await findSource(slug);
           if (!source) return sourceNotFound(slug);
@@ -86,11 +105,6 @@ export function registerListCommand(program: Command) {
           console.log("");
           return;
         }
-
-        const limitOpt = opts.limit ? parseInt(opts.limit, 10) : undefined;
-        const explicitLimit = limitOpt != null && limitOpt > 0;
-        const pageSize = explicitLimit ? limitOpt : DEFAULT_PAGE_SIZE;
-        const page = opts.page ? Math.max(1, parseInt(opts.page, 10)) : 1;
 
         const { items: pageItems, pagination: apiPagination } = await listSourcesWithOrg({
           orgSlug: opts.org,
@@ -147,7 +161,7 @@ export function registerListCommand(program: Command) {
           }
 
           if (warnTruncated) {
-            console.error(
+            logger.warn(
               formatTruncationWarning({
                 returned: items.length,
                 pageSize,
@@ -179,7 +193,7 @@ export function registerListCommand(program: Command) {
 
         console.log(table.toString());
         if (!explicitLimit && apiPagination.hasMore) {
-          console.error(
+          logger.warn(
             formatTruncationWarning({
               returned: pageItems.length,
               pageSize,
