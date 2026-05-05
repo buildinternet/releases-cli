@@ -1,6 +1,6 @@
 {
   "name": "releases-cli",
-  "version": "0.28.0",
+  "version": "0.28.1",
   "private": true,
   "description": "CLI and shared packages for Releases — the changelog registry for AI agents and developers.",
   "type": "module",
