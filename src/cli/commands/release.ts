@@ -14,9 +14,16 @@ import { stripAnsi } from "../../lib/sanitize.js";
 import { normalizeReleaseId } from "@buildinternet/releases-core/id";
 import { writeJson, writeJsonLine } from "../../lib/output.js";
 import { warnDeprecatedAlias } from "../../lib/deprecated-alias.js";
+import { logger } from "@releases/lib/logger";
 
 function releaseNotFound(id: string): never {
   console.error(chalk.red(`Release not found: ${id}`));
+  process.exit(1);
+}
+
+async function releaseLookupMiss(id: string, json: boolean): Promise<never> {
+  if (json) await writeJson(null);
+  logger.info(`No release matching: ${id}`);
   process.exit(1);
 }
 
@@ -28,7 +35,7 @@ async function releaseGetAction(rawId: string, opts: ReleaseGetOpts): Promise<vo
   const id = normalizeReleaseId(rawId);
   const result = await getRelease(id);
 
-  if (!result) releaseNotFound(id);
+  if (!result) return releaseLookupMiss(id, !!opts.json);
 
   const rel = result;
 

@@ -15,6 +15,12 @@ import { writeJson } from "../../lib/output.js";
 
 export type GetEntityOpts = { json?: boolean };
 
+async function notFound(identifier: string, kind: string, opts: GetEntityOpts): Promise<never> {
+  if (opts.json) await writeJson(null);
+  logger.info(`No ${kind} matching: ${identifier}`);
+  process.exit(1);
+}
+
 /** Shared action for both the canonical `get` command and the deprecated `show` alias. */
 export async function getEntityAction(identifier: string, opts: GetEntityOpts): Promise<void> {
   const type = getEntityType(identifier);
@@ -26,23 +32,21 @@ export async function getEntityAction(identifier: string, opts: GetEntityOpts): 
   if (type === "org") return getOrg(identifier, opts);
   if (type === "product") return await getProduct(identifier, opts);
 
-  const org = await findOrg(identifier);
+  const [org, product, source] = await Promise.all([
+    findOrg(identifier),
+    findProduct(identifier),
+    findSource(identifier),
+  ]);
   if (org) return renderOrg(org, opts);
-  const product = await findProduct(identifier);
   if (product) return await renderProduct(product, opts);
-  const source = await findSource(identifier);
   if (source) return await renderSource(source, opts);
 
-  logger.error(`Not found: ${identifier}`);
-  process.exit(1);
+  return notFound(identifier, "entity", opts);
 }
 
 async function getRelease_(id: string, opts: GetEntityOpts) {
   const result = await getRelease(id);
-  if (!result) {
-    logger.error(`Release not found: ${id}`);
-    process.exit(1);
-  }
+  if (!result) return notFound(id, "release", opts);
   const rel = result;
   if (opts.json) {
     await writeJson(rel);
@@ -70,28 +74,19 @@ async function getRelease_(id: string, opts: GetEntityOpts) {
 
 async function getSource(identifier: string, opts: GetEntityOpts) {
   const source = await findSource(identifier);
-  if (!source) {
-    logger.error(`Source not found: ${identifier}`);
-    process.exit(1);
-  }
+  if (!source) return notFound(identifier, "source", opts);
   await renderSource(source, opts);
 }
 
 async function getOrg(identifier: string, opts: GetEntityOpts) {
   const org = await findOrg(identifier);
-  if (!org) {
-    logger.error(`Organization not found: ${identifier}`);
-    process.exit(1);
-  }
+  if (!org) return notFound(identifier, "organization", opts);
   await renderOrg(org, opts);
 }
 
 async function getProduct(identifier: string, opts: GetEntityOpts) {
   const product = await findProduct(identifier);
-  if (!product) {
-    logger.error(`Product not found: ${identifier}`);
-    process.exit(1);
-  }
+  if (!product) return notFound(identifier, "product", opts);
   await renderProduct(product, opts);
 }
 
