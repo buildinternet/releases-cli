@@ -71,7 +71,7 @@
     "@types/bun": "latest",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
-    "oxlint": "^1.60.0",
+    "oxlint": "^1.63.0",
     "prettier": "^3.8.3",
     "typescript": "^6.0.3"
   }
