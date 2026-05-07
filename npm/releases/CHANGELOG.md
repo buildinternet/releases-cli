@@ -1,5 +1,42 @@
 # @buildinternet/releases
 
+## 0.29.0
+
+### Minor Changes
+
+- 41cb6d4: Extend `--dry-run` coverage to the remaining mutating `admin` commands.
+
+  Previously only delete-shaped commands and a few specials (`source import`, `product adopt`, `release suppress`, `policy ignore/block`, `embed`) could preview their effects. Create/update/link verbs went straight to the API, which made scripted onboarding flows hard to validate before running them.
+
+  Now also supports `--dry-run`:
+  - `admin org create` (+ deprecated `org add`)
+  - `admin org update` (+ deprecated `org edit`)
+  - `admin org link`, `admin org unlink`
+  - `admin product create` (+ deprecated `product add`)
+  - `admin product update` (+ deprecated `product edit`)
+  - `admin source create` (+ deprecated `source add`)
+  - `admin source update` (+ deprecated `source edit`)
+  - `admin release update` (+ deprecated `release edit`)
+  - `admin release unsuppress`
+
+  For `source create`, the dry-run still resolves the org (creating it would normally happen here, so the preview reports "would create" instead) and runs the existing-URL and exclusion checks before reporting the planned write — operators get the same rejection signal they would on a real run, without writes. Same idea for `source update`'s auto-create-org branch.
+
+  Tag and alias add/remove on org/product still don't take `--dry-run`; those are trivially reversible joins where the preview adds little.
+
+- f1f3fdb: Add `--into-org` / `--into-product` flags to `releases admin discovery onboard` and exit non-zero when `releases admin source create` finds a URL collision with mismatched org/product attribution. Both surfaced during the multi-product Google onboarding (#794).
+
+  `--into-org <slug>` (and optionally `--into-product <slug>`) pin the discovery agent to attach every source it adds to that existing org/product, instead of the default behavior of letting the agent auto-create new ones. Eliminates the manual cleanup of orphan orgs that used to follow multi-product onboarding under an existing org. Server-side scope plumbing lands in the monorepo PR; the API surface is `intoOrgSlug` / `intoProductSlug` on `POST /v1/workflows/discover`.
+
+  `source create` previously soft-warned and returned `existed: true` when the URL was already attached to a different org/product than the one passed via `--org` / `--product`. It now exits non-zero with the current attribution and a `releases admin source update` hint. `--strict` continues to reject any URL collision regardless of attribution.
+
+### Patch Changes
+
+- 9801893: Fix `releases admin overview inputs <org> --json` ignoring the flag and printing the chalk-formatted summary instead of JSON.
+
+  Root cause was a commander parsing quirk: the deprecated bare `overview <org>` form is registered with `.argument("[org]")` on the same `overview` command that hosts subcommands like `inputs`, `get`, `update`. Without positional option scoping, options that follow a subcommand's positional arg (`overview inputs google --json`) were being swallowed before the subcommand could see them. The same bug affected `--check --json` and silently dropped any subcommand option that appeared after the org slug.
+
+  Fixed by enabling `.enablePositionalOptions()` at the program level so each command's options are scoped to their own position. The deprecated `overview <org>` bare form still works.
+
 ## 0.28.1
 
 ### Patch Changes
