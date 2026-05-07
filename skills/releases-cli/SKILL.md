@@ -54,6 +54,8 @@ releases admin mcp serve
 
 Every command that takes an org / product / source / release identifier accepts the typed ID (`org_…`, `prod_…`, `src_…`, `rel_…`) interchangeably with the slug — including `--org`, `--product`, `--source` flags. IDs are stable across renames; slugs are friendlier to type. Source and product commands also accept an `org/slug` coordinate (e.g. `vercel/vercel-ai-sdk`); coordinates and typed IDs are unambiguous and skip an extra resolver round-trip that bare slugs require. Every reader command accepts `--json` for machine-readable output.
 
+Every mutating admin command accepts `--dry-run` to print the planned write (with all validations applied) without calling the API. Pair with `--json` for a machine-readable plan. See `references/admin.md` for the full coverage list.
+
 ## Authentication
 
 Reader access is unauthenticated and may be rate-limited per IP.
