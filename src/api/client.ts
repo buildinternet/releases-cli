@@ -35,6 +35,7 @@ import type {
 } from "./types.js";
 import type { ListResponse } from "@buildinternet/releases-core/cli-contracts";
 import type {
+  DomainLookupResponse,
   OverviewInputsCheck,
   OverviewManifestResponse,
   OverviewManifestRow,
@@ -42,6 +43,7 @@ import type {
   OverviewStaleness,
 } from "@buildinternet/releases-api-types";
 export type {
+  DomainLookupResponse,
   OverviewInputsCheck,
   OverviewManifestResponse,
   OverviewManifestRow,
@@ -344,12 +346,25 @@ export async function checkContentHash(source: Source, contentHash: string): Pro
 export async function unifiedSearch(
   query: string,
   limit: number,
-  opts?: { org?: string; mode?: "lexical" | "semantic" | "hybrid" },
+  opts?: {
+    org?: string;
+    domain?: string;
+    mode?: "lexical" | "semantic" | "hybrid";
+  },
 ): Promise<UnifiedSearchResponse> {
   const params = new URLSearchParams({ q: query, limit: String(limit) });
   if (opts?.org) params.set("org", opts.org);
+  if (opts?.domain) params.set("domain", opts.domain);
   if (opts?.mode) params.set("mode", opts.mode);
   return apiFetch<UnifiedSearchResponse>(`/v1/search?${params}`);
+}
+
+// ── Domain lookup ──
+
+export async function lookupDomain(domain: string): Promise<DomainLookupResponse | null> {
+  return apiFetch<DomainLookupResponse | null>(
+    `/v1/lookups/by-domain?domain=${encodeURIComponent(domain)}`,
+  );
 }
 
 // ── List sources with org ──

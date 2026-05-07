@@ -118,11 +118,21 @@ export function registerSearchCommand(program: Command) {
     .option("-l, --limit <n>", "Max results per type", "10")
     .option("--type <type>", "Limit to a result type: orgs, catalog, releases")
     .option("--mode <mode>", `Search mode: ${SEARCH_MODES.join(" | ")}`)
+    .option(
+      "--domain <domain>",
+      "Scope to the org owning this domain (URL-shaped input is normalized)",
+    )
     .option("--json", "Output as JSON")
     .action(
       async (
         query: string,
-        opts: { limit: string; type?: string; mode?: string; json?: boolean },
+        opts: {
+          limit: string;
+          type?: string;
+          mode?: string;
+          domain?: string;
+          json?: boolean;
+        },
       ) => {
         const limit = parseInt(opts.limit, 10);
 
@@ -144,7 +154,20 @@ export function registerSearchCommand(program: Command) {
           process.exit(1);
         }
 
-        const response = await unifiedSearch(query, limit, mode ? { mode } : undefined);
+        const searchOpts: { mode?: SearchMode; domain?: string } = {};
+        if (mode) searchOpts.mode = mode;
+        if (opts.domain) searchOpts.domain = opts.domain;
+        const response = await unifiedSearch(
+          query,
+          limit,
+          Object.keys(searchOpts).length > 0 ? searchOpts : undefined,
+        );
+
+        if (response.domainStatus === "not_found" && !opts.json) {
+          logger.warn(
+            `No org owns the domain "${response.domain ?? opts.domain}". Showing no results.`,
+          );
+        }
 
         // Read the new `catalog` field, falling back to the deprecated `products`
         // alias so older API deployments keep working. Drop the fallback once
