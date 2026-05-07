@@ -12,7 +12,7 @@ Missing or invalid keys fail fast at CLI startup with a clear error; don't retry
 
 All admin commands accept an entity ID (`org_…`, `src_…`, `prod_…`, `rel_…`) or a slug wherever an identifier is expected. Source and product commands also accept an `org/slug` coordinate (e.g. `vercel/vercel-ai-sdk`). Prefer IDs or coordinates — slugs can change, IDs cannot, and coordinates typically skip an extra resolver round-trip that bare slugs require under the hood (#698).
 
-### Previewing changes (`--dry-run`)
+## Previewing changes (`--dry-run`)
 
 All mutating admin verbs accept `--dry-run`. The command resolves identifiers, runs validation (category, URL exclusion, existing-record dedup, etc.), and prints the planned write without calling the API. Combine with `--json` for a machine-readable plan. Coverage: `source create / update / delete / import`, `org create / update / delete / link / unlink`, `product create / update / delete / adopt`, `release update / delete / suppress / unsuppress`, `policy ignore add/remove`, `policy block add/remove`, `embed` write paths, `org refresh`. Tag and alias add/remove on org/product are intentionally left without a preview — they're trivially reversible joins.
 
