@@ -163,10 +163,15 @@ export function registerSearchCommand(program: Command) {
           Object.keys(searchOpts).length > 0 ? searchOpts : undefined,
         );
 
-        if (response.domainStatus === "not_found" && !opts.json) {
-          logger.warn(
-            `No org owns the domain "${response.domain ?? opts.domain}". Showing no results.`,
-          );
+        if (!opts.json) {
+          if (response.domainStatus === "not_found") {
+            logger.warn(
+              `No org owns the domain "${response.domain ?? opts.domain}". Showing no results.`,
+            );
+          } else if (response.domainStatus === "matched") {
+            const scopedOrgName = response.orgs[0]?.name ?? response.domain;
+            logger.info(`Scoped to ${scopedOrgName} (${response.domain}).`);
+          }
         }
 
         // Read the new `catalog` field, falling back to the deprecated `products`
@@ -187,6 +192,8 @@ export function registerSearchCommand(program: Command) {
           if (response.degraded !== undefined) filtered.degraded = response.degraded;
           if (response.degradedReason !== undefined)
             filtered.degradedReason = response.degradedReason;
+          if (response.domain !== undefined) filtered.domain = response.domain;
+          if (response.domainStatus !== undefined) filtered.domainStatus = response.domainStatus;
           if (response.lookup != null) filtered.lookup = response.lookup;
           await writeJson(filtered);
           return;
