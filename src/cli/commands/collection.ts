@@ -101,7 +101,17 @@ async function memberAddAction(
   org: string,
   opts: GlobalOpts & { position?: string },
 ): Promise<void> {
-  const position = opts.position !== undefined ? Number(opts.position) : undefined;
+  let position: number | undefined;
+  if (opts.position !== undefined) {
+    const parsed = Number(opts.position);
+    if (!Number.isInteger(parsed) || parsed < 0) {
+      console.error(
+        chalk.red(`Invalid --position "${opts.position}" (need a non-negative integer)`),
+      );
+      process.exit(1);
+    }
+    position = parsed;
+  }
   const result = await addCollectionMember(slug, { ...refToInput(org), position });
   if (opts.json) await writeJson(result);
   else

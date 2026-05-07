@@ -45,6 +45,10 @@ import type {
   CollectionDetail,
   CollectionMemberInput,
   CollectionRow,
+  CreateCollectionRequest,
+  UpdateCollectionRequest,
+  ReplaceCollectionMembersRequest,
+  AddCollectionMemberRequest,
 } from "@buildinternet/releases-api-types";
 export type {
   DomainLookupResponse,
@@ -898,11 +902,7 @@ export async function getCollection(slug: string): Promise<CollectionDetail | nu
   return apiFetch<CollectionDetail | null>(`/v1/collections/${encodeURIComponent(slug)}`);
 }
 
-export async function createCollection(input: {
-  name: string;
-  slug?: string;
-  description?: string | null;
-}): Promise<CollectionRow> {
+export async function createCollection(input: CreateCollectionRequest): Promise<CollectionRow> {
   return apiFetch<CollectionRow>("/v1/collections", {
     method: "POST",
     body: JSON.stringify(input),
@@ -911,7 +911,7 @@ export async function createCollection(input: {
 
 export async function updateCollection(
   slug: string,
-  input: { name?: string; slug?: string; description?: string | null },
+  input: UpdateCollectionRequest,
 ): Promise<CollectionRow> {
   return apiFetch<CollectionRow>(`/v1/collections/${encodeURIComponent(slug)}`, {
     method: "PATCH",
@@ -925,17 +925,18 @@ export async function deleteCollection(slug: string): Promise<void> {
 
 export async function replaceCollectionMembers(
   slug: string,
-  orgs: CollectionMemberInput[],
+  orgs: ReplaceCollectionMembersRequest["orgs"],
 ): Promise<{ collectionSlug: string; members: { orgId: string; position: number }[] }> {
+  const payload: ReplaceCollectionMembersRequest = { orgs };
   return apiFetch(`/v1/collections/${encodeURIComponent(slug)}/members`, {
     method: "PUT",
-    body: JSON.stringify({ orgs }),
+    body: JSON.stringify(payload),
   });
 }
 
 export async function addCollectionMember(
   slug: string,
-  member: CollectionMemberInput,
+  member: AddCollectionMemberRequest,
 ): Promise<{ collectionSlug: string; orgId: string; position: number }> {
   return apiFetch(`/v1/collections/${encodeURIComponent(slug)}/members`, {
     method: "POST",
