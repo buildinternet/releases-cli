@@ -9,6 +9,8 @@ import { writeJson } from "../../lib/output.js";
 interface OnboardOpts {
   domain?: string;
   githubOrg?: string;
+  intoOrg?: string;
+  intoProduct?: string;
   json?: boolean;
   managedAgents?: boolean;
   sandbox?: boolean;
@@ -50,12 +52,24 @@ export function registerOnboardCommand(program: Command) {
     .argument("<company>", "Company or product name to discover sources for")
     .option("--domain <domain>", "Seed with the company's domain")
     .option("--github-org <org>", "Seed with the company's GitHub organization")
+    .option(
+      "--into-org <slug>",
+      "Attach discovered sources to this existing org (skips org creation; agent will not call manage_org(add))",
+    )
+    .option(
+      "--into-product <slug>",
+      "Attach discovered sources to this existing product (requires --into-org; product slug is per-org)",
+    )
     .option("--managed-agents", "Use the managed-agents discovery engine (default)")
     .option("--sandbox", "Use the legacy sandbox discovery engine")
     .option("--json", "Output results as JSON")
     .action(async (company: string, opts: OnboardOpts) => {
       if (opts.managedAgents && opts.sandbox) {
         logger.error("Cannot specify both --managed-agents and --sandbox");
+        process.exit(1);
+      }
+      if (opts.intoProduct && !opts.intoOrg) {
+        logger.error("--into-product requires --into-org (product slugs are per-org)");
         process.exit(1);
       }
 
@@ -82,7 +96,14 @@ async function runRemoteDiscovery(
   try {
     const result = await apiFetch<{ sessionId: string }>("/v1/workflows/discover", {
       method: "POST",
-      body: JSON.stringify({ company, domain: opts.domain, githubOrg: opts.githubOrg, engine }),
+      body: JSON.stringify({
+        company,
+        domain: opts.domain,
+        githubOrg: opts.githubOrg,
+        intoOrgSlug: opts.intoOrg,
+        intoProductSlug: opts.intoProduct,
+        engine,
+      }),
     });
     sessionId = result.sessionId;
   } catch (err) {
