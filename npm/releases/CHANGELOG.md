@@ -1,5 +1,15 @@
 # @buildinternet/releases
 
+## 0.31.0
+
+### Minor Changes
+
+- 052e167: Add `releases admin collection` command tree for managing curated cross-org collections (the playlists rendered at `/collections/<slug>` on the registry web app). Subcommands: `list`, `get <slug>`, `create <name>`, `update <slug>`, `delete <slug>`, plus `members add | set | remove` for membership management. Wraps the new admin write endpoints introduced in the registry API (#813); requires `@buildinternet/releases-api-types@^0.9.0`.
+
+### Patch Changes
+
+- 37b7bac: Drop the local `SessionDetail` shim in `task get` now that `@buildinternet/releases-api-types@0.8.1` exposes `agent`, `runner`, `correlationId`, `anthropicSessionId`, `usage`, `warnings`, and `result` natively on `Session`.
+
 ## 0.30.0
 
 ### Minor Changes
