@@ -112,34 +112,17 @@ async function createSingleSource(input: CreateSourceInput): Promise<CreateSourc
     // and the existing row is attached to a *different* one, exit non-zero
     // with the current attribution and the update hint. Pre-fix this was a
     // silent no-op that made multi-product onboarding need manual cleanup.
-    let mismatch = false;
-    let requestedProductId: string | null = null;
-    if (input.org) {
-      const requestedOrg = await findOrg(input.org);
-      if (requestedOrg && existingOrg && requestedOrg.id !== existingOrg.id) {
-        mismatch = true;
-      }
-    }
-    if (input.product) {
-      const requestedProduct = await findProduct(input.product);
-      if (requestedProduct) requestedProductId = requestedProduct.id;
-      const existingProductId = (src as { productId?: string | null }).productId ?? null;
-      if (requestedProductId && requestedProductId !== existingProductId) {
-        mismatch = true;
-      }
-    }
-    if (mismatch) {
-      const reqLabel = [
-        input.org ? `org=${input.org}` : null,
-        input.product ? `product=${input.product}` : null,
-      ]
-        .filter(Boolean)
-        .join(", ");
+    const requestedOrg = input.org ? await findOrg(input.org) : null;
+    const requestedProduct = input.product ? await findProduct(input.product) : null;
+    const orgMismatch = Boolean(requestedOrg && existingOrg && requestedOrg.id !== existingOrg.id);
+    const productMismatch = Boolean(
+      requestedProduct && requestedProduct.id !== (src.productId ?? null),
+    );
+    if (orgMismatch || productMismatch) {
+      const reqLabel = [`org=${input.org ?? "∅"}`, `product=${input.product ?? "∅"}`].join(", ");
       const curLabel = [
-        existingOrg?.slug ? `org=${existingOrg.slug}` : "org=∅",
-        (src as { productId?: string | null }).productId
-          ? `productId=${(src as { productId?: string | null }).productId}`
-          : "product=∅",
+        `org=${existingOrg?.slug ?? "∅"}`,
+        `productId=${src.productId ?? "∅"}`,
       ].join(", ");
       return {
         name: src.name,
