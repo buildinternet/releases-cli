@@ -24,6 +24,7 @@ import { isValidCategory, CATEGORIES } from "@buildinternet/releases-core/catego
 import { writeJson } from "../../lib/output.js";
 import { computePagination, type ListResponse } from "@buildinternet/releases-core/cli-contracts";
 import { warnDeprecatedAlias } from "../../lib/deprecated-alias.js";
+import { parseTagList } from "../../lib/flags.js";
 
 // ── Shared action handlers ────────────────────────────────────────────────────
 
@@ -35,6 +36,7 @@ type ProductCreateOpts = {
   category?: string;
   tags?: string;
   json?: boolean;
+  dryRun?: boolean;
 };
 
 async function productCreateAction(name: string, opts: ProductCreateOpts): Promise<void> {
@@ -51,6 +53,28 @@ async function productCreateAction(name: string, opts: ProductCreateOpts): Promi
       chalk.red(`Invalid category: "${opts.category}". Valid: ${CATEGORIES.join(", ")}`),
     );
     process.exit(1);
+  }
+
+  if (opts.dryRun) {
+    const tagList = parseTagList(opts.tags);
+    const plan = {
+      wouldCreate: true,
+      name,
+      slug,
+      org: { id: org.id, slug: org.slug, name: org.name },
+      url: opts.url ?? null,
+      description: opts.description ?? null,
+      category: opts.category ?? null,
+      tagsToAdd: tagList,
+    };
+    if (opts.json) await writeJson(plan);
+    else
+      console.log(
+        chalk.yellow(
+          `[dry-run] Would create product: ${name} (${slug}) under ${org.name}${tagList.length ? ` with tags: ${tagList.join(", ")}` : ""}`,
+        ),
+      );
+    return;
   }
 
   let created;
@@ -93,6 +117,7 @@ type ProductUpdateOpts = {
   description?: string;
   category?: string | boolean;
   json?: boolean;
+  dryRun?: boolean;
 };
 
 async function productUpdateAction(slug: string, opts: ProductUpdateOpts): Promise<void> {
@@ -122,6 +147,16 @@ async function productUpdateAction(slug: string, opts: ProductUpdateOpts): Promi
   if (Object.keys(updates).length === 0) {
     console.error(chalk.yellow("No fields to update."));
     process.exit(1);
+  }
+
+  if (opts.dryRun) {
+    if (opts.json) await writeJson({ wouldUpdate: found.slug, name: found.name, updates });
+    else {
+      console.log(chalk.yellow(`[dry-run] Would update product: ${found.name} (${found.slug})`));
+      for (const [k, v] of Object.entries(updates))
+        console.log(`  ${k} → ${v === null ? "(cleared)" : String(v)}`);
+    }
+    return;
   }
 
   const updated = await updateProduct(found, updates);
@@ -209,6 +244,7 @@ export function registerProductCommand(program: Command) {
     .option("--category <category>", "Category")
     .option("--tags <tags>", "Comma-separated tags")
     .option("--json", "Output as JSON")
+    .option("--dry-run", "Show what would be created without writing")
     .action(productCreateAction);
 
   product
@@ -222,6 +258,7 @@ export function registerProductCommand(program: Command) {
     .option("--category <category>", "Category")
     .option("--tags <tags>", "Comma-separated tags")
     .option("--json", "Output as JSON")
+    .option("--dry-run", "Show what would be created without writing")
     .action(warnDeprecatedAlias<[string, ProductCreateOpts]>("add", "create", productCreateAction));
 
   // ── product update (canonical) / product edit (deprecated) ──
@@ -235,6 +272,7 @@ export function registerProductCommand(program: Command) {
     .option("--category <category>", "Set category")
     .option("--no-category", "Clear category")
     .option("--json", "Output as JSON")
+    .option("--dry-run", "Show what would change without writing")
     .action(productUpdateAction);
 
   product
@@ -247,6 +285,7 @@ export function registerProductCommand(program: Command) {
     .option("--category <category>", "Set category")
     .option("--no-category", "Clear category")
     .option("--json", "Output as JSON")
+    .option("--dry-run", "Show what would change without writing")
     .action(
       warnDeprecatedAlias<[string, ProductUpdateOpts]>("edit", "update", productUpdateAction),
     );

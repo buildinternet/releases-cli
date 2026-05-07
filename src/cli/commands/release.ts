@@ -74,7 +74,13 @@ async function releaseGetAction(rawId: string, opts: ReleaseGetOpts): Promise<vo
   }
 }
 
-type ReleaseUpdateOpts = { title?: string; version?: string; content?: string; json?: boolean };
+type ReleaseUpdateOpts = {
+  title?: string;
+  version?: string;
+  content?: string;
+  json?: boolean;
+  dryRun?: boolean;
+};
 
 async function releaseUpdateAction(rawId: string, opts: ReleaseUpdateOpts): Promise<void> {
   const id = normalizeReleaseId(rawId);
@@ -103,6 +109,15 @@ async function releaseUpdateAction(rawId: string, opts: ReleaseUpdateOpts): Prom
 
   if (changes.length === 0) {
     console.log(chalk.yellow("No changes specified."));
+    return;
+  }
+
+  if (opts.dryRun) {
+    if (opts.json) await writeJson({ wouldUpdate: id, updates, changes });
+    else {
+      console.log(chalk.yellow(`[dry-run] Would update release ${id}:`));
+      for (const change of changes) console.log(`  ${change}`);
+    }
     return;
   }
 
@@ -226,6 +241,7 @@ export function registerReleaseCommand(program: Command) {
     .option("--version <version>", "Update version")
     .option("--content <content>", "Update content (recomputes contentHash)")
     .option("--json", "Output as JSON")
+    .option("--dry-run", "Show what would change without writing")
     .action(releaseUpdateAction);
 
   release
@@ -236,6 +252,7 @@ export function registerReleaseCommand(program: Command) {
     .option("--version <version>", "Update version")
     .option("--content <content>", "Update content (recomputes contentHash)")
     .option("--json", "Output as JSON")
+    .option("--dry-run", "Show what would change without writing")
     .action(
       warnDeprecatedAlias<[string, ReleaseUpdateOpts]>("edit", "update", releaseUpdateAction),
     );
@@ -277,9 +294,15 @@ export function registerReleaseCommand(program: Command) {
     .command("unsuppress")
     .description("Restore a suppressed release")
     .argument("<id>", "Release ID to unsuppress")
+    .option("--dry-run", "Show what would be unsuppressed without writing")
     .option("--json", "Output as JSON")
-    .action(async (rawId: string, opts: { json?: boolean }) => {
+    .action(async (rawId: string, opts: { dryRun?: boolean; json?: boolean }) => {
       const id = normalizeReleaseId(rawId);
+      if (opts.dryRun) {
+        if (opts.json) console.log(JSON.stringify({ id, suppressed: false, dryRun: true }));
+        else console.log(chalk.yellow(`[dry-run] Would unsuppress release ${id}`));
+        return;
+      }
       const found = await unsuppressRelease(id);
       if (!found) releaseNotFound(id);
 

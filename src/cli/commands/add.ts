@@ -30,6 +30,7 @@ export function registerAddCommand(program: Command) {
     .option("--batch <file>", "JSON file with sources to add (use - for stdin)")
     .option("--json", "Output as JSON")
     .option("--strict", "Exit 1 if the source URL already exists (default: return existing)")
+    .option("--dry-run", "Show what would be created without writing")
     .action(
       warnDeprecatedAlias<[string | undefined, CreateSourceOpts]>(
         "add",

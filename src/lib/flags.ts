@@ -14,3 +14,12 @@ export function parsePositiveIntFlag(label: string, raw: string | undefined): nu
   }
   return n;
 }
+
+/** Parse a comma-separated `--tags foo,bar` flag into a trimmed, non-empty list. */
+export function parseTagList(raw: string | undefined): string[] {
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+}
