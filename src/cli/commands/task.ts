@@ -15,7 +15,7 @@ import type { Session } from "@buildinternet/releases-api-types";
  * the CLI typecheck green until that bump lands.
  */
 type SessionDetail = Session & {
-  agent?: "sonnet" | "haiku";
+  agent?: "sonnet" | "haiku" | "coordinator";
   runner?: string;
   correlationId?: string;
   anthropicSessionId?: string;
