@@ -163,14 +163,13 @@ export function registerSearchCommand(program: Command) {
           Object.keys(searchOpts).length > 0 ? searchOpts : undefined,
         );
 
-        if (!opts.json) {
+        if (!opts.json && response.domainStatus !== undefined) {
+          const scopedDomain = response.domain ?? opts.domain;
           if (response.domainStatus === "not_found") {
-            logger.warn(
-              `No org owns the domain "${response.domain ?? opts.domain}". Showing no results.`,
-            );
+            logger.warn(`No org owns the domain "${scopedDomain}". Showing no results.`);
           } else if (response.domainStatus === "matched") {
-            const scopedOrgName = response.orgs[0]?.name ?? response.domain;
-            logger.info(`Scoped to ${scopedOrgName} (${response.domain}).`);
+            const scopedOrgName = response.orgs[0]?.name ?? scopedDomain;
+            logger.info(`Scoped to ${scopedOrgName} (${scopedDomain}).`);
           }
         }
 
