@@ -131,6 +131,13 @@ export const program = new Command()
   .name("releases")
   .description("Changelog indexer and registry for AI agents and developers")
   .version(VERSION_DISPLAY, "-v, --version")
+  // `admin overview` declares a deprecated bare form (`overview <org>`) on the
+  // parent command alongside subcommands like `overview inputs <org>`. Without
+  // positional options, commander mis-routes options that follow a
+  // subcommand's positional arg (e.g. `overview inputs google --json` swallows
+  // `--json`). Enable positional parsing so each command's options are scoped
+  // to its own position. (Issue releases-cli#133.)
+  .enablePositionalOptions()
   .hook("preAction", (_thisCommand, actionCommand) => {
     if (actionCommand.name() !== "admin" && isWithinAdminCommand(actionCommand) && !isAdminMode()) {
       adminKeyError("admin");
