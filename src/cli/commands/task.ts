@@ -9,30 +9,6 @@ import {
 } from "@buildinternet/releases-core/cli-contracts";
 import type { Session } from "@buildinternet/releases-api-types";
 
-/**
- * Session detail fields surfaced by `task get`. These ship in the next
- * `@buildinternet/releases-api-types` release; this local extension keeps
- * the CLI typecheck green until that bump lands.
- */
-type SessionDetail = Session & {
-  agent?: "sonnet" | "haiku" | "coordinator";
-  runner?: string;
-  correlationId?: string;
-  anthropicSessionId?: string;
-  sourcesFound?: number;
-  sourcesValidated?: number;
-  warnings?: string[];
-  usage?: {
-    inputTokens?: number;
-    outputTokens?: number;
-    cacheWriteTokens?: number;
-    cacheReadTokens?: number;
-    model?: string;
-    estimatedUsd?: number;
-  };
-  result?: Record<string, unknown>;
-};
-
 const fmtTimestamp = (n: number) => new Date(n).toISOString();
 
 function statusChalk(status: string) {
@@ -166,7 +142,7 @@ export function registerTaskCommand(program: Command) {
     .action(async (sessionIdArg: string, opts: { json?: boolean }) => {
       const sessionId = await resolveSessionIdFromPrefix(sessionIdArg);
 
-      const session = (await apiClient.getSession(sessionId)) as SessionDetail | null;
+      const session = (await apiClient.getSession(sessionId)) as Session | null;
       if (!session) {
         console.error(chalk.red(`Session not found: ${sessionId}`));
         process.exit(1);
