@@ -41,6 +41,14 @@ import type {
   OverviewManifestRow,
   OverviewPlanAction,
   OverviewStaleness,
+  CollectionListItem,
+  CollectionDetail,
+  CollectionMemberInput,
+  CollectionRow,
+  CreateCollectionRequest,
+  UpdateCollectionRequest,
+  ReplaceCollectionMembersRequest,
+  AddCollectionMemberRequest,
 } from "@buildinternet/releases-api-types";
 export type {
   DomainLookupResponse,
@@ -49,6 +57,10 @@ export type {
   OverviewManifestRow,
   OverviewPlanAction,
   OverviewStaleness,
+  CollectionListItem,
+  CollectionDetail,
+  CollectionMemberInput,
+  CollectionRow,
 };
 export type {
   SourceWithOrg,
@@ -878,6 +890,64 @@ export async function updateProduct(
 
 export async function deleteProduct(productId: string): Promise<void> {
   await apiFetch(`/v1/products/${productId}`, { method: "DELETE" });
+}
+
+// ── Collections ──
+
+export async function listCollections(): Promise<CollectionListItem[]> {
+  return apiFetch<CollectionListItem[]>("/v1/collections");
+}
+
+export async function getCollection(slug: string): Promise<CollectionDetail | null> {
+  return apiFetch<CollectionDetail | null>(`/v1/collections/${encodeURIComponent(slug)}`);
+}
+
+export async function createCollection(input: CreateCollectionRequest): Promise<CollectionRow> {
+  return apiFetch<CollectionRow>("/v1/collections", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateCollection(
+  slug: string,
+  input: UpdateCollectionRequest,
+): Promise<CollectionRow> {
+  return apiFetch<CollectionRow>(`/v1/collections/${encodeURIComponent(slug)}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteCollection(slug: string): Promise<void> {
+  await apiFetch(`/v1/collections/${encodeURIComponent(slug)}`, { method: "DELETE" });
+}
+
+export async function replaceCollectionMembers(
+  slug: string,
+  orgs: ReplaceCollectionMembersRequest["orgs"],
+): Promise<{ collectionSlug: string; members: { orgId: string; position: number }[] }> {
+  const payload: ReplaceCollectionMembersRequest = { orgs };
+  return apiFetch(`/v1/collections/${encodeURIComponent(slug)}/members`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function addCollectionMember(
+  slug: string,
+  member: AddCollectionMemberRequest,
+): Promise<{ collectionSlug: string; orgId: string; position: number }> {
+  return apiFetch(`/v1/collections/${encodeURIComponent(slug)}/members`, {
+    method: "POST",
+    body: JSON.stringify(member),
+  });
+}
+
+export async function removeCollectionMember(slug: string, org: string): Promise<void> {
+  await apiFetch(`/v1/collections/${encodeURIComponent(slug)}/members/${encodeURIComponent(org)}`, {
+    method: "DELETE",
+  });
 }
 
 // ── Tags ──

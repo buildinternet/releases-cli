@@ -14,6 +14,7 @@ import { registerTailCommand } from "./commands/tail.js";
 import { registerUsageCommand } from "./commands/usage.js";
 import { registerOrgCommand } from "./commands/org.js";
 import { registerProductCommand } from "./commands/product.js";
+import { registerCollectionCommand } from "./commands/collection.js";
 import { registerStatsCommand } from "./commands/stats.js";
 import { registerReleaseCommand } from "./commands/release.js";
 import { registerCheckCommand } from "./commands/check.js";
@@ -211,6 +212,7 @@ registerChangelogCommand(sourceAdmin);
 
 registerOrgCommand(admin);
 registerProductCommand(admin);
+registerCollectionCommand(admin);
 registerReleaseCommand(admin);
 
 const discoveryAdmin = admin
