@@ -9,6 +9,7 @@ import { registerDeleteCommand } from "./commands/delete.js";
 import { registerListCommand } from "./commands/list.js";
 import { registerFetchCommand } from "./commands/fetch.js";
 import { registerSearchCommand } from "./commands/search.js";
+import { registerLookupCommand } from "./commands/lookup.js";
 import { registerTailCommand } from "./commands/tail.js";
 import { registerUsageCommand } from "./commands/usage.js";
 import { registerOrgCommand } from "./commands/org.js";
@@ -166,6 +167,7 @@ export const program = new Command()
 
 // Public commands — available to all users
 registerSearchCommand(program);
+registerLookupCommand(program);
 registerTailCommand(program);
 registerStatsCommand(program);
 registerListCommand(program);
