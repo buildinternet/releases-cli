@@ -57,14 +57,14 @@
   "homepage": "https://releases.sh",
   "dependencies": {
     "@buildinternet/releases-api-types": "^0.9.0",
-    "@buildinternet/releases-core": "^0.17.0",
+    "@buildinternet/releases-core": "^0.18.0",
     "@buildinternet/releases-lib": "workspace:*",
     "@buildinternet/releases-skills": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "chalk": "^5.6.2",
     "cli-table3": "^0.6.5",
     "commander": "^14.0.3",
-    "zod": "^4.3.6"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.10",
