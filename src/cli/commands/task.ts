@@ -50,13 +50,31 @@ function formatDuration(sec: number): string {
 
 /**
  * Resolve a session ID from a unique prefix by listing sessions and filtering
- * client-side. Exits the process on no-match or ambiguous match. The server
- * has no `?prefix=` query, so the client filter is the only option.
+ * client-side. Walks pages lazily — first page handles the common case
+ * without extra round-trips; older sessions trigger a paginated walk only
+ * when the first page yields no match. Exits the process on no-match or
+ * ambiguous match. The server has no `?prefix=` query, so the client
+ * filter is the only option.
  */
 async function resolveSessionIdFromPrefix(prefix: string): Promise<string> {
   if (prefix.length >= 36) return prefix;
-  const { items: sessions } = await apiClient.listSessions();
-  const matches = sessions.filter((s) => s.sessionId.startsWith(prefix));
+
+  const matches: { sessionId: string; company: string; status: string }[] = [];
+  let page = 1;
+  while (true) {
+    // oxlint-disable-next-line no-await-in-loop -- pagination cursor depends on prior page; can't run in parallel
+    const { items, pagination } = await apiClient.listSessions({ page });
+    for (const s of items) {
+      if (s.sessionId.startsWith(prefix)) matches.push(s);
+    }
+    // Two matches is already ambiguous; stop walking instead of paging on.
+    if (matches.length >= 2) break;
+    // Walk until pages exhausted (or 50-page safety cap, ~25k sessions) so
+    // an older row with the same prefix on a later page surfaces as ambiguous.
+    if (!pagination?.hasMore || page >= 50) break;
+    page += 1;
+  }
+
   if (matches.length === 0) {
     console.error(chalk.red(`No session found matching "${prefix}".`));
     process.exit(1);

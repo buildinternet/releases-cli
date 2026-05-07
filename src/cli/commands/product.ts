@@ -48,8 +48,13 @@ async function migrateOrgToProduct(args: {
     accounts.map(async (acct) => {
       try {
         await linkOrgAccount(targetOrg.slug, acct.platform, acct.handle);
-      } catch {
-        /* skip duplicates */
+      } catch (err) {
+        // Per-handle uniqueness comes from `idx_org_accounts_platform_handle` —
+        // a 409 here means the target already has that account linked, which
+        // is the intended no-op. Anything else (404 target org gone, 5xx, …)
+        // must propagate so we don't silently strand half a migration.
+        const msg = err instanceof Error ? err.message : String(err);
+        if (!msg.includes("(409)")) throw err;
       }
     }),
   );
