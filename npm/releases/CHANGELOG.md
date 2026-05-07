@@ -1,5 +1,12 @@
 # @buildinternet/releases
 
+## 0.30.0
+
+### Minor Changes
+
+- a3e7980: Add `releases lookup domain <domain>` for resolving any URL-shaped input to its registry org/products, and `--domain <domain>` on `releases search` for scoping a search to a single org by domain. Mirrors the new `GET /v1/lookups/by-domain` API endpoint and `lookup_domain` MCP tool.
+- 79cf3af: Add `releases admin discovery task get <session-id>` for full session detail (timing, usage, errors, agent state). Add `releases admin product adopt --merge-into <product>` to fold a source org into an existing product instead of creating a new one. Both close out items in buildinternet/releases#794.
+
 ## 0.29.0
 
 ### Minor Changes
