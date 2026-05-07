@@ -43,6 +43,7 @@ export type UpdateSourceOpts = {
   priority?: string;
   disable?: boolean;
   enable?: boolean;
+  dryRun?: boolean;
 };
 
 /** Shared action for both the canonical `update` command and the deprecated `edit` alias. */
@@ -129,11 +130,20 @@ export async function updateSourceAction(
         console.error(chalk.red(`Organization not found: ${opts.org}`));
         process.exit(1);
       }
-      org = await createOrg(opts.org, { slug: toSlug(opts.org) });
-      logger.info(`Created organization: ${org.name} (${org.slug})`);
+      if (opts.dryRun) {
+        const projectedSlug = toSlug(opts.org);
+        logger.info(`[dry-run] Would create organization: ${opts.org} (${projectedSlug})`);
+        changes.push(`org → ${opts.org} (would be created)`);
+      } else {
+        org = await createOrg(opts.org, { slug: toSlug(opts.org) });
+        logger.info(`Created organization: ${org.name} (${org.slug})`);
+        updates.orgId = org.id;
+        changes.push(`org → ${org.name}`);
+      }
+    } else {
+      updates.orgId = org.id;
+      changes.push(`org → ${org.name}`);
     }
-    updates.orgId = org.id;
-    changes.push(`org → ${org.name}`);
   }
 
   if (opts.product === false) {
@@ -232,6 +242,27 @@ export async function updateSourceAction(
     changes.push("rendering → disabled (fast fetch)");
   }
 
+  if (changes.length === 0) {
+    if (!opts.json) logger.warn("No changes specified. Use --help to see options.");
+    return;
+  }
+
+  if (opts.dryRun) {
+    if (opts.json)
+      await writeJson({
+        wouldUpdate: source.slug,
+        name: source.name,
+        updates,
+        metaUpdates,
+        changes,
+      });
+    else {
+      logger.warn(`[dry-run] Would update ${source.name} (${source.slug}):`);
+      for (const change of changes) logger.warn(`  ${change}`);
+    }
+    return;
+  }
+
   if (Object.keys(metaUpdates).length > 0) {
     await updateSourceMeta(source, metaUpdates);
   }
@@ -244,11 +275,6 @@ export async function updateSourceAction(
       if (idx !== -1) changes.splice(idx, 1);
       logger.warn(`Slug was not updated (API returned slug="${updated.slug}")`);
     }
-  }
-
-  if (changes.length === 0) {
-    if (!opts.json) logger.warn("No changes specified. Use --help to see options.");
-    return;
   }
 
   const displaySlug = updated?.slug ?? source.slug;
@@ -295,7 +321,8 @@ export function attachUpdateOptions(cmd: Command): Command {
     .option("--priority <level>", "Set fetch priority (normal, low, paused)")
     .option("--disable", "Disable source")
     .option("--enable", "Re-enable a disabled source")
-    .option("--json", "Output as JSON");
+    .option("--json", "Output as JSON")
+    .option("--dry-run", "Show what would change without writing");
 }
 
 export function registerUpdateCommand(program: Command) {

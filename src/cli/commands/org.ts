@@ -41,6 +41,7 @@ import {
   overviewPreview,
 } from "@buildinternet/releases-core/overview";
 import { warnDeprecatedAlias } from "../../lib/deprecated-alias.js";
+import { parseTagList } from "../../lib/flags.js";
 
 // ── Shared action handlers ────────────────────────────────────────────────────
 
@@ -52,25 +53,46 @@ type OrgCreateOpts = {
   tags?: string;
   json?: boolean;
   strict?: boolean;
+  dryRun?: boolean;
 };
 
 async function applyTagsToOrg(orgId: string, raw: string | undefined): Promise<void> {
-  if (!raw) return;
-  const tagList = raw
-    .split(",")
-    .map((t) => t.trim())
-    .filter(Boolean);
+  const tagList = parseTagList(raw);
   if (tagList.length > 0) await addTagsToOrg(orgId, tagList);
 }
 
 async function orgCreateAction(name: string, opts: OrgCreateOpts): Promise<void> {
   const slug = opts.slug ?? toSlug(name);
 
+  if (opts.category && !isValidCategory(opts.category)) {
+    logger.error(`Invalid category: "${opts.category}". Valid: ${CATEGORIES.join(", ")}`);
+    process.exit(1);
+  }
+
   // Guard against findOrg() resolving via domain alias rather than slug:
   // /v1/orgs/:id matches by ID, slug, or domain alias, so an exact slug match
   // is the only safe signal that we'd actually collide on slug uniqueness.
   const existing = await findOrg(slug);
   if (existing && existing.slug === slug) {
+    if (opts.dryRun) {
+      const tagList = parseTagList(opts.tags);
+      if (opts.json)
+        await writeJson({
+          wouldCreate: false,
+          existed: true,
+          slug: existing.slug,
+          name: existing.name,
+          tagsToAdd: opts.strict ? [] : tagList,
+          strictWouldFail: !!opts.strict,
+        });
+      else if (opts.strict)
+        logger.warn(`[dry-run] Organization "${slug}" already exists; --strict would exit 1.`);
+      else
+        logger.warn(
+          `[dry-run] Organization "${existing.name}" (${slug}) already exists — would return existing${tagList.length ? ` and add tags: ${tagList.join(", ")}` : ""}.`,
+        );
+      return;
+    }
     // --strict bails before any reconciliation runs, preserving its original
     // "fail on duplicate" semantics. Tag reconciliation is a non-strict thing.
     if (opts.strict) {
@@ -83,9 +105,23 @@ async function orgCreateAction(name: string, opts: OrgCreateOpts): Promise<void>
     return;
   }
 
-  if (opts.category && !isValidCategory(opts.category)) {
-    logger.error(`Invalid category: "${opts.category}". Valid: ${CATEGORIES.join(", ")}`);
-    process.exit(1);
+  if (opts.dryRun) {
+    const tagList = parseTagList(opts.tags);
+    const plan = {
+      wouldCreate: true,
+      name,
+      slug,
+      domain: opts.domain ?? null,
+      description: opts.description ?? null,
+      category: opts.category ?? null,
+      tagsToAdd: tagList,
+    };
+    if (opts.json) await writeJson(plan);
+    else
+      logger.warn(
+        `[dry-run] Would create organization: ${name} (${slug})${tagList.length ? ` with tags: ${tagList.join(", ")}` : ""}`,
+      );
+    return;
   }
 
   // Race window: another process may have created this slug between our
@@ -231,6 +267,7 @@ type OrgUpdateOpts = {
   category?: string | boolean;
   avatar?: string | boolean;
   json?: boolean;
+  dryRun?: boolean;
 };
 
 async function orgUpdateAction(identifier: string, opts: OrgUpdateOpts): Promise<void> {
@@ -259,6 +296,16 @@ async function orgUpdateAction(identifier: string, opts: OrgUpdateOpts): Promise
   if (Object.keys(updates).length === 0) {
     logger.warn("No fields to update.");
     process.exit(1);
+  }
+
+  if (opts.dryRun) {
+    if (opts.json) await writeJson({ wouldUpdate: found.slug, name: found.name, updates });
+    else {
+      logger.warn(`[dry-run] Would update organization: ${found.name} (${found.slug})`);
+      for (const [k, v] of Object.entries(updates))
+        logger.warn(`  ${k} → ${v === null ? "(cleared)" : String(v)}`);
+    }
+    return;
   }
 
   const updated = await updateOrg(found.slug, updates);
@@ -360,6 +407,7 @@ export function registerOrgCommand(program: Command) {
     .option("--tags <tags>", "Comma-separated tags")
     .option("--json", "Output as JSON")
     .option("--strict", "Exit 1 if the organization already exists (default: return existing)")
+    .option("--dry-run", "Show what would be created without writing")
     .action(orgCreateAction);
 
   org
@@ -373,6 +421,7 @@ export function registerOrgCommand(program: Command) {
     .option("--tags <tags>", "Comma-separated tags")
     .option("--json", "Output as JSON")
     .option("--strict", "Exit 1 if the organization already exists (default: return existing)")
+    .option("--dry-run", "Show what would be created without writing")
     .action(warnDeprecatedAlias<[string, OrgCreateOpts]>("add", "create", orgCreateAction));
 
   // ── org list ──
@@ -568,6 +617,7 @@ Examples:
     .option("--avatar <url>", "Set avatar image URL")
     .option("--no-avatar", "Clear avatar URL")
     .option("--json", "Output as JSON")
+    .option("--dry-run", "Show what would change without writing")
     .action(orgUpdateAction);
 
   org
@@ -583,6 +633,7 @@ Examples:
     .option("--avatar <url>", "Set avatar image URL")
     .option("--no-avatar", "Clear avatar URL")
     .option("--json", "Output as JSON")
+    .option("--dry-run", "Show what would change without writing")
     .action(warnDeprecatedAlias<[string, OrgUpdateOpts]>("edit", "update", orgUpdateAction));
 
   // ── org delete (canonical) / org remove (deprecated) ──
@@ -614,10 +665,27 @@ Examples:
     .requiredOption("--platform <platform>", "Platform name (github, x, etc.)")
     .requiredOption("--handle <handle>", "Account handle on the platform")
     .option("--json", "Output as JSON")
+    .option("--dry-run", "Show what would be linked without writing")
     .action(
-      async (identifier: string, opts: { platform: string; handle: string; json?: boolean }) => {
+      async (
+        identifier: string,
+        opts: { platform: string; handle: string; json?: boolean; dryRun?: boolean },
+      ) => {
         const found = await findOrg(identifier);
         if (!found) return orgNotFound(identifier);
+
+        if (opts.dryRun) {
+          if (opts.json)
+            await writeJson({
+              wouldLink: { platform: opts.platform, handle: opts.handle },
+              org: found.slug,
+            });
+          else
+            console.log(
+              chalk.yellow(`[dry-run] Would link ${opts.platform}/${opts.handle} to ${found.name}`),
+            );
+          return;
+        }
 
         const created = await linkOrgAccount(found.slug, opts.platform, opts.handle);
 
@@ -634,10 +702,29 @@ Examples:
     .requiredOption("--platform <platform>", "Platform name")
     .requiredOption("--handle <handle>", "Account handle")
     .option("--json", "Output as JSON")
+    .option("--dry-run", "Show what would be unlinked without writing")
     .action(
-      async (identifier: string, opts: { platform: string; handle: string; json?: boolean }) => {
+      async (
+        identifier: string,
+        opts: { platform: string; handle: string; json?: boolean; dryRun?: boolean },
+      ) => {
         const found = await findOrg(identifier);
         if (!found) return orgNotFound(identifier);
+
+        if (opts.dryRun) {
+          if (opts.json)
+            await writeJson({
+              wouldUnlink: { platform: opts.platform, handle: opts.handle },
+              org: found.slug,
+            });
+          else
+            console.log(
+              chalk.yellow(
+                `[dry-run] Would unlink ${opts.platform}/${opts.handle} from ${found.name}`,
+              ),
+            );
+          return;
+        }
 
         await unlinkOrgAccount(found.slug, opts.platform, opts.handle);
 

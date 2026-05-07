@@ -34,6 +34,7 @@ interface CreateSourceInput {
   feedUrl?: string;
   batch?: boolean;
   strict?: boolean;
+  dryRun?: boolean;
 }
 
 interface CreateSourceResult {
@@ -42,7 +43,7 @@ interface CreateSourceResult {
   type: string;
   url: string;
   org?: string;
-  status: "added" | "error" | "ignored";
+  status: "added" | "error" | "ignored" | "would-add";
   existed?: boolean;
   error?: string;
   reason?: string;
@@ -130,11 +131,21 @@ async function createSingleSource(input: CreateSourceInput): Promise<CreateSourc
       if (input.org.startsWith("org_") || input.org.includes("/")) {
         throw new Error(`Organization not found: ${input.org}`);
       }
-      org = await createOrg(input.org, { slug: toSlug(input.org) });
-      logger.info(`Created organization: ${org.name} (${org.slug})`);
+      if (input.dryRun) {
+        // Skip the createOrg side-effect; just report what we'd do.
+        const projectedSlug = toSlug(input.org);
+        logger.info(`[dry-run] Would create organization: ${input.org} (${projectedSlug})`);
+        orgName = input.org;
+      } else {
+        org = await createOrg(input.org, { slug: toSlug(input.org) });
+        logger.info(`Created organization: ${org.name} (${org.slug})`);
+        orgId = org.id;
+        orgName = org.name;
+      }
+    } else {
+      orgId = org.id;
+      orgName = org.name;
     }
-    orgId = org.id;
-    orgName = org.name;
   }
 
   let productId: string | null = null;
@@ -183,6 +194,18 @@ async function createSingleSource(input: CreateSourceInput): Promise<CreateSourc
     };
   }
 
+  if (input.dryRun) {
+    return {
+      name,
+      slug,
+      type: sourceType,
+      url,
+      org: orgName ?? undefined,
+      status: "would-add",
+      existed: false,
+    };
+  }
+
   try {
     await createSource({
       name,
@@ -228,6 +251,7 @@ export type CreateSourceOpts = {
   batch?: string;
   json?: boolean;
   strict?: boolean;
+  dryRun?: boolean;
 };
 
 /** Shared action for both the canonical `create` command and the deprecated `add` alias. */
@@ -265,7 +289,12 @@ export async function createSourceAction(
     // referencing the same org.
     for (const entry of entries) {
       // eslint-disable-next-line no-await-in-loop
-      const result = await createSingleSource({ ...entry, batch: true, strict: opts.strict });
+      const result = await createSingleSource({
+        ...entry,
+        batch: true,
+        strict: opts.strict,
+        dryRun: opts.dryRun,
+      });
       results.push(result);
 
       if (result.status === "error") {
@@ -280,7 +309,13 @@ export async function createSourceAction(
           );
       } else if (!opts.json) {
         const orgLabel = result.org ? ` [org: ${result.org}]` : "";
-        if (result.existed) {
+        if (result.status === "would-add") {
+          logger.info(
+            chalk.yellow(
+              `[dry-run] Would create source: ${result.name} (${result.slug}) [${result.type}]${orgLabel}`,
+            ),
+          );
+        } else if (result.existed) {
           logger.info(
             chalk.yellow(
               `Source already exists: ${result.name} (${result.slug}) [${result.type}]${orgLabel} — returning existing`,
@@ -322,6 +357,7 @@ export async function createSourceAction(
     product: opts.product,
     feedUrl: opts.feedUrl,
     strict: opts.strict,
+    dryRun: opts.dryRun,
   });
 
   if (result.status === "error") {
@@ -340,7 +376,13 @@ export async function createSourceAction(
   } else {
     const orgLabel = result.org ? ` [org: ${result.org}]` : "";
     const typeLabel = !opts.type ? ` (auto-detected: ${result.type})` : "";
-    if (result.existed) {
+    if (result.status === "would-add") {
+      logger.info(
+        chalk.yellow(
+          `[dry-run] Would create source: ${result.name} (${result.slug})${typeLabel}${orgLabel}`,
+        ),
+      );
+    } else if (result.existed) {
       logger.info(
         chalk.yellow(
           `Source already exists: ${result.name} (${result.slug})${typeLabel}${orgLabel} — returning existing`,
@@ -369,7 +411,8 @@ function attachCreateOptions(cmd: Command): Command {
     .option("--feed-url <feedUrl>", "Explicit feed URL")
     .option("--batch <file>", "JSON file with sources to add (use - for stdin)")
     .option("--json", "Output as JSON")
-    .option("--strict", "Exit 1 if the source URL already exists (default: return existing)");
+    .option("--strict", "Exit 1 if the source URL already exists (default: return existing)")
+    .option("--dry-run", "Show what would be created without writing");
 }
 
 export function registerCreateCommand(program: Command) {
