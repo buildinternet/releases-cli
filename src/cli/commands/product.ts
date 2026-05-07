@@ -26,6 +26,37 @@ import { computePagination, type ListResponse } from "@buildinternet/releases-co
 import { warnDeprecatedAlias } from "../../lib/deprecated-alias.js";
 import { parseTagList } from "../../lib/flags.js";
 
+/**
+ * Move every source in `sources` to `targetOrg.id` + `productId`, copy
+ * `sourceOrg`'s org_accounts onto the target (skipping duplicates), then
+ * soft-delete the now-empty source org. Mirrors the server-side
+ * `migrateOrgToProduct` helper but goes through the public REST endpoints.
+ */
+async function migrateOrgToProduct(args: {
+  sourceOrg: { slug: string; id: string };
+  targetOrg: { slug: string; id: string };
+  productId: string;
+  sources: { id: string }[];
+}): Promise<void> {
+  const { sourceOrg, targetOrg, productId, sources } = args;
+  await Promise.all(
+    sources.map((source) => updateSource(source, { orgId: targetOrg.id, productId })),
+  );
+
+  const accounts = await getOrgAccountsBySlug(sourceOrg.slug);
+  await Promise.all(
+    accounts.map(async (acct) => {
+      try {
+        await linkOrgAccount(targetOrg.slug, acct.platform, acct.handle);
+      } catch {
+        /* skip duplicates */
+      }
+    }),
+  );
+
+  await removeOrg(sourceOrg.slug);
+}
+
 // ── Shared action handlers ────────────────────────────────────────────────────
 
 type ProductCreateOpts = {
@@ -322,13 +353,33 @@ export function registerProductCommand(program: Command) {
     )
     .option("--slug <slug>", "Custom slug for the new product")
     .option("--url <url>", "URL for the new product")
+    .option(
+      "--merge-into <product>",
+      "Fold source org into an existing product (slug or prod_… ID) under --into instead of creating a new one",
+    )
     .option("--dry-run", "Show what would happen")
     .option("--json", "Output as JSON")
     .action(
       async (
         sourceOrgSlug: string,
-        opts: { into: string; slug?: string; url?: string; dryRun?: boolean; json?: boolean },
+        opts: {
+          into: string;
+          slug?: string;
+          url?: string;
+          mergeInto?: string;
+          dryRun?: boolean;
+          json?: boolean;
+        },
       ) => {
+        if (opts.mergeInto && (opts.slug || opts.url)) {
+          console.error(
+            chalk.red(
+              "--merge-into cannot be combined with --slug or --url (existing product is reused).",
+            ),
+          );
+          process.exit(1);
+        }
+
         const sourceOrg = await findOrg(sourceOrgSlug);
         if (!sourceOrg) {
           console.error(chalk.red(`Source organization not found: ${sourceOrgSlug}`));
@@ -347,6 +398,76 @@ export function registerProductCommand(program: Command) {
         }
 
         const sources = await getSourcesByOrg(sourceOrg.id);
+
+        if (opts.mergeInto) {
+          const existingProduct = await findProduct(opts.mergeInto);
+          if (!existingProduct) {
+            console.error(chalk.red(`Product not found: ${opts.mergeInto}`));
+            process.exit(1);
+          }
+          if (existingProduct.orgId !== targetOrg.id) {
+            console.error(
+              chalk.red(
+                `Product "${existingProduct.slug}" is not under target org "${targetOrg.slug}".`,
+              ),
+            );
+            process.exit(1);
+          }
+
+          if (opts.dryRun) {
+            const plan = {
+              action: "adopt",
+              mergeInto: existingProduct.slug,
+              sourceOrg: { slug: sourceOrg.slug, name: sourceOrg.name },
+              targetOrg: { slug: targetOrg.slug, name: targetOrg.name },
+              existingProduct: { slug: existingProduct.slug, name: existingProduct.name },
+              sourcesToMove: sources.map((s) => s.slug),
+              wouldRemoveOrg: sourceOrg.slug,
+            };
+
+            if (opts.json) {
+              await writeJson(plan);
+            } else {
+              console.log(
+                chalk.yellow(
+                  `[dry-run] Would fold "${sourceOrg.name}" into existing product "${existingProduct.slug}" under "${targetOrg.name}"`,
+                ),
+              );
+              console.log(
+                `  Sources to move:  ${sources.length > 0 ? sources.map((s) => s.slug).join(", ") : chalk.dim("none")}`,
+              );
+              console.log(`  Would remove org: ${sourceOrg.slug}`);
+            }
+            return;
+          }
+
+          await migrateOrgToProduct({
+            sourceOrg,
+            targetOrg,
+            productId: existingProduct.id,
+            sources,
+          });
+
+          if (opts.json) {
+            await writeJson({
+              adopted: sourceOrg.slug,
+              into: targetOrg.slug,
+              mergedInto: existingProduct.slug,
+              product: existingProduct,
+              sourcesMoved: sources.length,
+            });
+          } else {
+            console.log(
+              chalk.green(
+                `Folded "${sourceOrg.name}" into existing product "${existingProduct.slug}" under "${targetOrg.name}"`,
+              ),
+            );
+            if (sources.length > 0)
+              console.log(`  Moved ${sources.length} source(s) to ${targetOrg.name}`);
+          }
+          return;
+        }
+
         const productSlug = opts.slug ?? sourceOrg.slug;
         const productUrl =
           opts.url ?? (sourceOrg.domain ? `https://${sourceOrg.domain}` : undefined);
@@ -385,38 +506,20 @@ export function registerProductCommand(program: Command) {
           description: sourceOrg.description ?? undefined,
         });
 
-        await Promise.all(
-          sources.map((source) =>
-            updateSource(source, { orgId: targetOrg.id, productId: created.id }),
-          ),
-        );
-
-        const accounts = await getOrgAccountsBySlug(sourceOrg.slug);
-        await Promise.all(
-          accounts.map(async (acct) => {
-            try {
-              await linkOrgAccount(targetOrg.slug, acct.platform, acct.handle);
-            } catch {
-              /* skip duplicates */
-            }
-          }),
-        );
-
-        await removeOrg(sourceOrg.slug);
+        await migrateOrgToProduct({
+          sourceOrg,
+          targetOrg,
+          productId: created.id,
+          sources,
+        });
 
         if (opts.json) {
-          console.log(
-            JSON.stringify(
-              {
-                adopted: sourceOrg.slug,
-                into: targetOrg.slug,
-                product: created,
-                sourcesMoved: sources.length,
-              },
-              null,
-              2,
-            ),
-          );
+          await writeJson({
+            adopted: sourceOrg.slug,
+            into: targetOrg.slug,
+            product: created,
+            sourcesMoved: sources.length,
+          });
         } else {
           console.log(
             chalk.green(
