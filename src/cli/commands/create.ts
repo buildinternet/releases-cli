@@ -108,6 +108,33 @@ async function createSingleSource(input: CreateSourceInput): Promise<CreateSourc
     // caller passed in — passing --org=wrong-org should not relabel a source
     // that already belongs to right-org in the response payload.
     const existingOrg = src.orgId ? await findOrg(src.orgId) : null;
+    // #794 item 3: when the operator requested a specific --org / --product
+    // and the existing row is attached to a *different* one, exit non-zero
+    // with the current attribution and the update hint. Pre-fix this was a
+    // silent no-op that made multi-product onboarding need manual cleanup.
+    const requestedOrg = input.org ? await findOrg(input.org) : null;
+    const requestedProduct = input.product ? await findProduct(input.product) : null;
+    const orgMismatch = Boolean(requestedOrg && existingOrg && requestedOrg.id !== existingOrg.id);
+    const productMismatch = Boolean(
+      requestedProduct && requestedProduct.id !== (src.productId ?? null),
+    );
+    if (orgMismatch || productMismatch) {
+      const reqLabel = [`org=${input.org ?? "∅"}`, `product=${input.product ?? "∅"}`].join(", ");
+      const curLabel = [
+        `org=${existingOrg?.slug ?? "∅"}`,
+        `productId=${src.productId ?? "∅"}`,
+      ].join(", ");
+      return {
+        name: src.name,
+        slug: src.slug,
+        type: src.type,
+        url: src.url,
+        org: existingOrg?.name ?? undefined,
+        status: "error",
+        existed: true,
+        error: `Source URL already exists with different attribution. requested {${reqLabel}}; current {${curLabel}}. Run \`releases admin source update ${src.slug} --org <slug> --product <slug>\` to re-attach.`,
+      };
+    }
     logger.info(`Source already exists: ${src.name} (${src.slug}) — returning existing`);
     return {
       name: src.name,
