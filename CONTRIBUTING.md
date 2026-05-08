@@ -72,7 +72,7 @@ it("respects --json on overview inputs subcommand", async () => {
 
 PR titles follow [Conventional Commits](https://www.conventionalcommits.org/), with an optional scope:
 
-```
+```text
 feat(cli): admin collection command tree
 fix: respect --json on overview inputs subcommand
 chore(deps): bump oxlint from 1.62.0 to 1.63.0
