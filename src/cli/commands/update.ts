@@ -38,6 +38,7 @@ export type UpdateSourceOpts = {
   fetchMethod?: string;
   parseInstructions?: string | boolean;
   parseInstructionsFile?: string;
+  categoryAllow?: string | boolean;
   render?: boolean;
   primary?: boolean;
   priority?: string;
@@ -234,6 +235,24 @@ export async function updateSourceAction(
     changes.push(`parse instructions → "${preview}"`);
   }
 
+  if (opts.categoryAllow === false) {
+    metaUpdates.categoryAllow = undefined;
+    changes.push("category allowlist removed");
+  } else if (typeof opts.categoryAllow === "string") {
+    const allow = opts.categoryAllow
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+    if (allow.length === 0) {
+      logger.error(
+        "--category-allow requires at least one category (use --no-category-allow to clear)",
+      );
+      process.exit(1);
+    }
+    metaUpdates.categoryAllow = allow;
+    changes.push(`category allowlist → ${allow.join(", ")}`);
+  }
+
   if (opts.render === true) {
     metaUpdates.renderRequired = true;
     changes.push("rendering → required (headless browser)");
@@ -312,6 +331,11 @@ export function attachUpdateOptions(cmd: Command): Command {
       "Path to file with AI parsing instructions (use - for stdin; empty file clears)",
     )
     .option("--no-parse-instructions", "Remove AI parsing instructions")
+    .option(
+      "--category-allow <list>",
+      "Comma-separated allowlist of feed `<category>` values to keep (case-insensitive). Items whose categories don't intersect — and items with no category at all — are dropped at ingest. Example: 'Product,Release'",
+    )
+    .option("--no-category-allow", "Remove the feed category allowlist")
     .option("--render", "Force headless browser rendering for this source")
     .option("--no-render", "Allow fast fetch without headless browser rendering")
     .option("--provider <provider>", "Set the detected provider")
