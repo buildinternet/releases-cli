@@ -123,29 +123,9 @@ Nothing is required for reader access. For admin operations (closed beta — see
 
 Copy `.env.example` to `.env` to configure these locally.
 
-## Development
+## Contributing
 
-```bash
-bun install
-bun src/index.ts search "next"            # run from source
-bun run build                             # compile binary to dist/releases
-bun run typecheck                         # tsc --noEmit
-bun test                                  # unit tests
-```
-
-The project is a Bun workspace. Two shared packages (`@buildinternet/releases-lib`, `@buildinternet/releases-skills`) are published from this repo alongside the CLI. `@buildinternet/releases-core` is published from the private monorepo and consumed here as a regular npm dependency.
-
-### Releasing
-
-Changesets handle versioning:
-
-```bash
-bun run changeset           # write a bump entry for your PR
-bun run changeset:version   # apply pending bumps (runs in CI)
-bun run changeset:publish   # publish to npm (runs in CI)
-```
-
-Seven `@buildinternet/releases*` packages (5 binaries + `-lib` + `-skills`) live in a fixed group so they bump together. `@buildinternet/releases-core` is published independently from the monorepo.
+Build, test, and release instructions live in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Exit codes
 
