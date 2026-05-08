@@ -6,7 +6,9 @@ import {
   findProduct,
   getRelease,
   getLatestReleases,
+  getOrgCollections,
 } from "../../api/client.js";
+import type { CollectionListItem } from "@buildinternet/releases-api-types";
 import { stripAnsi } from "../../lib/sanitize.js";
 import { logger } from "@releases/lib/logger";
 import { renderLatestReleasesTable } from "../render/releases-table.js";
@@ -118,10 +120,24 @@ async function renderOrg(
   org: { id: string; name: string; slug: string; domain: string | null; category: string | null },
   opts: GetEntityOpts,
 ) {
-  const releases = await getLatestReleases({ org: org.slug, count: 10 });
+  // Collections degrade to empty on failure so an unrelated bug in the
+  // collections endpoint doesn't break the canonical org card; the warning
+  // surfaces real issues without aborting.
+  const fetchCollections = async (): Promise<CollectionListItem[]> => {
+    try {
+      return (await getOrgCollections(org.slug)) ?? [];
+    } catch (err) {
+      logger.warn(`Failed to fetch collections for ${org.slug}: ${err}`);
+      return [];
+    }
+  };
+  const [releases, collections] = await Promise.all([
+    getLatestReleases({ org: org.slug, count: 10 }),
+    fetchCollections(),
+  ]);
 
   if (opts.json) {
-    await writeJson({ ...org, releases });
+    await writeJson({ ...org, releases, collections });
     return;
   }
 
@@ -131,6 +147,10 @@ async function renderOrg(
   console.log(`  Slug:    ${org.slug}`);
   if (org.domain) console.log(`  Domain:  ${org.domain}`);
   if (org.category) console.log(`  Category: ${org.category}`);
+  if (collections.length > 0) {
+    const labels = collections.map((c) => `${c.name} ${chalk.dim(`(${c.slug})`)}`).join(", ");
+    console.log(`  Collections: ${labels}`);
+  }
 
   console.log("");
   if (releases.length === 0) {
