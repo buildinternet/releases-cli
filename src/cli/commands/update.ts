@@ -43,8 +43,20 @@ export type UpdateSourceOpts = {
   priority?: string;
   disable?: boolean;
   enable?: boolean;
+  changelogPaths?: string | boolean;
   dryRun?: boolean;
 };
+
+// Match the API worker cap (CHANGELOG_MAX_FILES) so we fail fast instead of
+// silently dropping the tail at fetch time.
+const CHANGELOG_PATHS_MAX = 20;
+
+function parseChangelogPathsFlag(value: string): string[] {
+  return value
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
 
 /** Shared action for both the canonical `update` command and the deprecated `edit` alias. */
 export async function updateSourceAction(
@@ -242,6 +254,27 @@ export async function updateSourceAction(
     changes.push("rendering → disabled (fast fetch)");
   }
 
+  if (opts.changelogPaths === false) {
+    metaUpdates.changelogPaths = undefined;
+    changes.push("changelog paths cleared (auto-discovery only)");
+  } else if (typeof opts.changelogPaths === "string") {
+    const paths = parseChangelogPathsFlag(opts.changelogPaths);
+    if (paths.length === 0) {
+      logger.error(
+        "--changelog-paths requires at least one path (use --no-changelog-paths to clear)",
+      );
+      process.exit(1);
+    }
+    if (paths.length > CHANGELOG_PATHS_MAX) {
+      logger.error(
+        `--changelog-paths accepts at most ${CHANGELOG_PATHS_MAX} entries (got ${paths.length})`,
+      );
+      process.exit(1);
+    }
+    metaUpdates.changelogPaths = paths;
+    changes.push(`changelog paths → ${paths.length} path(s) [${paths.join(", ")}]`);
+  }
+
   if (changes.length === 0) {
     if (!opts.json) logger.warn("No changes specified. Use --help to see options.");
     return;
@@ -321,6 +354,11 @@ export function attachUpdateOptions(cmd: Command): Command {
     .option("--priority <level>", "Set fetch priority (normal, low, paused)")
     .option("--disable", "Disable source")
     .option("--enable", "Re-enable a disabled source")
+    .option(
+      "--changelog-paths <paths>",
+      "Comma-separated list of CHANGELOG paths (relative to repo root) for monorepo sources, e.g. 'packages/core/CHANGELOG.md,packages/cli/CHANGELOG.md'",
+    )
+    .option("--no-changelog-paths", "Clear the changelog paths override (return to auto-discovery)")
     .option("--json", "Output as JSON")
     .option("--dry-run", "Show what would change without writing");
 }
