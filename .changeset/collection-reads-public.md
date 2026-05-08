@@ -2,7 +2,7 @@
 "@buildinternet/releases": minor
 ---
 
-Collections are now first-class browseable from the CLI.
+Collections are now first-class browsable from the CLI.
 
 - `releases collection list` and `releases collection get <slug>` are public — no API key needed. The same commands also stay under `admin` for back-compat.
 - New `releases collection releases <slug>` shows the cross-org release feed with cursor pagination (`--limit`, `--cursor`, `--include-prereleases`).

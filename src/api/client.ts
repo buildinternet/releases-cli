@@ -933,13 +933,13 @@ interface CollectionReleasesResponseCli {
 export async function getCollectionReleases(
   slug: string,
   opts: { limit?: number; cursor?: string | null; includePrereleases?: boolean } = {},
-): Promise<CollectionReleasesResponseCli> {
+): Promise<CollectionReleasesResponseCli | null> {
   const qs = new URLSearchParams();
   if (opts.limit !== undefined) qs.set("limit", String(opts.limit));
   if (opts.cursor) qs.set("cursor", opts.cursor);
   if (opts.includePrereleases) qs.set("include_prereleases", "1");
   const suffix = qs.size > 0 ? `?${qs.toString()}` : "";
-  return apiFetch<CollectionReleasesResponseCli>(
+  return apiFetch<CollectionReleasesResponseCli | null>(
     `/v1/collections/${encodeURIComponent(slug)}/releases${suffix}`,
   );
 }

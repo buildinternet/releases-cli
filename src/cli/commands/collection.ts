@@ -77,8 +77,8 @@ type ReleasesOpts = GlobalOpts & {
 };
 async function releasesAction(slug: string, opts: ReleasesOpts): Promise<void> {
   const limit = opts.limit ? Number(opts.limit) : undefined;
-  if (limit !== undefined && (!Number.isInteger(limit) || limit < 1)) {
-    console.error(chalk.red(`Invalid --limit "${opts.limit}" (need a positive integer)`));
+  if (limit !== undefined && (!Number.isInteger(limit) || limit < 1 || limit > 100)) {
+    console.error(chalk.red(`Invalid --limit "${opts.limit}" (need an integer between 1 and 100)`));
     process.exit(1);
   }
   const result = await getCollectionReleases(slug, {
@@ -86,6 +86,11 @@ async function releasesAction(slug: string, opts: ReleasesOpts): Promise<void> {
     cursor: opts.cursor ?? null,
     includePrereleases: opts.includePrereleases,
   });
+  if (!result) {
+    if (opts.json) await writeJson(null);
+    else console.error(chalk.red(`Collection not found: ${slug}`));
+    process.exit(1);
+  }
   if (opts.json) {
     await writeJson(result);
     return;
@@ -204,6 +209,32 @@ async function memberRemoveAction(slug: string, org: string, opts: GlobalOpts): 
   else console.log(chalk.green(`Removed ${org} from ${slug}`));
 }
 
+/** Wires `list` / `get` / `releases` onto a parent `collection` command. */
+function attachReadSubcommands(collection: Command): void {
+  collection
+    .command("list")
+    .description("List collections")
+    .option("--json", "Output as JSON")
+    .action(listAction);
+
+  collection
+    .command("get")
+    .description("Show a collection's detail and member orgs")
+    .argument("<slug>", "Collection slug")
+    .option("--json", "Output as JSON")
+    .action(getAction);
+
+  collection
+    .command("releases")
+    .description("Show the cross-org release feed for a collection")
+    .argument("<slug>", "Collection slug")
+    .option("--limit <n>", "Slice size (default 20, max 100)")
+    .option("--cursor <token>", "Continuation cursor from a prior call")
+    .option("--include-prereleases", "Include alphas, betas, RCs (default: hide)")
+    .option("--json", "Output as JSON")
+    .action(releasesAction);
+}
+
 /**
  * Read-only collection commands — public, no admin gate. Registered at the
  * top-level program so anyone can browse collections without an API key.
@@ -212,30 +243,7 @@ export function registerCollectionReadCommands(program: Command): Command {
   const collection = program
     .command("collection")
     .description("Browse curated collections (cross-org playlists)");
-
-  collection
-    .command("list")
-    .description("List collections")
-    .option("--json", "Output as JSON")
-    .action(listAction);
-
-  collection
-    .command("get")
-    .description("Show a collection's detail and member orgs")
-    .argument("<slug>", "Collection slug")
-    .option("--json", "Output as JSON")
-    .action(getAction);
-
-  collection
-    .command("releases")
-    .description("Show the cross-org release feed for a collection")
-    .argument("<slug>", "Collection slug")
-    .option("--limit <n>", "Slice size (default 20, max 100)")
-    .option("--cursor <token>", "Continuation cursor from a prior call")
-    .option("--include-prereleases", "Include alphas, betas, RCs (default: hide)")
-    .option("--json", "Output as JSON")
-    .action(releasesAction);
-
+  attachReadSubcommands(collection);
   return collection;
 }
 
@@ -244,28 +252,7 @@ export function registerCollectionCommand(program: Command) {
     .command("collection")
     .description("Manage curated collections (cross-org playlists)");
 
-  collection
-    .command("list")
-    .description("List collections")
-    .option("--json", "Output as JSON")
-    .action(listAction);
-
-  collection
-    .command("get")
-    .description("Show a collection's detail and member orgs")
-    .argument("<slug>", "Collection slug")
-    .option("--json", "Output as JSON")
-    .action(getAction);
-
-  collection
-    .command("releases")
-    .description("Show the cross-org release feed for a collection")
-    .argument("<slug>", "Collection slug")
-    .option("--limit <n>", "Slice size (default 20, max 100)")
-    .option("--cursor <token>", "Continuation cursor from a prior call")
-    .option("--include-prereleases", "Include alphas, betas, RCs (default: hide)")
-    .option("--json", "Output as JSON")
-    .action(releasesAction);
+  attachReadSubcommands(collection);
 
   collection
     .command("create")
