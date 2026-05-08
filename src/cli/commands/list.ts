@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import Table from "cli-table3";
+import { renderTable } from "../render/table.js";
 import { listSourcesWithOrg, findSource } from "../../api/client.js";
 import { sourceNotFound } from "../suggest.js";
 import { stripAnsi } from "../../lib/sanitize.js";
@@ -172,26 +172,33 @@ export function registerListCommand(program: Command) {
           return;
         }
 
-        const table = new Table({
-          head: ["Name", "Slug", "Type", "Method", "URL", "Org", "Product", "Last Fetched"],
-        });
-
-        for (const row of pageItems) {
-          const method = getFetchMethod(row.type, parseMetadataObject(row.metadata));
-          const name = stripAnsi(row.name);
-          table.push([
-            row.isPrimary ? `${name} ${chalk.yellow("\u2605")}` : name,
-            row.slug,
-            row.type,
-            method,
-            row.url,
-            row.orgName ? stripAnsi(row.orgName) : chalk.dim("\u2014"),
-            row.productName ?? chalk.dim("\u2014"),
-            row.lastFetchedAt ?? chalk.dim("never"),
-          ]);
-        }
-
-        console.log(table.toString());
+        console.log(
+          renderTable({
+            head: [
+              { label: "Name" },
+              { label: "Slug", noTruncate: true },
+              { label: "Type", noTruncate: true },
+              { label: "Method", noTruncate: true },
+              { label: "URL" },
+              { label: "Org" },
+              { label: "Product" },
+              { label: "Last Fetched", noTruncate: true },
+            ],
+            rows: pageItems.map((row) => {
+              const name = stripAnsi(row.name);
+              return [
+                row.isPrimary ? `${name} ${chalk.yellow("\u2605")}` : name,
+                row.slug,
+                row.type,
+                getFetchMethod(row.type, parseMetadataObject(row.metadata)),
+                row.url,
+                row.orgName ? stripAnsi(row.orgName) : chalk.dim("\u2014"),
+                row.productName ?? chalk.dim("\u2014"),
+                row.lastFetchedAt ?? chalk.dim("never"),
+              ];
+            }),
+          }),
+        );
         if (!explicitLimit && apiPagination.hasMore) {
           logger.warn(
             formatTruncationWarning({

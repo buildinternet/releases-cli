@@ -62,6 +62,8 @@ Every command that takes an org / product / source / release identifier accepts 
 
 Every reader command supports `--json` for machine-readable output. List commands emit a `{ items, pagination }` envelope — parse with `jq '.items[]'`, and check `.pagination.hasMore` before assuming you've seen every row. Nested `metadata` fields are returned as parsed objects (no `fromjson` needed). `org get` includes a short overview preview (with a stale warning when more than 30 days old); `org overview <identifier>` prints the full body.
 
+Tabular reader commands fit themselves to the terminal width when stdout is a TTY (column truncation with `…`) and switch to bare TSV when piped — no headers, no color, no truncation — so `releases org list | cut -f2` works without parsing ANSI. `COLUMNS=<n>` overrides the detected width. For complete, parseable output prefer `--json`.
+
 ### MCP
 
 Point Claude Code (or any MCP-compatible agent) at the hosted MCP server:
