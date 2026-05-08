@@ -51,11 +51,29 @@ export type UpdateSourceOpts = {
 // silently dropping the tail at fetch time.
 const CHANGELOG_PATHS_MAX = 20;
 
+/**
+ * Parse a `--changelog-paths` value into a non-empty, capped list of paths.
+ * Exits the process with a friendly error on empty input or overflow so
+ * callers don't have to repeat the same two checks inline.
+ */
 function parseChangelogPathsFlag(value: string): string[] {
-  return value
+  const paths = value
     .split(",")
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
+  if (paths.length === 0) {
+    logger.error(
+      "--changelog-paths requires at least one path (use --no-changelog-paths to clear)",
+    );
+    process.exit(1);
+  }
+  if (paths.length > CHANGELOG_PATHS_MAX) {
+    logger.error(
+      `--changelog-paths accepts at most ${CHANGELOG_PATHS_MAX} entries (got ${paths.length})`,
+    );
+    process.exit(1);
+  }
+  return paths;
 }
 
 /** Shared action for both the canonical `update` command and the deprecated `edit` alias. */
@@ -259,18 +277,6 @@ export async function updateSourceAction(
     changes.push("changelog paths cleared (auto-discovery only)");
   } else if (typeof opts.changelogPaths === "string") {
     const paths = parseChangelogPathsFlag(opts.changelogPaths);
-    if (paths.length === 0) {
-      logger.error(
-        "--changelog-paths requires at least one path (use --no-changelog-paths to clear)",
-      );
-      process.exit(1);
-    }
-    if (paths.length > CHANGELOG_PATHS_MAX) {
-      logger.error(
-        `--changelog-paths accepts at most ${CHANGELOG_PATHS_MAX} entries (got ${paths.length})`,
-      );
-      process.exit(1);
-    }
     metaUpdates.changelogPaths = paths;
     changes.push(`changelog paths → ${paths.length} path(s) [${paths.join(", ")}]`);
   }
