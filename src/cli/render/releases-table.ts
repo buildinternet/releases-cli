@@ -15,7 +15,7 @@ export interface RenderOptions {
 export function renderLatestReleasesTable(rows: LatestRelease[], opts: RenderOptions = {}): string {
   return renderTable({
     head: [
-      { label: "ID" },
+      { label: "ID", noTruncate: true },
       { label: "Source" },
       { label: "Title" },
       { label: "Version", noTruncate: true },

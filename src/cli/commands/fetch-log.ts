@@ -78,7 +78,7 @@ Examples:
               statusLabel,
               String(log.releasesFound),
               log.releasesInserted > 0 ? chalk.green(String(log.releasesInserted)) : chalk.dim("0"),
-              log.durationMs ? `${(log.durationMs / 1000).toFixed(1)}s` : chalk.dim("—"),
+              log.durationMs != null ? `${(log.durationMs / 1000).toFixed(1)}s` : chalk.dim("—"),
               log.error ? chalk.red(stripAnsi(log.error)) : chalk.dim("—"),
               timeAgo(log.createdAt) ?? "—",
             ];

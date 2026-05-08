@@ -116,7 +116,7 @@ export function registerStatsCommand(program: Command) {
                 String(f.releasesFound),
                 f.releasesInserted > 0 ? chalk.green(String(f.releasesInserted)) : chalk.dim("0"),
                 String(f.totalReleases),
-                f.durationMs ? `${(f.durationMs / 1000).toFixed(1)}s` : chalk.dim("—"),
+                f.durationMs != null ? `${(f.durationMs / 1000).toFixed(1)}s` : chalk.dim("—"),
                 timeAgo(f.createdAt) ?? "",
               ];
             }),

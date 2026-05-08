@@ -32,6 +32,13 @@ function padLeft(s: string, width: number): string {
   return pad > 0 ? " ".repeat(pad) + s : s;
 }
 
+/**
+ * Truncate to a visible width, appending an ellipsis. ANSI escape sequences
+ * are stripped from the truncated output — preserving them across an arbitrary
+ * cut point would require an ANSI-aware slicer (e.g. slice-ansi), and the
+ * tradeoff isn't worth the dep for cells that already fall back to plain text
+ * only when they overflow.
+ */
 function truncateToWidth(s: string, width: number): string {
   if (width <= 0) return "";
   if (stringWidth(s) <= width) return s;
