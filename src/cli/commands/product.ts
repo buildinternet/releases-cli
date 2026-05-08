@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import Table from "cli-table3";
+import { renderTable } from "../render/table.js";
 import {
   findOrg,
   findProduct,
@@ -257,15 +257,22 @@ export function registerProductCommand(program: Command) {
         return;
       }
 
-      const table = new Table({
-        head: [chalk.cyan("Name"), chalk.cyan("Slug"), chalk.cyan("URL"), chalk.cyan("Sources")],
-      });
-
-      for (const p of productList) {
-        table.push([p.name, p.slug, p.url ?? chalk.dim("—"), String(p.sourceCount)]);
-      }
-
-      console.log(table.toString());
+      console.log(
+        renderTable({
+          head: [
+            { label: "Name" },
+            { label: "Slug", noTruncate: true },
+            { label: "URL" },
+            { label: "Sources", noTruncate: true, alignRight: true },
+          ],
+          rows: productList.map((p) => [
+            p.name,
+            p.slug,
+            p.url ?? chalk.dim("—"),
+            String(p.sourceCount),
+          ]),
+        }),
+      );
     });
 
   // ── product create (canonical) / product add (deprecated) ──

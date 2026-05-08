@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import Table from "cli-table3";
+import { renderTable } from "../render/table.js";
 import {
   listCollections,
   getCollection,
@@ -29,18 +29,22 @@ async function listAction(opts: GlobalOpts): Promise<void> {
     console.log(chalk.yellow("No collections."));
     return;
   }
-  const table = new Table({
-    head: [
-      chalk.cyan("Slug"),
-      chalk.cyan("Name"),
-      chalk.cyan("Members"),
-      chalk.cyan("Description"),
-    ],
-  });
-  for (const r of rows) {
-    table.push([r.slug, r.name, String(r.memberCount), r.description ?? chalk.dim("—")]);
-  }
-  console.log(table.toString());
+  console.log(
+    renderTable({
+      head: [
+        { label: "Slug", noTruncate: true },
+        { label: "Name" },
+        { label: "Members", noTruncate: true, alignRight: true },
+        { label: "Description" },
+      ],
+      rows: rows.map((r) => [
+        r.slug,
+        r.name,
+        String(r.memberCount),
+        r.description ?? chalk.dim("—"),
+      ]),
+    }),
+  );
 }
 
 async function getAction(slug: string, opts: GlobalOpts): Promise<void> {

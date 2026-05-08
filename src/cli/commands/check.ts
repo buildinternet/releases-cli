@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import Table from "cli-table3";
+import { renderTable } from "../render/table.js";
 import { findSource, listSourcesWithOrg } from "../../api/client.js";
 import { timeAgo } from "@buildinternet/releases-core/dates";
 import { stripAnsi } from "../../lib/sanitize.js";
@@ -152,39 +152,41 @@ export function registerCheckCommand(program: Command) {
         return;
       }
 
-      const table = new Table({
-        head: [
-          chalk.cyan("Name"),
-          chalk.cyan("Type"),
-          chalk.cyan("Status"),
-          chalk.cyan("Response (ms)"),
-          chalk.cyan("Health"),
-          chalk.cyan("Last Fetch"),
-        ],
-      });
-
-      for (const r of results) {
-        table.push([
-          stripAnsi(r.name),
-          r.type,
-          statusLabel(r.httpStatus),
-          String(r.responseMs),
-          healthLabel(r.health),
-          r.timeAgoLastFetch ?? chalk.dim("never"),
-        ]);
-
-        if (r.feedUrl) {
-          table.push([
-            chalk.dim(`  feed: ${stripAnsi(r.feedUrl)}`),
-            chalk.dim("feed"),
-            statusLabel(r.feedHttpStatus ?? null),
-            String(r.feedResponseMs ?? 0),
-            healthLabel(r.feedHealth ?? "error"),
-            "",
-          ]);
-        }
-      }
-
-      console.log(table.toString());
+      console.log(
+        renderTable({
+          head: [
+            { label: "Name" },
+            { label: "Type", noTruncate: true },
+            { label: "Status", noTruncate: true },
+            { label: "Response (ms)", noTruncate: true, alignRight: true },
+            { label: "Health", noTruncate: true },
+            { label: "Last Fetch", noTruncate: true },
+          ],
+          // Each result expands to one row, plus a second indented row when a
+          // feed URL was probed alongside the main URL.
+          rows: results.flatMap((r) => {
+            const main = [
+              stripAnsi(r.name),
+              r.type,
+              statusLabel(r.httpStatus),
+              String(r.responseMs),
+              healthLabel(r.health),
+              r.timeAgoLastFetch ?? chalk.dim("never"),
+            ];
+            if (!r.feedUrl) return [main];
+            return [
+              main,
+              [
+                chalk.dim(`  feed: ${stripAnsi(r.feedUrl)}`),
+                chalk.dim("feed"),
+                statusLabel(r.feedHttpStatus ?? null),
+                String(r.feedResponseMs ?? 0),
+                healthLabel(r.feedHealth ?? "error"),
+                "",
+              ],
+            ];
+          }),
+        }),
+      );
     });
 }

@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import Table from "cli-table3";
+import { renderTable } from "../render/table.js";
 import {
   findOrg,
   getSourcesByOrg,
@@ -491,20 +491,17 @@ export function registerOrgCommand(program: Command) {
           return;
         }
 
-        const table = new Table({
-          head: [
-            chalk.cyan("Name"),
-            chalk.cyan("Slug"),
-            chalk.cyan("Domain"),
-            chalk.cyan("Updated"),
-          ],
-        });
-
-        for (const o of pageItems) {
-          table.push([o.name, o.slug, o.domain ?? chalk.dim("—"), o.updatedAt]);
-        }
-
-        console.log(table.toString());
+        console.log(
+          renderTable({
+            head: [
+              { label: "Name" },
+              { label: "Slug", noTruncate: true },
+              { label: "Domain" },
+              { label: "Updated", noTruncate: true },
+            ],
+            rows: pageItems.map((o) => [o.name, o.slug, o.domain ?? chalk.dim("—"), o.updatedAt]),
+          }),
+        );
         if (!explicitLimit && pagination.hasMore) {
           logger.warn(
             formatTruncationWarning({

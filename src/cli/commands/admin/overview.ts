@@ -7,7 +7,7 @@
  */
 import type { Command } from "commander";
 import chalk from "chalk";
-import Table from "cli-table3";
+import { renderTable, type ColumnSpec } from "../../render/table.js";
 import {
   findOrg,
   listOrgs,
@@ -247,53 +247,52 @@ async function fetchManifest(opts: {
   return all;
 }
 
-function renderManifestTable(rows: OverviewManifestRow[], plan: boolean): void {
-  const table = new Table({
-    head: [
-      chalk.cyan("Org"),
-      chalk.cyan("Staleness"),
-      chalk.cyan("Recent"),
-      chalk.cyan("Behind"),
-      chalk.cyan("Last Activity"),
-      chalk.cyan("Overview Updated"),
-      ...(plan ? [chalk.cyan("Action"), chalk.cyan("Fetch?")] : []),
-    ],
-  });
+function stalenessLabel(staleness: OverviewManifestRow["staleness"]): string {
+  switch (staleness) {
+    case "missing":
+      return chalk.yellow("missing");
+    case "behind":
+      return chalk.red("behind");
+    default:
+      return chalk.green("fresh");
+  }
+}
 
-  for (const r of rows) {
-    let stalenessLabel: string;
-    switch (r.staleness) {
-      case "missing":
-        stalenessLabel = chalk.yellow("missing");
-        break;
-      case "behind":
-        stalenessLabel = chalk.red("behind");
-        break;
-      default:
-        stalenessLabel = chalk.green("fresh");
-    }
-    const lastAct = r.orgLastActivity
-      ? (timeAgo(r.orgLastActivity) ?? r.orgLastActivity)
-      : chalk.dim("—");
-    const ovUpdated = r.overviewUpdatedAt
-      ? (timeAgo(r.overviewUpdatedAt) ?? r.overviewUpdatedAt)
-      : chalk.dim("—");
-    const row = [
-      r.orgSlug,
-      stalenessLabel,
-      String(r.recentReleaseCount),
-      String(r.releasesSinceOverview),
-      lastAct,
-      ovUpdated,
-    ];
-    if (plan) {
-      const action = r.action ?? "";
-      row.push(action, r.needsFetch ? chalk.yellow("yes") : chalk.dim("no"));
-    }
-    table.push(row);
+function timeAgoOrDim(iso: string | null | undefined): string {
+  if (!iso) return chalk.dim("—");
+  return timeAgo(iso) ?? iso;
+}
+
+function renderManifestTable(rows: OverviewManifestRow[], plan: boolean): void {
+  const head: ColumnSpec[] = [
+    { label: "Org", noTruncate: true },
+    { label: "Staleness", noTruncate: true },
+    { label: "Recent", noTruncate: true, alignRight: true },
+    { label: "Behind", noTruncate: true, alignRight: true },
+    { label: "Last Activity", noTruncate: true },
+    { label: "Overview Updated", noTruncate: true },
+  ];
+  if (plan) {
+    head.push({ label: "Action" }, { label: "Fetch?", noTruncate: true });
   }
 
-  console.log(table.toString());
+  console.log(
+    renderTable({
+      head,
+      rows: rows.map((r) => {
+        const base = [
+          r.orgSlug,
+          stalenessLabel(r.staleness),
+          String(r.recentReleaseCount),
+          String(r.releasesSinceOverview),
+          timeAgoOrDim(r.orgLastActivity),
+          timeAgoOrDim(r.overviewUpdatedAt),
+        ];
+        if (!plan) return base;
+        return [...base, r.action ?? "", r.needsFetch ? chalk.yellow("yes") : chalk.dim("no")];
+      }),
+    }),
+  );
 }
 
 async function overviewListAction(opts: OverviewListOpts): Promise<void> {
@@ -415,25 +414,24 @@ async function overviewListAction(opts: OverviewListOpts): Promise<void> {
     return;
   }
 
-  const table = new Table({
-    head: [
-      chalk.cyan("Org"),
-      chalk.cyan("Recent"),
-      chalk.cyan("Last Activity"),
-      chalk.cyan("Overview Updated"),
-    ],
-  });
-
-  for (const o of candidates) {
-    const lastAct = o.lastActivity ? (timeAgo(o.lastActivity) ?? o.lastActivity) : chalk.dim("—");
-    const ovUpdated = o.overview?.updatedAt
-      ? (timeAgo(o.overview.updatedAt) ?? o.overview.updatedAt)
-      : chalk.yellow("missing");
-
-    table.push([o.slug, String(o.recentReleaseCount), lastAct, ovUpdated]);
-  }
-
-  console.log(table.toString());
+  console.log(
+    renderTable({
+      head: [
+        { label: "Org", noTruncate: true },
+        { label: "Recent", noTruncate: true, alignRight: true },
+        { label: "Last Activity", noTruncate: true },
+        { label: "Overview Updated", noTruncate: true },
+      ],
+      rows: candidates.map((o) => [
+        o.slug,
+        String(o.recentReleaseCount),
+        timeAgoOrDim(o.lastActivity),
+        o.overview?.updatedAt
+          ? (timeAgo(o.overview.updatedAt) ?? o.overview.updatedAt)
+          : chalk.yellow("missing"),
+      ]),
+    }),
+  );
   if (opts.stale) {
     console.log(
       chalk.dim(

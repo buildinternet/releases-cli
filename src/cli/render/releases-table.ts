@@ -1,7 +1,7 @@
 import chalk from "chalk";
-import Table from "cli-table3";
 import type { LatestRelease } from "../../api/types.js";
 import { stripAnsi } from "../../lib/sanitize.js";
+import { renderTable } from "./table.js";
 
 function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max - 1) + "…" : s;
@@ -13,33 +13,36 @@ export interface RenderOptions {
 }
 
 export function renderLatestReleasesTable(rows: LatestRelease[], opts: RenderOptions = {}): string {
-  const table = new Table({
+  return renderTable({
     head: [
-      chalk.cyan("ID"),
-      chalk.cyan("Source"),
-      chalk.cyan("Title"),
-      chalk.cyan("Version"),
-      chalk.cyan(opts.withSummary ? "Published At" : "Published"),
+      { label: "ID", noTruncate: true },
+      { label: "Source" },
+      { label: "Title" },
+      { label: "Version", noTruncate: true },
+      { label: opts.withSummary ? "Published At" : "Published", noTruncate: true },
     ],
+    rows: rows.map((row) => {
+      const title = stripAnsi(row.title);
+      const titleCell =
+        opts.withSummary && row.contentSummary
+          ? `${title}\n${chalk.dim(truncate(row.contentSummary, 120))}`
+          : title;
+      const publishedCell = opts.withSummary
+        ? (row.publishedAt ?? "-")
+        : (row.publishedAt?.slice(0, 10) ?? chalk.dim("—"));
+
+      let versionCell: string;
+      if (row.version) versionCell = stripAnsi(row.version);
+      else if (opts.withSummary) versionCell = "-";
+      else versionCell = chalk.dim("—");
+
+      return [
+        chalk.dim(row.id),
+        `${stripAnsi(row.sourceName)} ${chalk.dim(`(${row.sourceSlug})`)}`,
+        titleCell,
+        versionCell,
+        publishedCell,
+      ];
+    }),
   });
-
-  for (const row of rows) {
-    const titleCell = opts.withSummary
-      ? stripAnsi(row.title) +
-        (row.contentSummary ? `\n${chalk.dim(truncate(row.contentSummary, 120))}` : "")
-      : truncate(stripAnsi(row.title), 50);
-    const publishedCell = opts.withSummary
-      ? (row.publishedAt ?? "-")
-      : (row.publishedAt?.slice(0, 10) ?? chalk.dim("—"));
-
-    table.push([
-      chalk.dim(row.id),
-      `${stripAnsi(row.sourceName)} ${chalk.dim(`(${row.sourceSlug})`)}`,
-      titleCell,
-      row.version ? stripAnsi(row.version) : opts.withSummary ? "-" : chalk.dim("—"),
-      publishedCell,
-    ]);
-  }
-
-  return table.toString();
 }
