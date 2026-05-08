@@ -14,7 +14,10 @@ import { registerTailCommand } from "./commands/tail.js";
 import { registerUsageCommand } from "./commands/usage.js";
 import { registerOrgCommand } from "./commands/org.js";
 import { registerProductCommand } from "./commands/product.js";
-import { registerCollectionCommand } from "./commands/collection.js";
+import {
+  registerCollectionCommand,
+  registerCollectionReadCommands,
+} from "./commands/collection.js";
 import { registerStatsCommand } from "./commands/stats.js";
 import { registerReleaseCommand } from "./commands/release.js";
 import { registerCheckCommand } from "./commands/check.js";
@@ -175,6 +178,7 @@ registerListCommand(program);
 // Canonical verb: get. Deprecated alias: show (emits a warning).
 registerGetCommand(program);
 registerShowCommand(program);
+registerCollectionReadCommands(program);
 registerTelemetryCommand(program);
 registerWhoamiCommand(program);
 registerAgentContextCommand(program);
