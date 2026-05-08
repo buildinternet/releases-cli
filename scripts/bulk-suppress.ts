@@ -34,6 +34,7 @@ async function worker(queue: typeof rows) {
     const row = queue.shift();
     if (!row) break;
     try {
+      // oxlint-disable-next-line no-await-in-loop -- worker drains shared queue; concurrency comes from running N workers in parallel
       await suppressRelease(row.id, row.reason);
       ok++;
     } catch (err) {
