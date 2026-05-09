@@ -1116,12 +1116,25 @@ export async function getPlaybook(identifier: string): Promise<KnowledgePage | n
   return apiFetch<KnowledgePage | null>(`/v1/orgs/${encodeURIComponent(identifier)}/playbook`);
 }
 
+// Defined locally until @buildinternet/releases-api-types ships an OverviewCitation
+// export. Mirror the wire shape from workers/api/src/routes/overview.ts —
+// startIndex/endIndex are character offsets into the overview body, sourceUrl
+// is the originating release URL, citedText is the verbatim quote.
+export interface OverviewCitation {
+  startIndex: number;
+  endIndex: number;
+  sourceUrl: string;
+  title?: string | null;
+  citedText: string;
+}
+
 export async function upsertOverview(
   orgSlug: string,
   data: {
     content: string;
     releaseCount: number;
     lastContributingReleaseAt?: string | null;
+    citations?: OverviewCitation[];
   },
 ): Promise<void> {
   await apiFetch(`/v1/orgs/${encodeURIComponent(orgSlug)}/overview`, {
