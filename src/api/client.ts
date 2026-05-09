@@ -36,6 +36,7 @@ import type {
 import type { ListResponse } from "@buildinternet/releases-core/cli-contracts";
 import type {
   DomainLookupResponse,
+  OverviewCitation,
   OverviewInputsCheck,
   OverviewManifestResponse,
   OverviewManifestRow,
@@ -52,6 +53,7 @@ import type {
 } from "@buildinternet/releases-api-types";
 export type {
   DomainLookupResponse,
+  OverviewCitation,
   OverviewInputsCheck,
   OverviewManifestResponse,
   OverviewManifestRow,
@@ -1122,6 +1124,7 @@ export async function upsertOverview(
     content: string;
     releaseCount: number;
     lastContributingReleaseAt?: string | null;
+    citations?: OverviewCitation[];
   },
 ): Promise<void> {
   await apiFetch(`/v1/orgs/${encodeURIComponent(orgSlug)}/overview`, {

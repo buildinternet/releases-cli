@@ -57,6 +57,13 @@ describe("admin overview subcommand group", () => {
     expect(exitCode).toBe(0);
     expect(stdout).toContain("--content-file");
   });
+
+  it("`overview update --help` exposes --citations-file", () => {
+    const { stdout, exitCode } = runCli(["admin", "overview", "update", "--help"]);
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("--citations-file");
+    expect(stdout).toContain("startIndex");
+  });
 });
 
 describe("deprecated overview kebab aliases", () => {

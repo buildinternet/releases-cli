@@ -16,6 +16,7 @@ import {
   getOverviewInputsCheck,
   getOverviewManifest,
   upsertOverview,
+  type OverviewCitation,
   type OverviewManifestRow,
 } from "../../../api/client.js";
 import { orgNotFound } from "../../suggest.js";
@@ -32,6 +33,7 @@ import {
 import type { OrgListItem } from "@buildinternet/releases-api-types";
 import { computePagination } from "@buildinternet/releases-core/cli-contracts";
 import { unescapeHtmlEntities } from "./overview/unescape-html.js";
+import { parseCitationsJson, ParseCitationsError } from "./overview/parse-citations.js";
 import { readContentArg } from "../../../lib/input.js";
 import { warnDeprecatedAlias } from "../../../lib/deprecated-alias.js";
 
@@ -56,6 +58,7 @@ interface OverviewGetOpts {
 
 interface OverviewUpdateOpts {
   contentFile: string;
+  citationsFile?: string;
   releaseCount?: string;
   lastContributingAt?: string;
   unescapeHtml?: boolean;
@@ -127,6 +130,20 @@ async function overviewUpdateAction(
     process.exit(2);
   }
 
+  let citations: OverviewCitation[] | undefined;
+  if (opts.citationsFile !== undefined) {
+    const raw = await readContentArg(opts.citationsFile);
+    try {
+      citations = parseCitationsJson(raw, opts.citationsFile);
+    } catch (err) {
+      if (err instanceof ParseCitationsError) {
+        logger.error(err.message);
+        process.exit(1);
+      }
+      throw err;
+    }
+  }
+
   let releaseCount = parsePositiveIntFlag("release-count", opts.releaseCount);
   let lastContributingAt = opts.lastContributingAt;
 
@@ -140,6 +157,7 @@ async function overviewUpdateAction(
     content,
     releaseCount,
     lastContributingReleaseAt: lastContributingAt ?? null,
+    citations,
   });
 
   if (opts.json) {
@@ -148,10 +166,12 @@ async function overviewUpdateAction(
       chars: content.length,
       releaseCount,
       lastContributingReleaseAt: lastContributingAt ?? null,
+      citations: citations?.length ?? 0,
     });
   } else {
+    const citationsLabel = citations ? `, ${citations.length} citations` : "";
     logger.info(
-      `Overview written for ${org.name}: ${content.length} chars, ${releaseCount} releases.`,
+      `Overview written for ${org.name}: ${content.length} chars, ${releaseCount} releases${citationsLabel}.`,
     );
   }
 }
@@ -601,6 +621,10 @@ result with \`releases admin overview update\`.`,
     .argument("<org>", "Organization slug or ID")
     .requiredOption("--content-file <path>", "Path to a markdown file containing the overview")
     .option(
+      "--citations-file <path>",
+      "Path to a JSON array of inline source citations ({startIndex,endIndex,sourceUrl,title?,citedText})",
+    )
+    .option(
       "--release-count <n>",
       "Number of releases the overview reflects (defaults to totalAvailable from inputs)",
     )
@@ -616,10 +640,15 @@ result with \`releases admin overview update\`.`,
 Examples:
   releases admin overview update vercel --content-file /tmp/vercel-overview.md
   releases admin overview update vercel --content-file - --json   (reads stdin)
+  releases admin overview update vercel --content-file /tmp/o.md --citations-file /tmp/c.json
 
 Writes via POST /v1/orgs/:slug/overview. Last-write-wins on conflict.
 When --release-count or --last-contributing-at are omitted, the CLI re-fetches
-overview-inputs to derive them.`,
+overview-inputs to derive them.
+
+Citations are replace-all on every write — omitting --citations-file CLEARS
+any existing citations on the page. Pass an empty-array file to be explicit,
+or include a non-empty array to swap them out.`,
     )
     .action(overviewUpdateAction);
 
@@ -664,6 +693,7 @@ overview-inputs to derive them.`,
     .description("(deprecated — use overview update) Upload a generated overview body")
     .argument("<org>", "Organization slug or ID")
     .requiredOption("--content-file <path>", "Path to a markdown file containing the overview")
+    .option("--citations-file <path>", "Path to a JSON array of inline source citations")
     .option("--release-count <n>", "Number of releases the overview reflects")
     .option("--last-contributing-at <iso>", "ISO timestamp of the most recent release reflected")
     .option("--unescape-html", "Decode HTML entities before uploading")
