@@ -78,6 +78,12 @@ type ReleaseUpdateOpts = {
   title?: string;
   version?: string;
   content?: string;
+  /** AI-generated self-contained headline (#860). */
+  titleGenerated?: string;
+  /** AI-generated smart-brevity headline (#860). */
+  titleShort?: string;
+  /** AI-generated summary (#860). */
+  summary?: string;
   json?: boolean;
   dryRun?: boolean;
 };
@@ -105,6 +111,26 @@ async function releaseUpdateAction(rawId: string, opts: ReleaseUpdateOpts): Prom
     updates.contentHash = hash;
     changes.push(`content → (${opts.content.length} chars)`);
     changes.push(`contentHash → ${hash.slice(0, 12)}…`);
+  }
+
+  // Treat empty strings as "clear" — pass through as null so the API stores
+  // a NULL rather than a literal empty value. The API accepts undefined to
+  // skip the column entirely; a present-but-empty CLI flag is an explicit
+  // request to wipe the field.
+  if (opts.titleGenerated !== undefined) {
+    const v = opts.titleGenerated.length === 0 ? null : opts.titleGenerated;
+    updates.titleGenerated = v;
+    changes.push(v === null ? "titleGenerated → (cleared)" : `titleGenerated → ${v}`);
+  }
+  if (opts.titleShort !== undefined) {
+    const v = opts.titleShort.length === 0 ? null : opts.titleShort;
+    updates.titleShort = v;
+    changes.push(v === null ? "titleShort → (cleared)" : `titleShort → ${v}`);
+  }
+  if (opts.summary !== undefined) {
+    const v = opts.summary.length === 0 ? null : opts.summary;
+    updates.summary = v;
+    changes.push(v === null ? "summary → (cleared)" : `summary → (${opts.summary.length} chars)`);
   }
 
   if (changes.length === 0) {
@@ -240,6 +266,15 @@ export function registerReleaseCommand(program: Command) {
     .option("--title <title>", "Update title")
     .option("--version <version>", "Update version")
     .option("--content <content>", "Update content (recomputes contentHash)")
+    .option(
+      "--title-generated <title>",
+      "Update AI-generated self-contained headline (pass empty string to clear)",
+    )
+    .option(
+      "--title-short <title>",
+      "Update AI-generated smart-brevity headline (pass empty string to clear)",
+    )
+    .option("--summary <summary>", "Update AI-generated summary (pass empty string to clear)")
     .option("--json", "Output as JSON")
     .option("--dry-run", "Show what would change without writing")
     .action(releaseUpdateAction);
@@ -251,6 +286,15 @@ export function registerReleaseCommand(program: Command) {
     .option("--title <title>", "Update title")
     .option("--version <version>", "Update version")
     .option("--content <content>", "Update content (recomputes contentHash)")
+    .option(
+      "--title-generated <title>",
+      "Update AI-generated self-contained headline (pass empty string to clear)",
+    )
+    .option(
+      "--title-short <title>",
+      "Update AI-generated smart-brevity headline (pass empty string to clear)",
+    )
+    .option("--summary <summary>", "Update AI-generated summary (pass empty string to clear)")
     .option("--json", "Output as JSON")
     .option("--dry-run", "Show what would change without writing")
     .action(
