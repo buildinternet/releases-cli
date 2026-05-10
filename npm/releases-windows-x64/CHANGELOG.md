@@ -1,5 +1,7 @@
 # @buildinternet/releases-windows-x64
 
+## 0.35.1
+
 ## 0.35.0
 
 ## 0.34.0
