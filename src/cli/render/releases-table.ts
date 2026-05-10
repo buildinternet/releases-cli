@@ -24,8 +24,8 @@ export function renderLatestReleasesTable(rows: LatestRelease[], opts: RenderOpt
     rows: rows.map((row) => {
       const title = stripAnsi(row.title);
       const titleCell =
-        opts.withSummary && row.contentSummary
-          ? `${title}\n${chalk.dim(truncate(row.contentSummary, 120))}`
+        opts.withSummary && row.summary
+          ? `${title}\n${chalk.dim(truncate(row.summary, 120))}`
           : title;
       const publishedCell = opts.withSummary
         ? (row.publishedAt ?? "-")
