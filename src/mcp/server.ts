@@ -154,7 +154,7 @@ server.registerTool(
 
     const text = releases
       .map((r) => {
-        const preview = (r.contentSummary || "").slice(0, 500);
+        const preview = (r.summary || "").slice(0, 500);
         return [
           `**${r.title}**`,
           `Source: ${r.sourceName} | Version: ${r.version ?? "N/A"} | Date: ${r.publishedAt ?? "N/A"}`,

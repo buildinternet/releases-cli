@@ -68,9 +68,9 @@ async function getRelease_(id: string, opts: GetEntityOpts) {
       `  ${chalk.yellow("Suppressed")}${rel.suppressedReason ? `: ${stripAnsi(rel.suppressedReason)}` : ""}`,
     );
   }
-  if (rel.contentSummary) {
+  if (rel.summary) {
     console.log("");
-    console.log(chalk.dim(stripAnsi(rel.contentSummary)));
+    console.log(chalk.dim(stripAnsi(rel.summary)));
   }
 }
 

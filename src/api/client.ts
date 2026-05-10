@@ -614,8 +614,6 @@ export async function getLatestReleases(opts: {
     sourceName: r.source.name,
     sourceSlug: r.source.slug,
     summary: r.summary ?? null,
-    /** @deprecated Use `summary`. Kept populated as an alias during the deprecation window. */
-    contentSummary: r.summary ?? null,
     media: toMediaItems(r.media),
   }));
 }

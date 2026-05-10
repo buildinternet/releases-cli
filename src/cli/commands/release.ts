@@ -57,10 +57,10 @@ async function releaseGetAction(rawId: string, opts: ReleaseGetOpts): Promise<vo
     );
   if (rel.url) console.log(`  URL:       ${rel.url}`);
 
-  if (rel.contentSummary) {
+  if (rel.summary) {
     console.log();
     console.log(chalk.bold("Summary:"));
-    console.log(stripAnsi(rel.contentSummary));
+    console.log(stripAnsi(rel.summary));
   }
 
   console.log();
