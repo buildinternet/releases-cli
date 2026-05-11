@@ -1,5 +1,11 @@
 # @buildinternet/releases
 
+## 0.35.2
+
+### Patch Changes
+
+- f8f4654: Update the reader skill reference to mention the editable categories overlay (`PATCH /v1/categories/:slug`) and alias resolution behavior introduced in buildinternet/releases#889.
+
 ## 0.35.1
 
 ### Patch Changes
