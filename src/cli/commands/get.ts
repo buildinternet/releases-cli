@@ -18,7 +18,20 @@ import { stripAnsi } from "../../lib/sanitize.js";
 import { logger } from "@releases/lib/logger";
 import { renderLatestReleasesTable } from "../render/releases-table.js";
 import { getEntityType, normalizeReleaseId, isLikelyBareId } from "@buildinternet/releases-core/id";
+import { countTokensSafe } from "@buildinternet/releases-core/tokens";
 import { writeJson } from "../../lib/output.js";
+
+/** Format a payload-size annotation like `3.2K chars (~800 tokens)` so agents
+ * can decide whether to pull the full content body before they spend the
+ * round-trip. Token count uses `cl100k_base` via tiktoken (within ~5% of
+ * Claude's tokenizer on English prose); see `packages/core/src/tokens.ts`. */
+function formatSize(text: string): string {
+  const chars = text.length;
+  const tokens = countTokensSafe(text);
+  const charsFmt =
+    chars >= 1000 ? `${(chars / 1000).toFixed(chars >= 10_000 ? 0 : 1)}K` : String(chars);
+  return `${charsFmt} chars (~${tokens.toLocaleString()} tokens)`;
+}
 
 export type GetEntityOpts = { json?: boolean };
 
@@ -70,8 +83,13 @@ async function getRelease_(id: string, opts: GetEntityOpts) {
   const result = await getRelease(id);
   if (!result) return notFound(id, "release", opts);
   const rel = result;
+  const contentChars = rel.content?.length ?? 0;
+  const contentTokens = rel.content ? countTokensSafe(rel.content) : 0;
+
   if (opts.json) {
-    await writeJson(rel);
+    // Computed-size annotations land on the JSON shape too so agents don't
+    // have to re-encode the body just to decide whether to pull it.
+    await writeJson({ ...rel, contentChars, contentTokens });
     return;
   }
   console.log(chalk.dim("Release"));
@@ -83,6 +101,7 @@ async function getRelease_(id: string, opts: GetEntityOpts) {
   );
   if (rel.publishedAt) console.log(`  Published: ${rel.publishedAt}`);
   if (rel.url) console.log(`  URL:       ${rel.url}`);
+  if (rel.content) console.log(`  Content:   ${formatSize(rel.content)}`);
   if (rel.suppressed) {
     console.log(
       `  ${chalk.yellow("Suppressed")}${rel.suppressedReason ? `: ${stripAnsi(rel.suppressedReason)}` : ""}`,
@@ -154,24 +173,41 @@ type SourceRow = Source & {
 
 async function renderSource(rawSource: unknown, opts: GetEntityOpts) {
   const source = rawSource as SourceRow;
-  if (opts.json) {
-    await writeJson(source);
-    return;
-  }
 
   // Resolve org/product context + a small recent-releases preview in parallel.
-  // Failures degrade silently so a broken sub-call doesn't blank the card.
+  // Run for both text and JSON paths so the JSON contract is at least as
+  // informative as the text card — agents shouldn't have to fall back to the
+  // human output to discover what the dispatcher resolved. Failures degrade
+  // silently so a broken sub-call doesn't blank the card.
   const [org, product, latest] = await Promise.all([
     source.orgId ? findOrg(source.orgId).catch(() => null) : Promise.resolve(null),
     source.productId ? findProduct(source.productId).catch(() => null) : Promise.resolve(null),
     getLatestReleases({ source: source.slug, count: PREVIEW_RELEASE_COUNT }).catch(() => []),
   ]);
 
-  const statusLabel = source.isHidden
-    ? chalk.red("hidden")
+  const status: "hidden" | "erroring" | "active" = source.isHidden
+    ? "hidden"
     : source.consecutiveErrors && source.consecutiveErrors > 0
-      ? chalk.yellow(`erroring (${source.consecutiveErrors} consecutive)`)
-      : chalk.green("active");
+      ? "erroring"
+      : "active";
+
+  if (opts.json) {
+    await writeJson({
+      ...source,
+      status,
+      org: org ? { id: org.id, slug: org.slug, name: org.name } : null,
+      product: product ? { id: product.id, slug: product.slug, name: product.name } : null,
+      latestReleases: latest,
+    });
+    return;
+  }
+
+  const statusLabel =
+    status === "hidden"
+      ? chalk.red("hidden")
+      : status === "erroring"
+        ? chalk.yellow(`erroring (${source.consecutiveErrors} consecutive)`)
+        : chalk.green("active");
 
   console.log(chalk.dim("Source"));
   console.log(chalk.bold(source.name));
