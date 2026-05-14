@@ -7,15 +7,48 @@ import {
   getRelease,
   getLatestReleases,
   getOrgCollections,
+  getSourcesByOrg,
+  getProductsByOrg,
+  getTagsForOrg,
+  getTagsForProduct,
 } from "../../api/client.js";
 import type { CollectionListItem } from "@buildinternet/releases-api-types";
+import type { Source } from "@buildinternet/releases-core/schema";
 import { stripAnsi } from "../../lib/sanitize.js";
 import { logger } from "@releases/lib/logger";
 import { renderLatestReleasesTable } from "../render/releases-table.js";
 import { getEntityType, normalizeReleaseId, isLikelyBareId } from "@buildinternet/releases-core/id";
+import { countTokensSafe } from "@buildinternet/releases-core/tokens";
 import { writeJson } from "../../lib/output.js";
 
+/** Format a payload-size annotation like `3.2K chars (~800 tokens)` so agents
+ * can decide whether to pull the full content body before they spend the
+ * round-trip. Token count uses `cl100k_base` via tiktoken (within ~5% of
+ * Claude's tokenizer on English prose); see `packages/core/src/tokens.ts`. */
+function formatSize(text: string): string {
+  const chars = text.length;
+  const tokens = countTokensSafe(text);
+  const charsFmt =
+    chars >= 1000 ? `${(chars / 1000).toFixed(chars >= 10_000 ? 0 : 1)}K` : String(chars);
+  return `${charsFmt} chars (~${tokens.toLocaleString()} tokens)`;
+}
+
 export type GetEntityOpts = { json?: boolean };
+
+/**
+ * Default count for the "Latest releases" preview embedded in get responses.
+ * Kept small so the text output stays scannable / token-efficient — callers
+ * who want more should pivot to `releases list` or the per-entity feed.
+ */
+const PREVIEW_RELEASE_COUNT = 5;
+
+/** Footer hint pointing at the canonical drill-in for fuller detail. */
+function printFooterHint(lines: string[]): void {
+  if (lines.length === 0) return;
+  console.log("");
+  console.log(chalk.dim("Next steps:"));
+  for (const line of lines) console.log(chalk.dim(`  ${line}`));
+}
 
 async function notFound(identifier: string, kind: string, opts: GetEntityOpts): Promise<never> {
   if (opts.json) await writeJson(null);
@@ -50,8 +83,13 @@ async function getRelease_(id: string, opts: GetEntityOpts) {
   const result = await getRelease(id);
   if (!result) return notFound(id, "release", opts);
   const rel = result;
+  const contentChars = rel.content?.length ?? 0;
+  const contentTokens = rel.content ? countTokensSafe(rel.content) : 0;
+
   if (opts.json) {
-    await writeJson(rel);
+    // Computed-size annotations land on the JSON shape too so agents don't
+    // have to re-encode the body just to decide whether to pull it.
+    await writeJson({ ...rel, contentChars, contentTokens });
     return;
   }
   console.log(chalk.dim("Release"));
@@ -63,15 +101,45 @@ async function getRelease_(id: string, opts: GetEntityOpts) {
   );
   if (rel.publishedAt) console.log(`  Published: ${rel.publishedAt}`);
   if (rel.url) console.log(`  URL:       ${rel.url}`);
+  if (rel.content) console.log(`  Content:   ${formatSize(rel.content)}`);
   if (rel.suppressed) {
     console.log(
       `  ${chalk.yellow("Suppressed")}${rel.suppressedReason ? `: ${stripAnsi(rel.suppressedReason)}` : ""}`,
     );
   }
+  // Preview tier — never leave the response with only metadata between the
+  // header and the footer. Order of preference:
+  //   1. AI summary (richest)
+  //   2. AI-generated headline (`titleGenerated` / `titleShort`) — cheap
+  //      single-line context for releases the summarizer hasn't reached yet
+  //   3. Slice of the raw content body — last-resort fallback so very old or
+  //      unsummarized releases still show *something* useful before the user
+  //      pivots to `release get`.
   if (rel.summary) {
     console.log("");
-    console.log(chalk.dim(stripAnsi(rel.summary)));
+    console.log(chalk.dim("Summary  · AI-generated, abbreviated"));
+    console.log(stripAnsi(rel.summary));
+  } else if (rel.titleGenerated || rel.titleShort) {
+    console.log("");
+    console.log(chalk.dim("Headline  · AI-generated (no full summary on file yet)"));
+    console.log(stripAnsi(rel.titleGenerated ?? rel.titleShort!));
+  } else if (rel.content && rel.content.trim().length > 0) {
+    const PREVIEW_CHARS = 280;
+    const raw = stripAnsi(rel.content).trim();
+    const truncated = raw.length > PREVIEW_CHARS;
+    console.log("");
+    console.log(
+      chalk.dim(
+        `Preview  · raw content${truncated ? ` (first ${PREVIEW_CHARS} of ${raw.length} chars)` : ""}`,
+      ),
+    );
+    console.log(truncated ? raw.slice(0, PREVIEW_CHARS) + "…" : raw);
   }
+
+  // Progressive disclosure: the dispatcher response never includes the full
+  // release body (content can run 10K+ tokens). Always point callers at the
+  // verbose command for the complete payload.
+  printFooterHint([`releases release get ${rel.id}      — full release body (content + metadata)`]);
 }
 
 async function getSource(identifier: string, opts: GetEntityOpts) {
@@ -92,32 +160,95 @@ async function getProduct(identifier: string, opts: GetEntityOpts) {
   await renderProduct(product, opts);
 }
 
-async function renderSource(
-  source: {
-    id: string;
-    name: string;
-    slug: string;
-    type: string;
-    url: string;
-    orgId: string | null;
-    productId: string | null;
-  },
-  opts: GetEntityOpts,
-) {
+/** Loose Source shape — `findSource` returns the full row but callers historically
+ * narrowed it. Accept the full schema row so we can surface fetch state. */
+type SourceRow = Source & {
+  // Drizzle-derived fields that aren't in the published narrow Source export
+  // but ARE on the wire (see `packages/core/src/schema.ts`).
+  lastFetchedAt?: string | null;
+  consecutiveErrors?: number | null;
+  isHidden?: boolean | null;
+  description?: string | null;
+};
+
+async function renderSource(rawSource: unknown, opts: GetEntityOpts) {
+  const source = rawSource as SourceRow;
+
+  // Resolve org/product context + a small recent-releases preview in parallel.
+  // Run for both text and JSON paths so the JSON contract is at least as
+  // informative as the text card — agents shouldn't have to fall back to the
+  // human output to discover what the dispatcher resolved. Failures degrade
+  // silently so a broken sub-call doesn't blank the card.
+  const [org, product, latest] = await Promise.all([
+    source.orgId ? findOrg(source.orgId).catch(() => null) : Promise.resolve(null),
+    source.productId ? findProduct(source.productId).catch(() => null) : Promise.resolve(null),
+    getLatestReleases({ source: source.slug, count: PREVIEW_RELEASE_COUNT }).catch(() => []),
+  ]);
+
+  const status: "hidden" | "erroring" | "active" = source.isHidden
+    ? "hidden"
+    : source.consecutiveErrors && source.consecutiveErrors > 0
+      ? "erroring"
+      : "active";
+
   if (opts.json) {
-    await writeJson(source);
+    await writeJson({
+      ...source,
+      status,
+      org: org ? { id: org.id, slug: org.slug, name: org.name } : null,
+      product: product ? { id: product.id, slug: product.slug, name: product.name } : null,
+      latestReleases: latest,
+    });
     return;
   }
+
+  const statusLabel =
+    status === "hidden"
+      ? chalk.red("hidden")
+      : status === "erroring"
+        ? chalk.yellow(`erroring (${source.consecutiveErrors} consecutive)`)
+        : chalk.green("active");
+
   console.log(chalk.dim("Source"));
   console.log(chalk.bold(source.name));
-  console.log(`  ID:        ${source.id}`);
-  console.log(`  Slug:      ${source.slug}`);
-  console.log(`  Type:      ${source.type}`);
-  console.log(`  URL:       ${source.url}`);
+  console.log(`  ID:         ${source.id}`);
+  console.log(`  Slug:       ${source.slug}`);
+  console.log(`  Type:       ${source.type}`);
+  console.log(`  URL:        ${source.url}`);
+  if (org) console.log(`  Org:        ${org.name} (${org.slug})`);
+  if (product) console.log(`  Product:    ${product.name} (${product.slug})`);
+  console.log(`  Status:     ${statusLabel}`);
+  if (source.lastFetchedAt) console.log(`  Last fetch: ${source.lastFetchedAt}`);
+
+  console.log("");
+  if (latest.length === 0) {
+    console.log(chalk.dim("No releases yet."));
+  } else {
+    console.log(
+      chalk.dim(
+        `Latest ${latest.length} release${latest.length === 1 ? "" : "s"} (most recent first):`,
+      ),
+    );
+    console.log(renderLatestReleasesTable(latest));
+  }
+
+  printFooterHint([
+    `releases list --source ${source.slug}             — full release feed`,
+    `releases fetch-log ${source.slug}                  — recent fetch attempts and errors`,
+    `releases release get <rel_id>                      — open one release with full content`,
+  ]);
 }
 
 async function renderOrg(
-  org: { id: string; name: string; slug: string; domain: string | null; category: string | null },
+  org: {
+    id: string;
+    name: string;
+    slug: string;
+    domain: string | null;
+    category: string | null;
+  } & {
+    description?: string | null;
+  },
   opts: GetEntityOpts,
 ) {
   // Collections degrade to empty on failure so an unrelated bug in the
@@ -131,22 +262,49 @@ async function renderOrg(
       return [];
     }
   };
-  const [releases, collections] = await Promise.all([
-    getLatestReleases({ org: org.slug, count: 10 }),
+  const [releases, collections, sources, products, tags] = await Promise.all([
+    getLatestReleases({ org: org.slug, count: PREVIEW_RELEASE_COUNT }),
     fetchCollections(),
+    getSourcesByOrg(org.id).catch(() => []),
+    getProductsByOrg(org.id).catch(() => []),
+    getTagsForOrg(org.id).catch(() => []),
   ]);
 
   if (opts.json) {
-    await writeJson({ ...org, releases, collections });
+    await writeJson({ ...org, releases, collections, sources, products, tags });
     return;
   }
 
+  const activeSources = sources.filter((s) => !s.isHidden && !s.consecutiveErrors).length;
+  const erroringSources = sources.filter(
+    (s) => !s.isHidden && s.consecutiveErrors && s.consecutiveErrors > 0,
+  ).length;
+  const hiddenSources = sources.filter((s) => s.isHidden).length;
+
   console.log(chalk.dim("Organization"));
   console.log(chalk.bold(org.name));
-  console.log(`  ID:      ${org.id}`);
-  console.log(`  Slug:    ${org.slug}`);
-  if (org.domain) console.log(`  Domain:  ${org.domain}`);
-  if (org.category) console.log(`  Category: ${org.category}`);
+  console.log(`  ID:          ${org.id}`);
+  console.log(`  Slug:        ${org.slug}`);
+  if (org.domain) console.log(`  Domain:      ${org.domain}`);
+  if (org.category) console.log(`  Category:    ${org.category}`);
+  if (org.description) console.log(`  About:       ${stripAnsi(org.description)}`);
+  if (tags.length > 0) console.log(`  Tags:        ${tags.join(", ")}`);
+  if (sources.length > 0) {
+    const breakdown: string[] = [];
+    if (activeSources) breakdown.push(`${activeSources} active`);
+    if (erroringSources) breakdown.push(chalk.yellow(`${erroringSources} erroring`));
+    if (hiddenSources) breakdown.push(chalk.dim(`${hiddenSources} hidden`));
+    const suffix = breakdown.length > 0 ? ` — ${breakdown.join(", ")}` : "";
+    console.log(`  Sources:     ${sources.length}${suffix}`);
+  }
+  if (products.length > 0) {
+    const names = products
+      .slice(0, 5)
+      .map((p) => `${p.name} ${chalk.dim(`(${p.slug})`)}`)
+      .join(", ");
+    const more = products.length > 5 ? chalk.dim(` +${products.length - 5} more`) : "";
+    console.log(`  Products:    ${products.length} — ${names}${more}`);
+  }
   if (collections.length > 0) {
     const labels = collections.map((c) => `${c.name} ${chalk.dim(`(${c.slug})`)}`).join(", ");
     console.log(`  Collections: ${labels}`);
@@ -154,11 +312,21 @@ async function renderOrg(
 
   console.log("");
   if (releases.length === 0) {
-    console.log(chalk.dim("  No releases yet."));
+    console.log(chalk.dim("No releases yet."));
   } else {
-    console.log(chalk.dim(`Latest ${releases.length} release${releases.length === 1 ? "" : "s"}:`));
+    console.log(
+      chalk.dim(
+        `Latest ${releases.length} release${releases.length === 1 ? "" : "s"} (most recent first):`,
+      ),
+    );
     console.log(renderLatestReleasesTable(releases));
   }
+
+  printFooterHint([
+    `releases org get ${org.slug}                  — accounts, aliases, overview, full source list`,
+    `releases org overview ${org.slug}             — AI-generated rollup`,
+    `releases list --org ${org.slug}               — full release feed`,
+  ]);
 }
 
 async function renderProduct(
@@ -169,14 +337,38 @@ async function renderProduct(
     orgId: string;
     url: string | null;
     category: string | null;
-  },
+  } & { description?: string | null },
   opts: GetEntityOpts,
 ) {
-  const org = await findOrg(product.orgId);
+  // Pull related context concurrently. Each individually-degradable so a
+  // single endpoint failure can't blank the product card.
+  const [org, orgProducts, orgSources, tags] = await Promise.all([
+    findOrg(product.orgId).catch(() => null),
+    getProductsByOrg(product.orgId).catch(() => []),
+    getSourcesByOrg(product.orgId).catch<Source[]>(() => []),
+    getTagsForProduct(product.id).catch(() => []),
+  ]);
+
+  // /v1/sources?orgId=… returns the SourceWithOrg projection, which carries
+  // productSlug/productName but not productId — match on slug to keep this
+  // working without an extra round-trip per source.
+  const productSources = orgSources.filter(
+    (s) => (s as unknown as { productSlug?: string | null }).productSlug === product.slug,
+  );
+  const sourceCountRow = orgProducts.find((p) => p.id === product.id);
+  const sourceCount = sourceCountRow?.sourceCount ?? productSources.length;
+
   if (opts.json) {
-    await writeJson({ ...product, orgSlug: org?.slug ?? null });
+    await writeJson({
+      ...product,
+      orgSlug: org?.slug ?? null,
+      sources: productSources,
+      sourceCount,
+      tags,
+    });
     return;
   }
+
   console.log(chalk.dim("Product"));
   console.log(chalk.bold(product.name));
   console.log(`  ID:        ${product.id}`);
@@ -184,6 +376,37 @@ async function renderProduct(
   console.log(`  Org:       ${org ? `${org.name} (${org.slug})` : product.orgId}`);
   console.log(`  URL:       ${product.url ?? chalk.dim("—")}`);
   console.log(`  Category:  ${product.category ?? chalk.dim("—")}`);
+  if (product.description) console.log(`  About:     ${stripAnsi(product.description)}`);
+  if (tags.length > 0) console.log(`  Tags:      ${tags.join(", ")}`);
+  if (sourceCount > 0) {
+    const preview = productSources
+      .slice(0, 5)
+      .map((s) => chalk.dim(`(${s.slug})`))
+      .join(" ");
+    const more = productSources.length > 5 ? chalk.dim(` +${productSources.length - 5}`) : "";
+    console.log(`  Sources:   ${sourceCount} ${preview}${more}`);
+  } else {
+    console.log(`  Sources:   ${chalk.dim("none")}`);
+  }
+
+  // No product-scoped "latest releases" endpoint today (releases/latest takes
+  // org or source, not product). Surface the workaround commands directly so
+  // the user doesn't have to discover them — releases-per-org gives the
+  // closest mixed feed, releases-per-source the per-source feed.
+  printFooterHint(
+    [
+      org
+        ? `releases list --org ${org.slug}              — release feed (org-scoped; mixes other products)`
+        : "",
+      // Use the typed source ID rather than the bare slug — bare slugs are
+      // per-org-unique since #698, so the same slug under a different org
+      // could misroute this example. Typed `src_…` IDs stay globally unique
+      // and resolve via the bare path regardless of org.
+      productSources.length > 0
+        ? `releases get ${productSources[0]!.id}        — drill into a source for its release feed`
+        : "",
+    ].filter(Boolean),
+  );
 }
 
 export function registerGetCommand(program: Command) {
