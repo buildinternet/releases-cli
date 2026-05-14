@@ -877,7 +877,15 @@ export async function findProduct(identifier: string): Promise<Product | null> {
 export async function getProductsByOrg(
   orgId: string,
 ): Promise<Array<Product & { sourceCount: number }>> {
-  return apiFetch<Array<Product & { sourceCount: number }>>(`/v1/products?orgId=${orgId}`);
+  // /v1/products returns a paginated envelope; tolerate the legacy bare-array
+  // shape too in case an old worker is ever in the path. Without the unwrap,
+  // every downstream `for/find/filter/map` over the result was silently
+  // iterating an object and yielding nothing — which is what made
+  // `releases org get` skip the Products section even when the org had them.
+  type Row = Product & { sourceCount: number };
+  const raw = await apiFetch<Row[] | ListResponse<Row>>(`/v1/products?orgId=${orgId}`);
+  if (!raw) return [];
+  return Array.isArray(raw) ? raw : raw.items;
 }
 
 export async function updateProduct(
