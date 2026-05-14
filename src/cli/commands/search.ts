@@ -117,7 +117,7 @@ function renderLookup(lookup: LookupResultPayload, query: string): void {
 export function registerSearchCommand(program: Command) {
   program
     .command("search")
-    .description("Search across organizations, the catalog, and releases")
+    .description("Search across organizations, collections, the catalog, and releases")
     .argument("<query>", "Search query")
     .option("-l, --limit <n>", "Max results per type", "10")
     .option("--type <type>", "Limit to a result type: orgs, catalog, releases, collections")
