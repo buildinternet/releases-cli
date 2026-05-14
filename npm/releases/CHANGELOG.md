@@ -1,5 +1,29 @@
 # @buildinternet/releases
 
+## 0.36.0
+
+### Minor Changes
+
+- d6c54fb: Improve the default `releases get` output for all entity kinds so the response is useful on its own without flag discovery, while staying token-efficient via progressive disclosure to the dedicated drill-in commands.
+  - **Release**: the summary is now labeled `Summary · AI-generated, abbreviated` (it was unlabeled before, so callers couldn't tell it wasn't the full body). Every response ends with a `Next steps` footer that points at `releases release get <id>` for the full content — phrasing flips when no summary is on file yet.
+  - **Organization**: now surfaces description, tags, a source breakdown (active / erroring / hidden), and the product list with names + slugs. Latest-releases preview trimmed from 10 to 5. Footer hints at `org get` (overview / accounts / aliases), `org overview`, and the org-scoped release feed.
+  - **Product**: previously showed only static metadata. Now adds description, tags, and the product's source list, with footer hints to the org-scoped release feed and to drilling into a specific source.
+  - **Source**: previously showed only static metadata. Now adds org/product binding, fetch status (active / erroring / hidden), `lastFetchedAt`, and the latest 5 releases for the source. Footer hints at `list --source`, `fetch-log`, and `release get`.
+
+  Also fixes a latent bug in `getProductsByOrg`: `/v1/products` returns a paginated envelope but the client typed the response as a bare array, so every downstream `for/find/filter/map` was silently no-op'ing. That's why the previous `releases org get` Products section never rendered for orgs that had products (e.g. Supabase's Auth / CLI / Client SDK). The client now unwraps the envelope and tolerates the legacy bare-array shape.
+
+  JSON output gains a few additive fields (`sources`, `products`, `sourceCount`, `tags`) on the org/product responses; existing fields are unchanged.
+
+- 0fba348: Surface collections in `releases search` output. Direct LIKE matches on the collection's name/slug/description appear in a new "Collections" section, alongside member rollups for collections containing one of the matched orgs (with an `↳ includes …` hint). Use `--type collections` to narrow to that section. JSON output includes a new `collections` array on the response shell.
+
+  Forward-compatible: the field is read as optional, so older API deployments mid-rollout still work — they just return `undefined` and the section stays empty until the API ships the matching change (`buildinternet/releases#955`).
+
+### Patch Changes
+
+- bf5e20d: Surface release body size on the latest-releases table (`releases get <org>`, `releases get <src_…>`, `releases tail`). Each row picks up a dim "~1.5K tokens" hint next to the title when the cached `contentTokens` field is available, so agents browsing a feed can decide whether to pull the full body before spending the round-trip. Compact mode only shows the hint for releases ≥1K tokens; `--with-summary` shows it on every row.
+
+  Forward-compatible: the field is read as optional. API deployments mid-rollout return `undefined` and the hint is silently dropped. Lights up once `@buildinternet/releases-api-types` ships the matching wire-shape change (`buildinternet/releases#958`).
+
 ## 0.35.3
 
 ### Patch Changes
