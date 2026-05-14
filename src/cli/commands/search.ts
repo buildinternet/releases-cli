@@ -15,12 +15,16 @@ function parseMode(raw: string | undefined): SearchMode | undefined {
   throw new Error(`Invalid --mode value: "${raw}". Expected one of: ${SEARCH_MODES.join(", ")}.`);
 }
 
-type SearchSection = "orgs" | "catalog" | "releases";
+type SearchSection = "orgs" | "catalog" | "releases" | "collections";
 
 function normalizeType(raw: string): SearchSection {
   if (raw === "products") return "catalog";
-  if (raw === "orgs" || raw === "catalog" || raw === "releases") return raw;
-  throw new Error(`Invalid --type value: "${raw}". Expected one of: orgs, catalog, releases.`);
+  if (raw === "orgs" || raw === "catalog" || raw === "releases" || raw === "collections") {
+    return raw;
+  }
+  throw new Error(
+    `Invalid --type value: "${raw}". Expected one of: orgs, catalog, releases, collections.`,
+  );
 }
 
 const PREVIEW_LIMIT = 5;
@@ -113,10 +117,10 @@ function renderLookup(lookup: LookupResultPayload, query: string): void {
 export function registerSearchCommand(program: Command) {
   program
     .command("search")
-    .description("Search across organizations, the catalog, and releases")
+    .description("Search across organizations, collections, the catalog, and releases")
     .argument("<query>", "Search query")
     .option("-l, --limit <n>", "Max results per type", "10")
-    .option("--type <type>", "Limit to a result type: orgs, catalog, releases")
+    .option("--type <type>", "Limit to a result type: orgs, catalog, releases, collections")
     .option("--mode <mode>", `Search mode: ${SEARCH_MODES.join(" | ")}`)
     .option(
       "--domain <domain>",
@@ -148,7 +152,7 @@ export function registerSearchCommand(program: Command) {
         try {
           types = opts.type
             ? [normalizeType(opts.type)]
-            : (["orgs", "catalog", "releases"] as const);
+            : (["orgs", "catalog", "releases", "collections"] as const);
         } catch (err) {
           logger.error(err instanceof Error ? err.message : String(err));
           process.exit(1);
@@ -181,11 +185,29 @@ export function registerSearchCommand(program: Command) {
           | UnifiedSearchResponse["catalog"]
           | undefined;
         const catalog: UnifiedSearchResponse["catalog"] = response.catalog ?? legacy ?? [];
+        // `collections` is optional on the wire — older API deployments emit it
+        // as `undefined`. Treat missing and `[]` identically so the CLI doesn't
+        // blow up before the feature lands in production. Inline the shape so
+        // the CLI can read it before the api-types pin bumps to a version that
+        // exports the field on UnifiedSearchResponse.
+        type SearchCollectionHit = {
+          slug: string;
+          name: string;
+          description: string | null;
+          memberCount: number;
+          via: "direct" | "member";
+          score?: number;
+          matchedOrgSlugs?: string[];
+        };
+        const collections: SearchCollectionHit[] =
+          (response as unknown as { collections?: SearchCollectionHit[] }).collections ?? [];
 
         if (opts.json) {
           const filtered: Record<string, unknown> = { query: response.query };
           for (const t of types) {
-            filtered[t] = t === "catalog" ? catalog : response[t];
+            if (t === "catalog") filtered[t] = catalog;
+            else if (t === "collections") filtered[t] = collections;
+            else filtered[t] = response[t];
           }
           if (response.mode !== undefined) filtered.mode = response.mode;
           if (response.degraded !== undefined) filtered.degraded = response.degraded;
@@ -233,6 +255,25 @@ export function registerSearchCommand(program: Command) {
           }
           console.log();
           totalResults += catalog.length;
+        }
+
+        if (types.includes("collections") && collections.length > 0) {
+          console.log(chalk.bold.underline("Collections"));
+          for (const c of collections) {
+            const count = c.memberCount === 1 ? "1 member" : `${c.memberCount} members`;
+            console.log(
+              `  ${chalk.cyan.bold(stripAnsi(c.name))} ${chalk.dim(`(${c.slug})`)} ${chalk.dim(`— ${count}`)}`,
+            );
+            if (c.via === "member" && c.matchedOrgSlugs && c.matchedOrgSlugs.length > 0) {
+              console.log(chalk.dim(`  ↳ includes ${c.matchedOrgSlugs.join(", ")}`));
+            }
+            if (c.description) {
+              const desc = stripAnsi(c.description);
+              console.log(chalk.dim(`  ${desc}`));
+            }
+          }
+          console.log();
+          totalResults += collections.length;
         }
 
         if (types.includes("releases") && response.releases.length > 0) {
