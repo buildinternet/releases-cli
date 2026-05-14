@@ -76,6 +76,7 @@ async function getRelease_(id: string, opts: GetEntityOpts) {
   }
   console.log(chalk.dim("Release"));
   console.log(chalk.bold(stripAnsi(rel.title)));
+  console.log(`  ID:        ${rel.id}`);
   if (rel.version) console.log(`  Version:   ${stripAnsi(rel.version)}`);
   console.log(
     `  Source:    ${rel.sourceName ? stripAnsi(rel.sourceName) : chalk.dim("—")} (${rel.sourceSlug ?? chalk.dim("—")})`,
@@ -87,20 +88,39 @@ async function getRelease_(id: string, opts: GetEntityOpts) {
       `  ${chalk.yellow("Suppressed")}${rel.suppressedReason ? `: ${stripAnsi(rel.suppressedReason)}` : ""}`,
     );
   }
+  // Preview tier — never leave the response with only metadata between the
+  // header and the footer. Order of preference:
+  //   1. AI summary (richest)
+  //   2. AI-generated headline (`titleGenerated` / `titleShort`) — cheap
+  //      single-line context for releases the summarizer hasn't reached yet
+  //   3. Slice of the raw content body — last-resort fallback so very old or
+  //      unsummarized releases still show *something* useful before the user
+  //      pivots to `release get`.
   if (rel.summary) {
     console.log("");
     console.log(chalk.dim("Summary  · AI-generated, abbreviated"));
     console.log(stripAnsi(rel.summary));
+  } else if (rel.titleGenerated || rel.titleShort) {
+    console.log("");
+    console.log(chalk.dim("Headline  · AI-generated (no full summary on file yet)"));
+    console.log(stripAnsi(rel.titleGenerated ?? rel.titleShort!));
+  } else if (rel.content && rel.content.trim().length > 0) {
+    const PREVIEW_CHARS = 280;
+    const raw = stripAnsi(rel.content).trim();
+    const truncated = raw.length > PREVIEW_CHARS;
+    console.log("");
+    console.log(
+      chalk.dim(
+        `Preview  · raw content${truncated ? ` (first ${PREVIEW_CHARS} of ${raw.length} chars)` : ""}`,
+      ),
+    );
+    console.log(truncated ? raw.slice(0, PREVIEW_CHARS) + "…" : raw);
   }
 
   // Progressive disclosure: the dispatcher response never includes the full
-  // release body (content can run 10K+ tokens). Point callers at the verbose
-  // command — phrasing differs depending on whether a summary was shown.
-  printFooterHint([
-    rel.summary
-      ? `releases release get ${rel.id}      — full release body (content + metadata)`
-      : `releases release get ${rel.id}      — full release body (no AI summary on file yet)`,
-  ]);
+  // release body (content can run 10K+ tokens). Always point callers at the
+  // verbose command for the complete payload.
+  printFooterHint([`releases release get ${rel.id}      — full release body (content + metadata)`]);
 }
 
 async function getSource(identifier: string, opts: GetEntityOpts) {
@@ -155,6 +175,7 @@ async function renderSource(rawSource: unknown, opts: GetEntityOpts) {
 
   console.log(chalk.dim("Source"));
   console.log(chalk.bold(source.name));
+  console.log(`  ID:         ${source.id}`);
   console.log(`  Slug:       ${source.slug}`);
   console.log(`  Type:       ${source.type}`);
   console.log(`  URL:        ${source.url}`);
@@ -226,6 +247,7 @@ async function renderOrg(
 
   console.log(chalk.dim("Organization"));
   console.log(chalk.bold(org.name));
+  console.log(`  ID:          ${org.id}`);
   console.log(`  Slug:        ${org.slug}`);
   if (org.domain) console.log(`  Domain:      ${org.domain}`);
   if (org.category) console.log(`  Category:    ${org.category}`);
@@ -313,6 +335,7 @@ async function renderProduct(
 
   console.log(chalk.dim("Product"));
   console.log(chalk.bold(product.name));
+  console.log(`  ID:        ${product.id}`);
   console.log(`  Slug:      ${product.slug}`);
   console.log(`  Org:       ${org ? `${org.name} (${org.slug})` : product.orgId}`);
   console.log(`  URL:       ${product.url ?? chalk.dim("—")}`);
@@ -339,8 +362,12 @@ async function renderProduct(
       org
         ? `releases list --org ${org.slug}              — release feed (org-scoped; mixes other products)`
         : "",
+      // Use the typed source ID rather than the bare slug — bare slugs are
+      // per-org-unique since #698, so the same slug under a different org
+      // could misroute this example. Typed `src_…` IDs stay globally unique
+      // and resolve via the bare path regardless of org.
       productSources.length > 0
-        ? `releases get ${productSources[0]!.slug}                    — drill into a source for its release feed`
+        ? `releases get ${productSources[0]!.id}        — drill into a source for its release feed`
         : "",
     ].filter(Boolean),
   );
