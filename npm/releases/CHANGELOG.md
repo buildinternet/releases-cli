@@ -1,5 +1,19 @@
 # @buildinternet/releases
 
+## 0.37.0
+
+### Minor Changes
+
+- fe9ce0b: `releases admin overview batch` wraps the new `BatchOverviewWorkflow` (`POST /v1/workflows/batch-overview`). Flags map 1:1 to the workflow body: `--orgs <slug,slug>`, `--min-new-releases`, `--min-overview-age-days`, `--max-candidates`, `--max-cost-usd`. Pass `--wait` to poll the status endpoint every 30s until the workflow reaches a terminal state; without it the command prints `instanceId` + `statusUrl` and returns immediately.
+
+  Sits next to the agent-driven `admin overview inputs` / `admin overview update` so the batch path is discoverable alongside the single-org regen flow. Closes #1005.
+
+### Patch Changes
+
+- ba51bdb: `releases org update --avatar <url>` now works end-to-end. The flag was already wired (it set `avatarUrl` in the PATCH body) but the API silently dropped the field via Zod's default unknown-key stripping. The matching API change landed in `buildinternet/releases#979`; once that ships in the published `releases-api-types` rev, the CLI's `--avatar` and `--no-avatar` flags affect the server state for real.
+
+  Forward-compatible: existing scripts that already use `--avatar` start working without any CLI change — the wire shape didn't move, only the server-side acceptance did.
+
 ## 0.36.0
 
 ### Minor Changes
