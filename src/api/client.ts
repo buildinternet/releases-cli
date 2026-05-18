@@ -1379,9 +1379,17 @@ export async function triggerBatchOverview(
 export async function getBatchOverviewStatus(
   instanceId: string,
 ): Promise<BatchOverviewStatusResponse> {
-  return apiFetch<BatchOverviewStatusResponse>(
+  // apiFetch returns null on 404 for GETs. The status route 404s with
+  // `instance_not_found` when the workflow ID is wrong (or briefly during
+  // the create→status race window). Throw so callers reading `.status`
+  // can't crash silently.
+  const res = await apiFetch<BatchOverviewStatusResponse | null>(
     `/v1/workflows/batch-overview/status/${encodeURIComponent(instanceId)}`,
   );
+  if (res === null) {
+    throw new Error(`Workflow instance not found: ${instanceId}`);
+  }
+  return res;
 }
 
 // ── Domain Aliases ──
