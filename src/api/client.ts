@@ -1337,6 +1337,53 @@ export async function getEmbedStatus(): Promise<EmbedStatusResponse> {
   return apiFetch<EmbedStatusResponse>("/v1/admin/embed/status");
 }
 
+// ── Batch overview workflow (admin-only) ──
+
+/** Trigger body for POST /v1/workflows/batch-overview — mirrors `BatchOverviewBody` on the API worker. */
+export interface BatchOverviewTriggerBody {
+  minNewReleases?: number;
+  minOverviewAgeDays?: number;
+  maxCandidates?: number;
+  orgs?: string[];
+  maxCostUsd?: number;
+}
+
+export interface BatchOverviewTriggerResponse {
+  instanceId: string;
+  statusUrl: string;
+}
+
+/**
+ * Cloudflare Workflows surfaces a small enum on `WorkflowInstance.status()`.
+ * Terminal states are `complete | errored | terminated`; pre-terminal states
+ * are `queued | running | paused`. We type the field as string to stay
+ * forward-compatible with any new values CF introduces.
+ */
+export interface BatchOverviewStatusResponse {
+  instanceId: string;
+  status: string;
+  output?: unknown;
+  error?: unknown;
+  [k: string]: unknown;
+}
+
+export async function triggerBatchOverview(
+  body: BatchOverviewTriggerBody,
+): Promise<BatchOverviewTriggerResponse> {
+  return apiFetch<BatchOverviewTriggerResponse>("/v1/workflows/batch-overview", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function getBatchOverviewStatus(
+  instanceId: string,
+): Promise<BatchOverviewStatusResponse> {
+  return apiFetch<BatchOverviewStatusResponse>(
+    `/v1/workflows/batch-overview/status/${encodeURIComponent(instanceId)}`,
+  );
+}
+
 // ── Domain Aliases ──
 
 export async function getAliases(
