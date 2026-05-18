@@ -5,7 +5,7 @@
     "": {
       "name": "releases-cli",
       "dependencies": {
-        "@buildinternet/releases-api-types": "^0.16.0",
+        "@buildinternet/releases-api-types": "^0.19.0",
         "@buildinternet/releases-core": "^0.21.0",
         "@buildinternet/releases-lib": "workspace:*",
         "@buildinternet/releases-skills": "workspace:*",
@@ -27,7 +27,7 @@
     },
     "npm/releases": {
       "name": "@buildinternet/releases",
-      "version": "0.35.2",
+      "version": "0.36.0",
       "bin": {
         "releases": "bin/releases",
       },
@@ -41,31 +41,31 @@
     },
     "npm/releases-darwin-arm64": {
       "name": "@buildinternet/releases-darwin-arm64",
-      "version": "0.35.2",
+      "version": "0.36.0",
     },
     "npm/releases-darwin-x64": {
       "name": "@buildinternet/releases-darwin-x64",
-      "version": "0.35.2",
+      "version": "0.36.0",
     },
     "npm/releases-linux-arm64": {
       "name": "@buildinternet/releases-linux-arm64",
-      "version": "0.35.2",
+      "version": "0.36.0",
     },
     "npm/releases-linux-x64": {
       "name": "@buildinternet/releases-linux-x64",
-      "version": "0.35.2",
+      "version": "0.36.0",
     },
     "npm/releases-windows-x64": {
       "name": "@buildinternet/releases-windows-x64",
-      "version": "0.35.2",
+      "version": "0.36.0",
     },
     "packages/lib": {
       "name": "@buildinternet/releases-lib",
-      "version": "0.35.2",
+      "version": "0.36.0",
     },
     "packages/skills": {
       "name": "@buildinternet/releases-skills",
-      "version": "0.35.2",
+      "version": "0.36.0",
     },
   },
   "packages": {
@@ -73,7 +73,7 @@
 
     "@buildinternet/releases": ["@buildinternet/releases@workspace:npm/releases"],
 
-    "@buildinternet/releases-api-types": ["@buildinternet/releases-api-types@0.16.0", "", { "dependencies": { "@buildinternet/releases-core": "^0.21.0", "zod": "^4.3.6" } }, "sha512-CCfkwVImIT3nLW79PEd9iuy1RD8e7dtr/BKli3okTZH9NdxlHyfsBH0eEH49MoR9CR94OULHCzd+aQLqi9TJmw=="],
+    "@buildinternet/releases-api-types": ["@buildinternet/releases-api-types@0.19.0", "", { "dependencies": { "@buildinternet/releases-core": "^0.21.0", "zod": "^4.3.6" } }, "sha512-LN1unLEru3H469Um+Z6qwGRZoaVvNvIcSsa2Ut2iYsYJHnO3ALps32fp5sn15gqbXj4gSKvHLG9QVVyVv60SOQ=="],
 
     "@buildinternet/releases-core": ["@buildinternet/releases-core@0.21.0", "", { "dependencies": { "drizzle-orm": "^0.45.2", "js-tiktoken": "^1.0.21", "nanoid": "^5.1.7" } }, "sha512-tWLBc3BvBot1Rrb5j3X2RPSogcgm5+hwFlnQocMTHFgF8gtF4jZRM7Mc+HoGNOlMJHacH1uyqt2nDcqTGZaNZQ=="],
 
