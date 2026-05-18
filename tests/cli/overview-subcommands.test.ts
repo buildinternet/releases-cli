@@ -64,6 +64,25 @@ describe("admin overview subcommand group", () => {
     expect(stdout).toContain("--citations-file");
     expect(stdout).toContain("startIndex");
   });
+
+  it("`overview batch --help` exposes the workflow trigger flag set", () => {
+    const { stdout, exitCode } = runCli(["admin", "overview", "batch", "--help"]);
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("--orgs");
+    expect(stdout).toContain("--min-new-releases");
+    expect(stdout).toContain("--min-overview-age-days");
+    expect(stdout).toContain("--max-candidates");
+    expect(stdout).toContain("--max-cost-usd");
+    expect(stdout).toContain("--wait");
+    expect(stdout).toContain("--json");
+    expect(stdout).toContain("BatchOverviewWorkflow");
+  });
+
+  it("`overview --help` lists batch as a subcommand", () => {
+    const { stdout, exitCode } = runCli(["admin", "overview", "--help"]);
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("batch");
+  });
 });
 
 describe("deprecated overview kebab aliases", () => {
