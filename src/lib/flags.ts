@@ -15,6 +15,21 @@ export function parsePositiveIntFlag(label: string, raw: string | undefined): nu
   return n;
 }
 
+/**
+ * Parse a non-negative-integer CLI flag value (0 is allowed). Returns
+ * `undefined` if the option was not provided. Exits with code 2 on invalid
+ * input.
+ */
+export function parseNonNegIntFlag(label: string, raw: string | undefined): number | undefined {
+  if (raw === undefined) return undefined;
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n) || n < 0) {
+    console.error(chalk.red(`Invalid --${label}: must be a non-negative integer (got ${raw})`));
+    process.exit(2);
+  }
+  return n;
+}
+
 /** Parse a comma-separated `--tags foo,bar` flag into a trimmed, non-empty list. */
 export function parseTagList(raw: string | undefined): string[] {
   if (!raw) return [];
