@@ -85,6 +85,72 @@ describe("admin overview subcommand group", () => {
   });
 });
 
+describe("`overview batch` flag validation", () => {
+  it("accepts 0 for --min-new-releases (no validation error)", () => {
+    // With 0 the flag parses fine; the action itself would need a live API so
+    // we only check that the CLI doesn't exit(2) on argument validation.
+    // Passing an unknown flag that triggers usage error would give exit 1,
+    // but a bad value gives exit 2 — so exit != 2 proves the validator passed.
+    const { exitCode, stderr } = runCli(["admin", "overview", "batch", "--min-new-releases", "0"]);
+    expect(exitCode).not.toBe(2);
+    expect(stderr).not.toContain("must be a non-negative integer");
+  });
+
+  it("accepts 0 for --min-overview-age-days (no validation error)", () => {
+    const { exitCode, stderr } = runCli([
+      "admin",
+      "overview",
+      "batch",
+      "--min-overview-age-days",
+      "0",
+    ]);
+    expect(exitCode).not.toBe(2);
+    expect(stderr).not.toContain("must be a non-negative integer");
+  });
+
+  it("rejects -1 for --min-new-releases with a clear message", () => {
+    const { exitCode, stderr } = runCli(["admin", "overview", "batch", "--min-new-releases", "-1"]);
+    expect(exitCode).toBe(2);
+    expect(stderr).toContain("must be a non-negative integer");
+  });
+
+  it("rejects -1 for --min-overview-age-days with a clear message", () => {
+    const { exitCode, stderr } = runCli([
+      "admin",
+      "overview",
+      "batch",
+      "--min-overview-age-days",
+      "-1",
+    ]);
+    expect(exitCode).toBe(2);
+    expect(stderr).toContain("must be a non-negative integer");
+  });
+
+  it("rejects non-integer strings like '1.5' for --min-new-releases", () => {
+    const { exitCode, stderr } = runCli([
+      "admin",
+      "overview",
+      "batch",
+      "--min-new-releases",
+      "1.5",
+    ]);
+    expect(exitCode).toBe(2);
+    expect(stderr).toContain("must be a non-negative integer");
+  });
+
+  it("rejects trailing-garbage strings like '10abc' for --min-new-releases", () => {
+    const { exitCode, stderr } = runCli([
+      "admin",
+      "overview",
+      "batch",
+      "--min-new-releases",
+      "10abc",
+    ]);
+    expect(exitCode).toBe(2);
+    expect(stderr).toContain("must be a non-negative integer");
+  });
+});
+
 describe("deprecated overview kebab aliases", () => {
   it("`overview-list --help` is marked deprecated", () => {
     const { stdout, exitCode } = runCli(["admin", "overview-list", "--help"]);

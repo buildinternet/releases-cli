@@ -25,7 +25,7 @@ import {
 } from "../../../api/client.js";
 import { orgNotFound } from "../../suggest.js";
 import { writeJson } from "../../../lib/output.js";
-import { parsePositiveIntFlag, parseTagList } from "../../../lib/flags.js";
+import { parseNonNegIntFlag, parsePositiveIntFlag, parseTagList } from "../../../lib/flags.js";
 import { logger } from "@releases/lib/logger";
 import { timeAgo } from "@buildinternet/releases-core/dates";
 import {
@@ -532,8 +532,8 @@ function parsePositiveFloatFlag(label: string, raw: string | undefined): number 
 }
 
 async function overviewBatchAction(opts: OverviewBatchOpts): Promise<void> {
-  const minNewReleases = parsePositiveIntFlag("min-new-releases", opts.minNewReleases);
-  const minOverviewAgeDays = parsePositiveIntFlag("min-overview-age-days", opts.minOverviewAgeDays);
+  const minNewReleases = parseNonNegIntFlag("min-new-releases", opts.minNewReleases);
+  const minOverviewAgeDays = parseNonNegIntFlag("min-overview-age-days", opts.minOverviewAgeDays);
   const maxCandidates = parsePositiveIntFlag("max-candidates", opts.maxCandidates);
   const maxCostUsd = parsePositiveFloatFlag("max-cost-usd", opts.maxCostUsd);
   const orgs = opts.orgs ? parseTagList(opts.orgs) : undefined;
