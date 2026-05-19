@@ -311,16 +311,23 @@ server.registerTool(
 server.registerTool(
   "list_organizations",
   {
-    description: "List all indexed organizations, optionally filtered",
+    description:
+      "List all indexed organizations, optionally filtered. Orgs with zero indexed releases are hidden by default (curator-stub noise); set `include_empty: true` to see them.",
     inputSchema: {
       query: z
         .string()
         .optional()
         .describe("Search across org name, slug, domain, and account handles"),
       platform: z.string().optional().describe("Filter to orgs with an account on this platform"),
+      include_empty: z
+        .boolean()
+        .optional()
+        .describe(
+          "Include orgs with zero indexed releases (curator stubs). Omit or set false to hide them.",
+        ),
     },
   },
-  async ({ query, platform }) => {
+  async ({ query, platform, include_empty }) => {
     // /v1/orgs is paginated server-side post-#723; page through every result so
     // the tool truly lists all indexed organizations, not just the first page.
     const allOrgs: Awaited<ReturnType<typeof listOrgs>>["items"] = [];
@@ -328,7 +335,13 @@ server.registerTool(
     let hasMore = true;
     while (hasMore) {
       // eslint-disable-next-line no-await-in-loop
-      const result = await listOrgs({ query, platform, page, limit: 200 });
+      const result = await listOrgs({
+        query,
+        platform,
+        page,
+        limit: 200,
+        includeEmpty: include_empty,
+      });
       allOrgs.push(...result.items);
       hasMore = result.pagination.hasMore;
       page += 1;
