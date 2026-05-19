@@ -1,5 +1,7 @@
 # @buildinternet/releases-linux-x64
 
+## 0.38.1
+
 ## 0.38.0
 
 ## 0.37.0
