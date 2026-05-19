@@ -124,13 +124,22 @@ The plugin bundles:
 
 ### Standalone skills (any agent)
 
-The bundled skills are also available as a standalone package. Install them into any Claude Code / Codex / Cursor / OpenCode workspace using the [`skills`](https://github.com/vercel-labs/skills) CLI, which reads the top-level `skills/` directory of this repo:
+The bundled skills are also available as a standalone package. The fastest way to install them is via the CLI:
+
+```bash
+releases skills install                       # detected agent, current project
+releases skills install --global              # user-wide instead of project
+releases skills install --agent cursor        # override detection
+releases skills install releases-mcp          # just the user-facing lookup skill
+```
+
+This is a thin wrapper around the [`skills`](https://github.com/vercel-labs/skills) CLI from the open agent-skills ecosystem (`vercel-labs/skills`), which auto-detects ~50 supported agents (Claude Code, Codex, Cursor, OpenCode, Gemini CLI, Windsurf, GitHub Copilot, …) and writes to the right per-agent skills directory. If you'd rather skip the `releases` CLI entirely, the underlying command is:
 
 ```bash
 npx skills add buildinternet/releases-cli
 ```
 
-Use this when you only want the skill behavior (auto-triggering on release/CLI questions) without also registering the hosted MCP connection, agents, and `/releases` command that the plugin provides.
+Use this path when you only want the skill behavior (auto-triggering on release/CLI questions) without also registering the hosted MCP connection, agents, and `/releases` command that the plugin provides. Skills are symlinked by default, so re-running `releases skills install` (or `npx skills update releases-cli`) refreshes everything atomically.
 
 ## Environment
 

@@ -24,6 +24,13 @@ For local development, point Claude Code at a cloned copy instead:
 claude --plugin-dir plugins/claude/releases
 ```
 
+If you only want the bundled skills without the hosted MCP connection, `discovery`/`worker` agents, and `/releases` command, install the skills package directly from the [releases CLI](https://github.com/buildinternet/releases-cli):
+
+```bash
+releases skills install                # any supported agent — CLI must be installed
+npx skills add buildinternet/releases-cli   # equivalent, no `releases` CLI required
+```
+
 ## Available MCP Tools
 
 ### search

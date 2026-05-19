@@ -91,7 +91,7 @@ releases categories          # list the canonical category values
 releases categories --json
 ```
 
-The category list is fixed — adding a new category requires a code change in `@buildinternet/releases-core`. Each canonical slug supports an optional editable overlay (display-name override, description byline, aliases) managed via `PATCH /v1/categories/:slug` on the API. Alias inputs (e.g. `e-commerce`) are resolved to their canonical slug on write paths and 301-redirect on read paths.
+The category list is fixed — adding a new category requires a code change in `@buildinternet/releases-core`.
 
 ## Changelog slicing (admin CLI, reader endpoint)
 
