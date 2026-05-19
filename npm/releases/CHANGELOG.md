@@ -1,5 +1,12 @@
 # @buildinternet/releases
 
+## 0.39.0
+
+### Minor Changes
+
+- 7a2307c: Add `--metadata-set <key=value>` and `--metadata-unset <key>` flags to `releases admin source update`. Both are repeatable and thread through the existing `updateSourceMeta` client-side merge, so one-off source metadata patches (e.g. `--metadata-set crawlEnabled=true --metadata-set githubUrl=https://github.com/docker/compose`) no longer require custom scripts. Value coercion follows standard CLI conventions: `true`/`false`/`null` become JSON literals, finite number strings become numbers, values starting with `{` or `[` are parsed as JSON, and everything else is kept as a string.
+- 1af16a3: Add `--kind <value>` support for the new source/product taxonomy (`platform | sdk | mobile | desktop | docs | integration | tool`). Write paths (`releases admin source update`, `releases admin product update`, `releases admin product create`) accept the flag and validate locally via `isValidKind` before hitting the API. Read paths (`releases list`, `releases admin source list`, `releases admin product list`, `releases search`) accept `--kind` as a filter and pass it through as a query string. The API applies inheritance (`COALESCE(source.kind, product.kind)`) on content-oriented surfaces and direct equality on metadata-oriented surfaces; see the help text for the per-command behavior. Bumps the pinned `@buildinternet/releases-core` and `@buildinternet/releases-api-types` to `^0.22.0`.
+
 ## 0.38.1
 
 ### Patch Changes
