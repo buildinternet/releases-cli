@@ -25,6 +25,17 @@ npx @buildinternet/releases search "react"
 
 The CLI talks to `api.releases.sh` by default — no configuration needed for reader commands.
 
+### Refreshing this skill
+
+To install or refresh the bundled releases skills (this one + `releases-mcp`, `finding-changelogs`, etc.) for any supported agent:
+
+```bash
+releases skills install        # detected agent (auto), current project
+releases skills install -g     # user-wide install instead
+```
+
+Skills are symlinked by default — re-running `releases skills install` refreshes everything atomically.
+
 ## What this skill covers
 
 - **[Reader commands](references/reader.md)** — Search, inspect, and export changelog data. No API key required.
