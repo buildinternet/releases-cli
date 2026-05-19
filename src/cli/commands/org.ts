@@ -439,6 +439,7 @@ export function registerOrgCommand(program: Command) {
     .description("List all organizations")
     .option("--query <text>", "Filter by name, slug, domain, handle, or org_ id")
     .option("--platform <platform>", "Filter to orgs with an account on this platform")
+    .option("--include-empty", "Include orgs with zero indexed releases (curator stubs)")
     .option("--json", "Output as JSON")
     .option("--limit <n>", `Limit the number of results (default ${DEFAULT_PAGE_SIZE})`)
     .option("--page <n>", "Page number for paginated results")
@@ -446,6 +447,7 @@ export function registerOrgCommand(program: Command) {
       async (opts: {
         query?: string;
         platform?: string;
+        includeEmpty?: boolean;
         json?: boolean;
         limit?: string;
         page?: string;
@@ -468,6 +470,7 @@ export function registerOrgCommand(program: Command) {
         const { items: pageItems, pagination } = await listOrgs({
           query: opts.query,
           platform: opts.platform,
+          includeEmpty: opts.includeEmpty,
           limit: pageSize,
           page,
         });

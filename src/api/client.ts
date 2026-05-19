@@ -222,12 +222,14 @@ export async function listOrgs(opts?: {
   platform?: string;
   limit?: number;
   page?: number;
+  includeEmpty?: boolean;
 }): Promise<ListResponse<Organization>> {
   const params = new URLSearchParams();
   if (opts?.query) params.set("q", opts.query);
   if (opts?.platform) params.set("platform", opts.platform);
   if (opts?.limit != null) params.set("limit", String(opts.limit));
   if (opts?.page != null) params.set("page", String(opts.page));
+  if (opts?.includeEmpty) params.set("includeEmpty", "true");
   const qs = params.toString();
   return apiFetch<ListResponse<Organization>>(`/v1/orgs${qs ? `?${qs}` : ""}`);
 }
