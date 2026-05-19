@@ -13,6 +13,7 @@ import { toSlug } from "@buildinternet/releases-core/slug";
 import { logger } from "@releases/lib/logger";
 import { writeJson } from "../../lib/output.js";
 import { readContentArg } from "../../lib/input.js";
+import { parseMetadataSetFlag } from "../../lib/flags.js";
 
 const VALID_TYPES = ["github", "scrape", "feed", "agent"] as const;
 
@@ -46,6 +47,8 @@ export type UpdateSourceOpts = {
   enable?: boolean;
   changelogPaths?: string | boolean;
   dryRun?: boolean;
+  metadataSet?: string[];
+  metadataUnset?: string[];
 };
 
 // Match the API worker cap (CHANGELOG_MAX_FILES) so we fail fast instead of
@@ -291,6 +294,38 @@ export async function updateSourceAction(
     changes.push(`changelog paths → ${paths.length} path(s) [${paths.join(", ")}]`);
   }
 
+  // --metadata-set / --metadata-unset
+  // When the same key appears in both, unset runs first so that a set on the
+  // same key in the same invocation is a no-op (users should avoid it, but
+  // last-write-wins is documented so we honour it via iteration order).
+  if (opts.metadataUnset && opts.metadataUnset.length > 0) {
+    for (const key of opts.metadataUnset) {
+      if (key.trim() === "") {
+        logger.error(`Invalid --metadata-unset key: key must be non-empty`);
+        process.exit(2);
+      }
+      if (key.includes(".") || key.includes("[")) {
+        logger.error(
+          `Invalid --metadata-unset key "${key}": nested paths (keys containing "." or "[") are not supported.`,
+        );
+        process.exit(2);
+      }
+      metaUpdates[key] = undefined;
+      changes.push(`metadata.${key} removed`);
+    }
+  }
+
+  if (opts.metadataSet && opts.metadataSet.length > 0) {
+    for (const token of opts.metadataSet) {
+      const [key, value] = parseMetadataSetFlag(token);
+      metaUpdates[key] = value;
+      const preview = JSON.stringify(value);
+      changes.push(
+        `metadata.${key} → ${preview.length > 60 ? preview.slice(0, 60) + "..." : preview}`,
+      );
+    }
+  }
+
   if (changes.length === 0) {
     if (!opts.json) logger.warn("No changes specified. Use --help to see options.");
     return;
@@ -376,6 +411,27 @@ export function attachUpdateOptions(cmd: Command): Command {
       "Comma-separated list of CHANGELOG paths (relative to repo root) for monorepo sources, e.g. 'packages/core/CHANGELOG.md,packages/cli/CHANGELOG.md'",
     )
     .option("--no-changelog-paths", "Clear the changelog paths override (return to auto-discovery)")
+    .option(
+      "--metadata-set <key=value>",
+      "Set a source metadata key. Repeatable; if the same key appears more than once, the last value wins. " +
+        "Value coercion: true/false/null → JSON literal; finite number string → number; " +
+        "value starting with { or [ → parsed as JSON; otherwise → string. " +
+        'Keys containing "." or "[" are rejected (use --metadata-set key=\'{"nested":"value"}\' for objects).',
+      (val: string, acc: string[]) => {
+        acc.push(val);
+        return acc;
+      },
+      [] as string[],
+    )
+    .option(
+      "--metadata-unset <key>",
+      'Delete a source metadata key. Repeatable. Keys containing "." or "[" are rejected.',
+      (val: string, acc: string[]) => {
+        acc.push(val);
+        return acc;
+      },
+      [] as string[],
+    )
     .option("--json", "Output as JSON")
     .option("--dry-run", "Show what would change without writing");
 }
@@ -388,7 +444,13 @@ export function registerUpdateCommand(program: Command) {
 Examples:
   releases update src_abc123 --primary
   releases update src_abc123 --parse-instructions-file parse.md
-  cat parse.md | releases update src_abc123 --parse-instructions-file -`,
+  cat parse.md | releases update src_abc123 --parse-instructions-file -
+  releases update redis-software-release-notes \\
+    --metadata-set crawlEnabled=true \\
+    --metadata-set crawlIncludePathPrefix=/docs/latest/operate/rs/release-notes/
+  releases update docker-compose-release-notes \\
+    --metadata-set githubUrl=https://github.com/docker/compose
+  releases update some-source --metadata-unset legacyFlag`,
     )
     .action(updateSourceAction);
 }

@@ -1,5 +1,10 @@
 import { describe, it, expect, spyOn } from "bun:test";
-import { parsePositiveIntFlag, parseNonNegIntFlag } from "../../src/lib/flags.js";
+import {
+  parsePositiveIntFlag,
+  parseNonNegIntFlag,
+  coerceMetadataValue,
+  parseMetadataSetFlag,
+} from "../../src/lib/flags.js";
 
 // Intercept process.exit so invalid-input tests don't kill the runner.
 function withExitTrap(fn: () => void): void {
@@ -82,6 +87,149 @@ describe("parseNonNegIntFlag", () => {
   it("rejects a negative integer", () => {
     withExitTrap(() => {
       expect(() => parseNonNegIntFlag("offset", "-1")).toThrow("process.exit called");
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// coerceMetadataValue — value-type coercion for --metadata-set
+// ---------------------------------------------------------------------------
+
+describe("coerceMetadataValue", () => {
+  it("coerces 'true' to boolean true", () => {
+    expect(coerceMetadataValue("true")).toBe(true);
+  });
+
+  it("coerces 'false' to boolean false", () => {
+    expect(coerceMetadataValue("false")).toBe(false);
+  });
+
+  it("false is not treated as falsy — it is the boolean value false, not undefined/null", () => {
+    const result = coerceMetadataValue("false");
+    expect(result).toBe(false);
+    expect(result).not.toBeNull();
+    expect(result).not.toBeUndefined();
+  });
+
+  it("coerces 'null' to null", () => {
+    expect(coerceMetadataValue("null")).toBeNull();
+  });
+
+  it("coerces a positive integer string to a number", () => {
+    expect(coerceMetadataValue("42")).toBe(42);
+  });
+
+  it("coerces '0' to the number 0, not falsy-undefined", () => {
+    const result = coerceMetadataValue("0");
+    expect(result).toBe(0);
+    expect(typeof result).toBe("number");
+  });
+
+  it("coerces a negative integer string to a number", () => {
+    expect(coerceMetadataValue("-7")).toBe(-7);
+  });
+
+  it("coerces a decimal string to a number", () => {
+    expect(coerceMetadataValue("3.14")).toBeCloseTo(3.14);
+  });
+
+  it("coerces a JSON object string to an object", () => {
+    expect(coerceMetadataValue('{"foo":"bar"}')).toEqual({ foo: "bar" });
+  });
+
+  it("coerces a JSON array string to an array", () => {
+    expect(coerceMetadataValue("[1,2,3]")).toEqual([1, 2, 3]);
+  });
+
+  it("treats a plain URL string as a string (not a number, not JSON)", () => {
+    const url = "https://github.com/docker/compose";
+    expect(coerceMetadataValue(url)).toBe(url);
+  });
+
+  it("treats a plain path string as a string", () => {
+    const path = "/docs/latest/operate/rs/release-notes/";
+    expect(coerceMetadataValue(path)).toBe(path);
+  });
+
+  it("treats an arbitrary string as a string", () => {
+    expect(coerceMetadataValue("hello world")).toBe("hello world");
+  });
+
+  it("exits on invalid JSON starting with {", () => {
+    withExitTrap(() => {
+      expect(() => coerceMetadataValue("{not valid json}")).toThrow("process.exit called");
+    });
+  });
+
+  it("exits on invalid JSON starting with [", () => {
+    withExitTrap(() => {
+      expect(() => coerceMetadataValue("[1,2,")).toThrow("process.exit called");
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseMetadataSetFlag — full key=value parsing
+// ---------------------------------------------------------------------------
+
+describe("parseMetadataSetFlag", () => {
+  it("parses a simple string value", () => {
+    expect(parseMetadataSetFlag("myKey=hello")).toEqual(["myKey", "hello"]);
+  });
+
+  it("parses a boolean true value", () => {
+    expect(parseMetadataSetFlag("crawlEnabled=true")).toEqual(["crawlEnabled", true]);
+  });
+
+  it("parses a boolean false value", () => {
+    expect(parseMetadataSetFlag("renderRequired=false")).toEqual(["renderRequired", false]);
+  });
+
+  it("parses a numeric value", () => {
+    expect(parseMetadataSetFlag("maxItems=20")).toEqual(["maxItems", 20]);
+  });
+
+  it("parses a URL value as a string", () => {
+    const token = "githubUrl=https://github.com/docker/compose";
+    const [key, value] = parseMetadataSetFlag(token);
+    expect(key).toBe("githubUrl");
+    expect(value).toBe("https://github.com/docker/compose");
+  });
+
+  it("splits only on the first '=' so values containing '=' are preserved", () => {
+    const token = "redirectUrl=https://example.com?a=1&b=2";
+    const [key, value] = parseMetadataSetFlag(token);
+    expect(key).toBe("redirectUrl");
+    expect(value).toBe("https://example.com?a=1&b=2");
+  });
+
+  it("parses a JSON object value", () => {
+    const [key, value] = parseMetadataSetFlag('config={"timeout":30}');
+    expect(key).toBe("config");
+    expect(value).toEqual({ timeout: 30 });
+  });
+
+  it("exits when no '=' is present", () => {
+    withExitTrap(() => {
+      expect(() => parseMetadataSetFlag("noequals")).toThrow("process.exit called");
+    });
+  });
+
+  it("exits when the key is empty (starts with '=')", () => {
+    withExitTrap(() => {
+      expect(() => parseMetadataSetFlag("=value")).toThrow("process.exit called");
+    });
+  });
+
+  it("exits when the key contains '.'", () => {
+    withExitTrap(() => {
+      expect(() => parseMetadataSetFlag("foo.bar=value")).toThrow("process.exit called");
+    });
+  });
+
+  it("exits when the key contains '['", () => {
+    withExitTrap(() => {
+      expect(() => parseMetadataSetFlag("foo[0]=value")).toThrow("process.exit called");
     });
   });
 });
