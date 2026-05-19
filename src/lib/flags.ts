@@ -46,3 +46,75 @@ export function parseTagList(raw: string | undefined): string[] {
     .map((t) => t.trim())
     .filter(Boolean);
 }
+
+/**
+ * Parse a `--metadata-set key=value` token into a `[key, coercedValue]` pair.
+ *
+ * Value coercion rules (applied in order):
+ *   - `true` / `false` / `null`   → JSON literal (boolean / null)
+ *   - Finite number string         → number
+ *   - Starts with `{` or `[`      → parsed as JSON (exits on invalid JSON)
+ *   - Otherwise                    → string
+ *
+ * Key constraints:
+ *   - Must contain `=` (first `=` splits key and value)
+ *   - Key must not be empty
+ *   - Key must not contain `.` or `[` (nested-path mutation is not supported)
+ *
+ * Exits with code 2 on any validation failure.
+ */
+export function parseMetadataSetFlag(raw: string): [string, unknown] {
+  const eqIdx = raw.indexOf("=");
+  if (eqIdx < 1) {
+    console.error(
+      chalk.red(
+        `Invalid --metadata-set "${raw}": expected key=value (key must be non-empty and separated by "=")`,
+      ),
+    );
+    process.exit(2);
+  }
+  const key = raw.slice(0, eqIdx);
+  const value = raw.slice(eqIdx + 1);
+
+  if (key.includes(".") || key.includes("[")) {
+    console.error(
+      chalk.red(
+        `Invalid --metadata-set key "${key}": nested paths (keys containing "." or "[") are not supported. ` +
+          `To mutate nested structure, pass the whole object: --metadata-set ${key}='{"...": "..."}'`,
+      ),
+    );
+    process.exit(2);
+  }
+
+  return [key, coerceMetadataValue(value)];
+}
+
+/**
+ * Coerce a raw CLI string value to the appropriate JSON type.
+ * Called by `parseMetadataSetFlag`; also exported for unit-testing.
+ */
+export function coerceMetadataValue(value: string): unknown {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  if (value === "null") return null;
+
+  // Number: must be finite; guard against the empty-string edge case.
+  if (value.length > 0) {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+
+  // JSON object or array
+  if (value.startsWith("{") || value.startsWith("[")) {
+    try {
+      return JSON.parse(value);
+    } catch {
+      console.error(
+        chalk.red(`Invalid --metadata-set value: could not parse as JSON: ${value.slice(0, 80)}`),
+      );
+      process.exit(2);
+    }
+  }
+
+  return value;
+}
