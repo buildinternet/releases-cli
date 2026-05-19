@@ -55,7 +55,7 @@ const catalogHits: UnifiedSearchResponse["catalog"] = [
     orgSlug: "meta",
     orgName: "Meta",
     category: "frontend",
-    kind: "product",
+    entryType: "product",
   },
   {
     slug: "react-native",
@@ -63,7 +63,7 @@ const catalogHits: UnifiedSearchResponse["catalog"] = [
     orgSlug: "meta",
     orgName: "Meta",
     category: null,
-    kind: "source",
+    entryType: "source",
     sourceSlug: "react-native",
   },
 ];

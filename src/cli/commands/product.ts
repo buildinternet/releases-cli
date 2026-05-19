@@ -21,6 +21,7 @@ import {
 } from "../../api/client.js";
 import { toSlug } from "@buildinternet/releases-core/slug";
 import { isValidCategory, CATEGORIES } from "@buildinternet/releases-core/categories";
+import { isValidKind, KIND_VALUES, type Kind } from "@buildinternet/releases-core/kinds";
 import { writeJson } from "../../lib/output.js";
 import { computePagination, type ListResponse } from "@buildinternet/releases-core/cli-contracts";
 import { warnDeprecatedAlias } from "../../lib/deprecated-alias.js";
@@ -70,6 +71,7 @@ type ProductCreateOpts = {
   url?: string;
   description?: string;
   category?: string;
+  kind?: string;
   tags?: string;
   json?: boolean;
   dryRun?: boolean;
@@ -91,6 +93,14 @@ async function productCreateAction(name: string, opts: ProductCreateOpts): Promi
     process.exit(1);
   }
 
+  if (opts.kind !== undefined && !isValidKind(opts.kind)) {
+    console.error(
+      chalk.red(`Invalid kind "${opts.kind}". Must be one of: ${KIND_VALUES.join(", ")}`),
+    );
+    process.exit(1);
+  }
+  const kind = opts.kind as Kind | undefined;
+
   if (opts.dryRun) {
     const tagList = parseTagList(opts.tags);
     const plan = {
@@ -101,6 +111,7 @@ async function productCreateAction(name: string, opts: ProductCreateOpts): Promi
       url: opts.url ?? null,
       description: opts.description ?? null,
       category: opts.category ?? null,
+      kind: kind ?? null,
       tagsToAdd: tagList,
     };
     if (opts.json) await writeJson(plan);
@@ -120,6 +131,7 @@ async function productCreateAction(name: string, opts: ProductCreateOpts): Promi
       url: opts.url,
       description: opts.description,
       category: opts.category,
+      kind,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -152,6 +164,7 @@ type ProductUpdateOpts = {
   url?: string;
   description?: string;
   category?: string | boolean;
+  kind?: string | boolean;
   json?: boolean;
   dryRun?: boolean;
 };
@@ -178,6 +191,18 @@ async function productUpdateAction(slug: string, opts: ProductUpdateOpts): Promi
       process.exit(1);
     }
     updates.category = opts.category;
+  }
+
+  if (opts.kind === false) {
+    updates.kind = null;
+  } else if (typeof opts.kind === "string") {
+    if (!isValidKind(opts.kind)) {
+      console.error(
+        chalk.red(`Invalid kind "${opts.kind}". Must be one of: ${KIND_VALUES.join(", ")}`),
+      );
+      process.exit(1);
+    }
+    updates.kind = opts.kind satisfies Kind;
   }
 
   if (Object.keys(updates).length === 0) {
@@ -232,11 +257,23 @@ export function registerProductCommand(program: Command) {
     .description("List products for an organization")
     .argument("[org]", "Organization (org_…, slug, domain, name, or handle)")
     .option("--json", "Output as JSON")
-    .action(async (orgIdentifier: string | undefined, opts: { json?: boolean }) => {
+    .option(
+      "--kind <kind>",
+      `Filter by product taxonomy (${KIND_VALUES.join(", ")}). Matches the product's own kind only.`,
+    )
+    .action(async (orgIdentifier: string | undefined, opts: { json?: boolean; kind?: string }) => {
       if (!orgIdentifier) {
         console.error(chalk.red("Please specify an organization"));
         process.exit(1);
       }
+
+      if (opts.kind !== undefined && !isValidKind(opts.kind)) {
+        console.error(
+          chalk.red(`Invalid kind "${opts.kind}". Must be one of: ${KIND_VALUES.join(", ")}`),
+        );
+        process.exit(1);
+      }
+      const kind = opts.kind as Kind | undefined;
 
       const org = await findOrg(orgIdentifier);
       if (!org) {
@@ -244,7 +281,7 @@ export function registerProductCommand(program: Command) {
         process.exit(1);
       }
 
-      const productList = await getProductsByOrg(org.id);
+      const productList = await getProductsByOrg(org.id, { kind });
 
       if (productList.length === 0) {
         if (opts.json) await writeJson([]);
@@ -285,6 +322,10 @@ export function registerProductCommand(program: Command) {
     .option("--url <url>", "Product URL")
     .option("--description <text>", "Brief product description")
     .option("--category <category>", "Category")
+    .option(
+      "--kind <kind>",
+      `Product taxonomy (${KIND_VALUES.join(", ")}). Sources without their own kind inherit this on content surfaces.`,
+    )
     .option("--tags <tags>", "Comma-separated tags")
     .option("--json", "Output as JSON")
     .option("--dry-run", "Show what would be created without writing")
@@ -299,6 +340,10 @@ export function registerProductCommand(program: Command) {
     .option("--url <url>", "Product URL")
     .option("--description <text>", "Brief product description")
     .option("--category <category>", "Category")
+    .option(
+      "--kind <kind>",
+      `Product taxonomy (${KIND_VALUES.join(", ")}). Sources without their own kind inherit this on content surfaces.`,
+    )
     .option("--tags <tags>", "Comma-separated tags")
     .option("--json", "Output as JSON")
     .option("--dry-run", "Show what would be created without writing")
@@ -314,6 +359,8 @@ export function registerProductCommand(program: Command) {
     .option("--description <text>", "New product description")
     .option("--category <category>", "Set category")
     .option("--no-category", "Clear category")
+    .option("--kind <kind>", `Set product taxonomy (${KIND_VALUES.join(", ")})`)
+    .option("--no-kind", "Clear product kind")
     .option("--json", "Output as JSON")
     .option("--dry-run", "Show what would change without writing")
     .action(productUpdateAction);
@@ -327,6 +374,8 @@ export function registerProductCommand(program: Command) {
     .option("--description <text>", "New product description")
     .option("--category <category>", "Set category")
     .option("--no-category", "Clear category")
+    .option("--kind <kind>", `Set product taxonomy (${KIND_VALUES.join(", ")})`)
+    .option("--no-kind", "Clear product kind")
     .option("--json", "Output as JSON")
     .option("--dry-run", "Show what would change without writing")
     .action(

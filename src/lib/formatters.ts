@@ -382,7 +382,8 @@ export function searchToMarkdown(results: UnifiedSearchResponse, opts: FormatOpt
     lines.push("");
     for (const p of catalog) {
       const orgInfo = p.orgSlug ? ` (${p.orgName})` : "";
-      const viewSlug = p.kind === "source" && p.sourceSlug ? p.sourceSlug : `product/${p.slug}`;
+      const viewSlug =
+        p.entryType === "source" && p.sourceSlug ? p.sourceSlug : `product/${p.slug}`;
       const url =
         opts.baseUrl && p.orgSlug ? ` — [view](${opts.baseUrl}/${p.orgSlug}/${viewSlug})` : "";
       lines.push(
