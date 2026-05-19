@@ -154,18 +154,14 @@ export function sourceToMarkdown(source: SourceDetail, opts: FormatOptions = {})
   }
 
   // ── Pagination ──
-  if ((source.pagination.totalPages ?? 0) > 1) {
-    const paginationAttrs = [
-      `page="${source.pagination.page}"`,
-      `total-pages="${source.pagination.totalPages}"`,
-      `total-items="${source.pagination.totalItems}"`,
-    ];
+  if (source.pagination.nextCursor) {
+    const cursorAttrs = [`cursor="${source.pagination.nextCursor}"`];
     if (opts.baseUrl) {
-      paginationAttrs.push(
-        `next="${opts.baseUrl}${sourcePath}.md?page=${source.pagination.page + 1}"`,
+      cursorAttrs.push(
+        `next="${opts.baseUrl}${sourcePath}.md?cursor=${encodeURIComponent(source.pagination.nextCursor)}&limit=${source.pagination.limit}"`,
       );
     }
-    lines.push(`<Pagination ${paginationAttrs.join(" ")} />`);
+    lines.push(`<Pagination ${cursorAttrs.join(" ")} />`);
     lines.push("");
   }
 

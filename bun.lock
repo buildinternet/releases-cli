@@ -5,7 +5,7 @@
     "": {
       "name": "releases-cli",
       "dependencies": {
-        "@buildinternet/releases-api-types": "^0.20.0",
+        "@buildinternet/releases-api-types": "^0.21.0",
         "@buildinternet/releases-core": "^0.21.0",
         "@buildinternet/releases-lib": "workspace:*",
         "@buildinternet/releases-skills": "workspace:*",
@@ -73,7 +73,7 @@
 
     "@buildinternet/releases": ["@buildinternet/releases@workspace:npm/releases"],
 
-    "@buildinternet/releases-api-types": ["@buildinternet/releases-api-types@0.20.0", "", { "dependencies": { "@buildinternet/releases-core": "^0.21.0", "zod": "^4.4.3" } }, "sha512-RoU/YU5QxvJdkptiVepy0T2q34UA6IvohKGJJMJM41/H++IID/MeI+iab7DbYTpLaFOp0heXh4pIdODWenqXEg=="],
+    "@buildinternet/releases-api-types": ["@buildinternet/releases-api-types@0.21.0", "", { "dependencies": { "@buildinternet/releases-core": "^0.21.0", "zod": "^4.4.3" } }, "sha512-2ZTTTxO2GrMXJZFufQ9ADs2YR1BjHLQGP4H/5fUEqrQFzXJJVqfjavELm4NK1koFhR2jsTWEDzIAzPoD6rq+GQ=="],
 
     "@buildinternet/releases-core": ["@buildinternet/releases-core@0.21.0", "", { "dependencies": { "drizzle-orm": "^0.45.2", "js-tiktoken": "^1.0.21", "nanoid": "^5.1.7" } }, "sha512-tWLBc3BvBot1Rrb5j3X2RPSogcgm5+hwFlnQocMTHFgF8gtF4jZRM7Mc+HoGNOlMJHacH1uyqt2nDcqTGZaNZQ=="],
 

@@ -16,7 +16,7 @@ const fullSource: FormatSourceDetail = {
   type: "github",
   url: "https://github.com/vercel/next.js",
   changelogUrl: "https://nextjs.org/changelog",
-  org: { slug: "vercel", name: "Vercel" },
+  org: { id: "org_vercel", slug: "vercel", name: "Vercel" },
   releaseCount: 150,
   latestVersion: "15.0.0",
   latestDate: "2024-06-15T00:00:00Z",
@@ -39,7 +39,7 @@ const fullSource: FormatSourceDetail = {
       url: null,
     },
   ],
-  pagination: { page: 1, pageSize: 20, totalPages: 1, totalItems: 2 },
+  pagination: { nextCursor: null, limit: 20 },
   summaries: {
     rolling: {
       windowDays: 90,
@@ -73,6 +73,7 @@ const fullOrg: FormatOrgDetail = {
   releasesLast30Days: 12,
   avgReleasesPerWeek: 3.5,
   lastFetchedAt: "2024-06-16T00:00:00Z",
+  lastPolledAt: "2024-06-16T06:00:00Z",
   trackingSince: "2024-01-01T00:00:00Z",
   accounts: [
     { platform: "github", handle: "vercel" },
@@ -195,18 +196,18 @@ describe("sourceToMarkdown", () => {
     expect(md).toContain("## Next.js 15");
   });
 
-  it("does NOT show Pagination when totalPages is 1", () => {
+  it("does NOT show Pagination when nextCursor is null", () => {
     const md = sourceToMarkdown(fullSource);
     expect(md).not.toContain("<Pagination");
   });
 
-  it("shows Pagination tag when totalPages > 1", () => {
+  it("shows Pagination tag when nextCursor is present", () => {
     const source: FormatSourceDetail = {
       ...fullSource,
-      pagination: { page: 1, pageSize: 20, totalPages: 3, totalItems: 55 },
+      pagination: { nextCursor: "tok_abc123", limit: 20 },
     };
     const md = sourceToMarkdown(source);
-    expect(md).toContain('<Pagination page="1" total-pages="3" total-items="55"');
+    expect(md).toContain('<Pagination cursor="tok_abc123"');
   });
 
   it("includes canonical URL when baseUrl is provided", () => {
@@ -215,13 +216,13 @@ describe("sourceToMarkdown", () => {
     expect(md).toContain("organization_url: https://releases.sh/vercel");
   });
 
-  it("includes next page URL in Pagination when baseUrl is provided", () => {
+  it("includes next cursor URL in Pagination when baseUrl is provided", () => {
     const source: FormatSourceDetail = {
       ...fullSource,
-      pagination: { page: 1, pageSize: 20, totalPages: 3, totalItems: 55 },
+      pagination: { nextCursor: "tok_abc123", limit: 20 },
     };
     const md = sourceToMarkdown(source, { baseUrl: "https://releases.sh" });
-    expect(md).toContain('next="https://releases.sh/vercel/next-js.md?page=2"');
+    expect(md).toContain('next="https://releases.sh/vercel/next-js.md?cursor=tok_abc123&limit=20"');
   });
 
   it("omits canonical URL when baseUrl is not provided", () => {
