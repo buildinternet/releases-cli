@@ -95,30 +95,44 @@ Or run a local stdio bridge that proxies the same tools to `api.releases.sh`:
 releases admin mcp serve
 ```
 
-### Claude Code plugin
+### Claude Code plugins
 
-Install from the marketplace manifest in this repo:
+This repo is a Claude Code marketplace named `releases` that publishes two plugins. Add the marketplace once, then install whichever surfaces you want:
 
 ```bash
 /plugin marketplace add buildinternet/releases-cli
+
+# Reader surface — search and look up releases:
 /plugin install releases@releases
+
+# Admin surface — onboard and maintain sources (requires admin API access):
+/plugin install releases-admin@releases
 ```
 
 Or point at a local clone for development:
 
 ```bash
-claude --plugin-dir plugins/claude/releases
+claude --plugin-dir .
 ```
 
-The plugin bundles:
+**`releases` (reader)** — for anyone querying the registry:
 
 - **Hosted MCP connection** to `mcp.releases.sh` — search, lookup, and changelog slicing tools.
-- **Auto-trigger skills**:
-  - `releases-mcp` — activates on user questions about releases, changelogs, or breaking changes ("what's new in Next.js 15?").
+- **`/releases <product> [query]`** command for manual lookups.
+- **Auto-trigger skills:**
+  - `releases-mcp` — activates on questions about releases, changelogs, or breaking changes ("what's new in Next.js 15?").
   - `releases-cli` — activates when a user mentions or runs the `releases` CLI.
-  - `finding-changelogs`, `managing-sources`, `parsing-changelogs`, `analyzing-releases`, `classify-media-relevance`, `seeding-playbooks` — operator playbooks for onboarding and maintaining sources (admin access required to act on them — see the callout at the top of this README).
+  - `analyzing-releases` — competitive intel across multiple companies.
+  - `finding-changelogs` — discovering and evaluating changelog URLs.
+
+**`releases-admin`** — for maintainers running their own registry or contributing back:
+
 - **Agents** — `discovery` (finds and onboards sources) and `worker` (executes fetches).
-- **Commands** — `/releases <product> [query]` for manual lookups.
+- **Auto-trigger skills:**
+  - `managing-sources` — CRUD on sources, ignored/blocked URLs, validation.
+  - `parsing-changelogs` — fetch and parse pipeline reference.
+  - `classify-media-relevance` — release-image classification helper.
+  - `seeding-playbooks` — bulk playbook authoring across orgs.
 
 > Claude Code plugins install atomically — there is no Claude Code–native flow for grabbing a single skill without the rest of the plugin. See the next section for an agent-neutral install path.
 
