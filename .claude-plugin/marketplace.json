@@ -38,7 +38,10 @@
         "./skills/classify-media-relevance",
         "./skills/seeding-playbooks"
       ],
-      "agents": "./plugins/claude/releases/agents"
+      "agents": [
+        "./plugins/claude/releases/agents/discovery.md",
+        "./plugins/claude/releases/agents/worker.md"
+      ]
     }
   ]
 }
