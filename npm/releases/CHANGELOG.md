@@ -1,5 +1,27 @@
 # @buildinternet/releases
 
+## 0.38.0
+
+### Minor Changes
+
+- df7dcae: feat(cli): add `--paused` / `--no-paused` flags to `admin org update` for the org-level ingest pause flag landed in [buildinternet/releases#1064](https://github.com/buildinternet/releases/pull/1064). Mirrors the existing `--enable` / `--disable` shape on `admin source update`; lands on the deprecated `edit` alias too. Pins `@buildinternet/releases-api-types` to `^0.20.0` so the typed `fetchPaused` field on `UpdateOrgBody` is in scope downstream. (#178)
+- 21d41b2: MCP `list_organizations` now mirrors the remote MCP default of hiding orgs
+  with zero indexed releases. Pass `include_empty: true` to see them.
+  CLI `releases org list` gains `--include-empty` for the same opt-in.
+  See buildinternet/releases#746.
+- a4729e3: feat(cli): add shell completion support for bash, zsh, and fish. `releases completion <bash|zsh|fish>` prints the script to stdout; `releases completion install` detects the user's shell and writes the script to the conventional location, mirroring how `gh` ships completions. Once the matching tap formula update in buildinternet/buildinternet-homebrew-tap lands, Homebrew will install all three shells automatically — until then, `brew` users should run `releases completion install`. On interactive TTYs, a one-time stderr hint nudges users who haven't installed completions yet — silence with `RELEASES_NO_COMPLETION_HINT=1`.
+- 5b1c5ae: feat(cli): add `releases skills install` for cross-agent skill installation (#187). Thin wrapper around `npx skills add buildinternet/releases-cli` from the open agent-skills ecosystem (`vercel-labs/skills`), which auto-detects ~50 supported coding agents (Claude Code, Cursor, Codex, Gemini CLI, Windsurf, GitHub Copilot, …) and writes the 8 bundled skill files to the right per-agent directory. Forwards `--global`, `--agent <name>`, `--copy`, `--list`, and `--no-yes` to the underlying `skills add` invocation. Skills are symlinked by default, so re-running the command refreshes everything atomically.
+- 05f08be: feat(cli): nag when installed agent skills are behind the repo's `main` HEAD (#188). After a successful `releases skills install`, the CLI records the current `skills/` tree SHA as a baseline. Subsequent invocations poll GitHub (24h cache, 2s timeout, best-effort) and print a single dim stderr line — "Your installed releases skills are behind. Run `releases skills install` to refresh." — when the baseline diverges. Also reads the `skills` CLI's lock file (`$XDG_STATE_HOME/skills/.skill-lock.json` or `~/.agents/.skill-lock.json`) to suppress the nag when the user has clearly uninstalled via `skills` (lock present, zero `buildinternet/releases-cli` entries); manual installers and users without a lock file fall through to the existing baseline check, unchanged. Mirrors the existing CLI update-check pattern, with the same skip conditions (`--help`/`--version`, non-TTY, no baseline recorded) plus a fresh `RELEASES_DISABLE_SKILL_UPDATE_CHECK=1` opt-out.
+- 839ab72: Remove deprecated `--notes` and `--parse-instructions` inline flags (Phase 2 of #103).
+
+  Both flags were deprecated in Phase 1 (#118) with file-based replacements. They are now removed; passing either flag exits non-zero with `unknown option`. Use `--notes-file` and `--parse-instructions-file` (or `-` for stdin) instead.
+
+### Patch Changes
+
+- 5aad6aa: chore(cli): bump `@buildinternet/releases-api-types` to `^0.21.0` and align `sourceToMarkdown` with the cursor-paginated `SourceDetail` shape. The helper had no callers in production code; this is a types-alignment fix with zero runtime impact.
+- 3b4b2a9: fix(cli): allow 0 for --min-new-releases and --min-overview-age-days in `admin overview batch` to match API contract (#174)
+- ac18409: fix(cli): reject partial integers in parsePositiveIntFlag — "1.5" and "10abc" no longer silently truncate to 1 and 10 (#177)
+
 ## 0.37.0
 
 ### Minor Changes
