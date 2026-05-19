@@ -66,7 +66,8 @@ export function registerSkillsCommand(parent: Command): void {
     .option("-a, --agent <name>", "override agent auto-detection (e.g. claude-code, cursor, codex)")
     .option("--copy", "copy files instead of symlinking")
     .option("-l, --list", "list available skills without installing")
-    .option("-y, --yes", "skip confirmation prompts", true)
+    .option("-y, --yes", "skip confirmation prompts")
+    .option("--no-yes", "force interactive prompts (default is to skip them)")
     .addHelpText(
       "after",
       [
@@ -108,7 +109,12 @@ export function registerSkillsCommand(parent: Command): void {
         forwardSignals(child);
 
         const code = await new Promise<number>((resolve) => {
-          child.on("exit", (c) => resolve(c ?? 0));
+          child.on("exit", (c, signal) => {
+            // Signal-terminated child reports exitCode === null. Treat that
+            // as failure so SIGINT/SIGTERM aren't masked as success.
+            if (signal) resolve(1);
+            else resolve(c ?? 1);
+          });
           child.on("error", () => resolve(1));
         });
 
