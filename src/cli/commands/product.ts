@@ -22,6 +22,7 @@ import {
 import { toSlug } from "@buildinternet/releases-core/slug";
 import { isValidCategory, CATEGORIES } from "@buildinternet/releases-core/categories";
 import { isValidKind, KIND_VALUES, type Kind } from "@buildinternet/releases-core/kinds";
+import { logger } from "@releases/lib/logger";
 import { writeJson } from "../../lib/output.js";
 import { computePagination, type ListResponse } from "@buildinternet/releases-core/cli-contracts";
 import { warnDeprecatedAlias } from "../../lib/deprecated-alias.js";
@@ -94,9 +95,7 @@ async function productCreateAction(name: string, opts: ProductCreateOpts): Promi
   }
 
   if (opts.kind !== undefined && !isValidKind(opts.kind)) {
-    console.error(
-      chalk.red(`Invalid kind "${opts.kind}". Must be one of: ${KIND_VALUES.join(", ")}`),
-    );
+    logger.error(`Invalid kind "${opts.kind}". Must be one of: ${KIND_VALUES.join(", ")}`);
     process.exit(1);
   }
   const kind = opts.kind as Kind | undefined;
@@ -197,9 +196,7 @@ async function productUpdateAction(slug: string, opts: ProductUpdateOpts): Promi
     updates.kind = null;
   } else if (typeof opts.kind === "string") {
     if (!isValidKind(opts.kind)) {
-      console.error(
-        chalk.red(`Invalid kind "${opts.kind}". Must be one of: ${KIND_VALUES.join(", ")}`),
-      );
+      logger.error(`Invalid kind "${opts.kind}". Must be one of: ${KIND_VALUES.join(", ")}`);
       process.exit(1);
     }
     updates.kind = opts.kind satisfies Kind;
@@ -268,9 +265,7 @@ export function registerProductCommand(program: Command) {
       }
 
       if (opts.kind !== undefined && !isValidKind(opts.kind)) {
-        console.error(
-          chalk.red(`Invalid kind "${opts.kind}". Must be one of: ${KIND_VALUES.join(", ")}`),
-        );
+        logger.error(`Invalid kind "${opts.kind}". Must be one of: ${KIND_VALUES.join(", ")}`);
         process.exit(1);
       }
       const kind = opts.kind as Kind | undefined;

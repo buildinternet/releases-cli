@@ -218,9 +218,7 @@ export async function updateSourceAction(
     changes.push("kind cleared");
   } else if (typeof opts.kind === "string") {
     if (!isValidKind(opts.kind)) {
-      console.error(
-        chalk.red(`Invalid kind "${opts.kind}". Must be one of: ${KIND_VALUES.join(", ")}`),
-      );
+      logger.error(`Invalid kind "${opts.kind}". Must be one of: ${KIND_VALUES.join(", ")}`);
       process.exit(1);
     }
     updates.kind = opts.kind satisfies Kind;

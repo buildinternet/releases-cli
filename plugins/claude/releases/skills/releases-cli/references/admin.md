@@ -73,7 +73,7 @@ releases admin source update my-blog --slug new-slug --confirm-slug-change
 
 Slug renames require `--confirm-slug-change` because they break existing web links.
 
-`--kind` sets the source's taxonomy. On content-oriented surfaces (releases feed, search release hits) it resolves through the parent product when null; on metadata surfaces (lists, catalog) it matches the row's own kind directly.
+`--kind` sets the source's taxonomy. In **release feeds** and **search release hits**, a source with no kind of its own inherits its parent product's kind — so filtering by `kind=sdk` returns content from any source that's either marked SDK or sits under an SDK product. In **catalog listings** and **source lists** (`releases list`, `admin product list`, `search` catalog hits), the filter matches the row's *own* kind field directly with no inheritance — so the same `kind=sdk` filter only returns rows explicitly classified as SDK.
 
 ### Fetch
 

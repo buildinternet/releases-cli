@@ -30,30 +30,35 @@ describe("--kind flag exposure", () => {
     expect(exitCode).toBe(0);
     expect(stdout).toContain("--kind <kind>");
     expect(stdout).toContain("--no-kind");
+    expect(stdout).toContain("platform, sdk");
   });
 
   it("admin product create --help lists --kind", () => {
     const { stdout, exitCode } = runCli(["admin", "product", "create", "--help"]);
     expect(exitCode).toBe(0);
     expect(stdout).toContain("--kind <kind>");
+    expect(stdout).toContain("platform, sdk");
   });
 
   it("admin product list --help lists --kind", () => {
     const { stdout, exitCode } = runCli(["admin", "product", "list", "--help"]);
     expect(exitCode).toBe(0);
     expect(stdout).toContain("--kind <kind>");
+    expect(stdout).toContain("platform, sdk");
   });
 
   it("list --help lists --kind", () => {
     const { stdout, exitCode } = runCli(["list", "--help"]);
     expect(exitCode).toBe(0);
     expect(stdout).toContain("--kind <kind>");
+    expect(stdout).toContain("platform, sdk");
   });
 
   it("search --help lists --kind", () => {
     const { stdout, exitCode } = runCli(["search", "--help"]);
     expect(exitCode).toBe(0);
     expect(stdout).toContain("--kind <kind>");
+    expect(stdout).toContain("platform, sdk");
   });
 });
 
@@ -69,6 +74,7 @@ describe("--kind validation", () => {
     const { stderr, exitCode } = runCli(["search", "anything", "--kind", "nope"]);
     expect(exitCode).not.toBe(0);
     expect(stderr).toContain('Invalid --kind value: "nope"');
+    expect(stderr).toContain("platform, sdk, mobile, desktop, docs, integration, tool");
   });
 
   it("list accepts a valid kind through flag parsing (network call may fail; flag parse must not)", () => {
