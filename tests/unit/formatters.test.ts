@@ -16,7 +16,7 @@ const fullSource: FormatSourceDetail = {
   type: "github",
   url: "https://github.com/vercel/next.js",
   changelogUrl: "https://nextjs.org/changelog",
-  org: { slug: "vercel", name: "Vercel" },
+  org: { id: "org_vercel", slug: "vercel", name: "Vercel" },
   releaseCount: 150,
   latestVersion: "15.0.0",
   latestDate: "2024-06-15T00:00:00Z",
@@ -73,6 +73,7 @@ const fullOrg: FormatOrgDetail = {
   releasesLast30Days: 12,
   avgReleasesPerWeek: 3.5,
   lastFetchedAt: "2024-06-16T00:00:00Z",
+  lastPolledAt: "2024-06-16T06:00:00Z",
   trackingSince: "2024-01-01T00:00:00Z",
   accounts: [
     { platform: "github", handle: "vercel" },
