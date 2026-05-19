@@ -1,4 +1,5 @@
 import { readFileSync, writeFileSync } from "fs";
+import { homedir } from "os";
 import { join } from "path";
 import { getDataDir } from "@releases/lib/config";
 import { RELEASES_CLI_UA } from "./user-agent.js";
@@ -10,7 +11,9 @@ const REPO_OWNER = "buildinternet";
 const REPO_NAME = "releases-cli";
 const REPO_BRANCH = "main";
 const SKILLS_DIR_NAME = "skills";
+const SKILLS_COORDINATE = `${REPO_OWNER}/${REPO_NAME}`;
 const DISABLE_ENV_VAR = "RELEASES_DISABLE_SKILL_UPDATE_CHECK";
+const SKILL_LOCK_FILE = ".skill-lock.json";
 
 export interface SkillsCache {
   /** Tree SHA recorded the last time the user ran `releases skills install`. */
@@ -55,6 +58,37 @@ export function buildNagMessage(): string {
   return "\x1b[2mYour installed releases skills are behind. Run `releases skills install` to refresh.\x1b[0m";
 }
 
+/**
+ * Inspect the `skills` CLI's lock file to decide whether the nag should fire
+ * for this user. Returns:
+ *  - `"suppress"` only when the lock file is present AND parses cleanly AND
+ *    has zero `buildinternet/releases-cli` entries (user uninstalled or never
+ *    installed via `skills`).
+ *  - `"proceed"` in every other case — including a missing/unreadable lock
+ *    file — so manual installers and users on non-standard `skills` state
+ *    paths keep the existing behavior of relying on the baseline cache.
+ *
+ * Pure: takes the raw file contents (or `null` if the file is missing) so the
+ * decision can be tested without touching the filesystem.
+ */
+export function getLockSuppressionState(rawLockJson: string | null): "suppress" | "proceed" {
+  if (rawLockJson === null) return "proceed";
+  let parsed: { skills?: Record<string, { source?: unknown }> };
+  try {
+    parsed = JSON.parse(rawLockJson);
+  } catch {
+    return "proceed";
+  }
+  const skills = parsed?.skills;
+  if (!skills || typeof skills !== "object") return "proceed";
+  for (const entry of Object.values(skills)) {
+    if (entry && typeof entry === "object" && entry.source === SKILLS_COORDINATE) {
+      return "proceed";
+    }
+  }
+  return "suppress";
+}
+
 // ── Side-effect wrappers ────────────────────────────────────────────────
 
 function cachePath(): string {
@@ -74,6 +108,21 @@ function writeCache(cache: SkillsCache): void {
     writeFileSync(cachePath(), JSON.stringify(cache), "utf8");
   } catch {
     // best-effort
+  }
+}
+
+function skillLockPath(env: NodeJS.ProcessEnv = process.env): string {
+  // Matches the `skills` CLI's resolution: $XDG_STATE_HOME/skills/.skill-lock.json
+  // when set, otherwise ~/.agents/.skill-lock.json. See vercel-labs/skills.
+  if (env.XDG_STATE_HOME) return join(env.XDG_STATE_HOME, "skills", SKILL_LOCK_FILE);
+  return join(homedir(), ".agents", SKILL_LOCK_FILE);
+}
+
+function readSkillLockRaw(): string | null {
+  try {
+    return readFileSync(skillLockPath(), "utf8");
+  } catch {
+    return null;
   }
 }
 
@@ -120,6 +169,12 @@ export async function checkForSkillsUpdate(): Promise<string | null> {
 
     const cached = readCache() ?? EMPTY_CACHE;
     if (!cached.baseline) return null; // never installed via this CLI
+
+    // If the `skills` CLI's lock file is present and confirms no releases-cli
+    // entries, the user has uninstalled (or moved to a non-skills install) —
+    // suppress the nag. Missing/unreadable lock falls through so users who
+    // installed manually or via other tooling aren't affected.
+    if (getLockSuppressionState(readSkillLockRaw()) === "suppress") return null;
 
     const now = Date.now();
     let latest: string | null = cached.latest;

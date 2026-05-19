@@ -4,6 +4,7 @@ import {
   isOutdated,
   isCheckSuppressed,
   buildNagMessage,
+  getLockSuppressionState,
   type SkillsCache,
 } from "../../src/lib/skills-update-check.js";
 
@@ -87,5 +88,56 @@ describe("SkillsCache shape", () => {
   it("typechecks the documented fields", () => {
     const cache: SkillsCache = { baseline: "abc", latest: "def", checkedAt: 1 };
     expect(cache.baseline).toBe("abc");
+  });
+});
+
+describe("getLockSuppressionState", () => {
+  it("proceeds when the lock file is missing", () => {
+    expect(getLockSuppressionState(null)).toBe("proceed");
+  });
+
+  it("proceeds when the lock file is invalid JSON", () => {
+    expect(getLockSuppressionState("not json")).toBe("proceed");
+    expect(getLockSuppressionState("")).toBe("proceed");
+  });
+
+  it("proceeds when the lock file lacks a `skills` map (older / wrong schema)", () => {
+    expect(getLockSuppressionState(JSON.stringify({ version: 3 }))).toBe("proceed");
+    expect(getLockSuppressionState(JSON.stringify({ skills: "not an object" }))).toBe("proceed");
+  });
+
+  it("proceeds when at least one entry sources from buildinternet/releases-cli", () => {
+    const lock = JSON.stringify({
+      version: 3,
+      skills: {
+        "releases-cli": { source: "buildinternet/releases-cli", skillFolderHash: "abc" },
+        "ai-sdk": { source: "vercel/ai", skillFolderHash: "def" },
+      },
+    });
+    expect(getLockSuppressionState(lock)).toBe("proceed");
+  });
+
+  it("suppresses when the lock file has skills but no releases-cli entries", () => {
+    // User installed other skills via `skills` but uninstalled / never installed ours.
+    const lock = JSON.stringify({
+      version: 3,
+      skills: {
+        "ai-sdk": { source: "vercel/ai", skillFolderHash: "def" },
+        turborepo: { source: "vercel/turborepo", skillFolderHash: "ghi" },
+      },
+    });
+    expect(getLockSuppressionState(lock)).toBe("suppress");
+  });
+
+  it("suppresses when the lock file has an empty skills map", () => {
+    expect(getLockSuppressionState(JSON.stringify({ version: 3, skills: {} }))).toBe("suppress");
+  });
+
+  it("ignores entries with non-string sources rather than treating them as a match", () => {
+    const lock = JSON.stringify({
+      version: 3,
+      skills: { broken: { source: 42, skillFolderHash: "abc" } },
+    });
+    expect(getLockSuppressionState(lock)).toBe("suppress");
   });
 });
