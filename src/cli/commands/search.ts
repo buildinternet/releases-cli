@@ -3,6 +3,7 @@ import chalk from "chalk";
 import { unifiedSearch } from "../../api/client.js";
 import { stripAnsi } from "../../lib/sanitize.js";
 import { logger } from "@releases/lib/logger";
+import { isValidKind, KIND_VALUES, type Kind } from "@buildinternet/releases-core/kinds";
 import type { LookupResultPayload, UnifiedSearchResponse } from "../../api/types.js";
 import { writeJson } from "../../lib/output.js";
 
@@ -126,6 +127,10 @@ export function registerSearchCommand(program: Command) {
       "--domain <domain>",
       "Scope to the org owning this domain (URL-shaped input is normalized)",
     )
+    .option(
+      "--kind <kind>",
+      `Filter by taxonomy (${KIND_VALUES.join(", ")}). Release hits use COALESCE(source.kind, product.kind); catalog hits match the row's own kind only.`,
+    )
     .option("--json", "Output as JSON")
     .action(
       async (
@@ -135,6 +140,7 @@ export function registerSearchCommand(program: Command) {
           type?: string;
           mode?: string;
           domain?: string;
+          kind?: string;
           json?: boolean;
         },
       ) => {
@@ -148,6 +154,14 @@ export function registerSearchCommand(program: Command) {
           process.exit(1);
         }
 
+        if (opts.kind !== undefined && !isValidKind(opts.kind)) {
+          logger.error(
+            `Invalid --kind value: "${opts.kind}". Must be one of: ${KIND_VALUES.join(", ")}`,
+          );
+          process.exit(1);
+        }
+        const kind = opts.kind as Kind | undefined;
+
         let types: readonly SearchSection[];
         try {
           types = opts.type
@@ -158,9 +172,10 @@ export function registerSearchCommand(program: Command) {
           process.exit(1);
         }
 
-        const searchOpts: { mode?: SearchMode; domain?: string } = {};
+        const searchOpts: { mode?: SearchMode; domain?: string; kind?: Kind } = {};
         if (mode) searchOpts.mode = mode;
         if (opts.domain) searchOpts.domain = opts.domain;
+        if (kind) searchOpts.kind = kind;
         const response = await unifiedSearch(
           query,
           limit,

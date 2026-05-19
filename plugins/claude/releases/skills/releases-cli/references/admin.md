@@ -66,10 +66,14 @@ releases admin source update my-blog --type feed                # change adapter
 releases admin source update my-blog --no-feed-url              # clear stored feed URL
 releases admin source update my-blog --markdown-url https://example.com/changelog.md
 releases admin source update my-blog --primary                  # mark as org's primary changelog
+releases admin source update my-blog --kind sdk                 # classify (platform|sdk|mobile|desktop|docs|integration|tool)
+releases admin source update my-blog --no-kind                  # clear; falls back to parent product's kind
 releases admin source update my-blog --slug new-slug --confirm-slug-change
 ```
 
 Slug renames require `--confirm-slug-change` because they break existing web links.
+
+`--kind` sets the source's taxonomy. In **release feeds** and **search release hits**, a source with no kind of its own inherits its parent product's kind — so filtering by `kind=sdk` returns content from any source that's either marked SDK or sits under an SDK product. In **catalog listings** and **source lists** (`releases list`, `admin product list`, `search` catalog hits), the filter matches the row's *own* kind field directly with no inheritance — so the same `kind=sdk` filter only returns rows explicitly classified as SDK.
 
 ### Fetch
 
@@ -139,13 +143,19 @@ Products group sources under multi-product orgs (e.g. Vercel → Next.js, Turbor
 
 ```bash
 releases admin product create "Next.js" --org vercel --url https://nextjs.org
+releases admin product create "Stripe Node" --org stripe --kind sdk
 releases admin product list vercel
+releases admin product list openai --kind sdk           # filter by taxonomy
 releases admin product update nextjs --description "React framework for production"
+releases admin product update stripe-node --kind sdk    # classify
+releases admin product update stripe-node --no-kind     # clear
 releases admin product tag add nextjs react
 releases admin product alias add nextjs nextjs.org
 releases admin product delete nextjs          # sources become unlinked, not deleted
 releases admin product adopt nextjs --into vercel   # convert an org into a product
 ```
+
+`--kind` on a product is inherited by its sources (when the source has no kind of its own) on content-oriented surfaces. Use it to classify a whole multi-source product family (e.g. "Stripe's SDKs are all kind=sdk") instead of stamping every source individually.
 
 ## Releases
 

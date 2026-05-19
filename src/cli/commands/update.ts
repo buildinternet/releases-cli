@@ -10,6 +10,7 @@ import {
 } from "../../api/client.js";
 import { sourceNotFound } from "../suggest.js";
 import { toSlug } from "@buildinternet/releases-core/slug";
+import { isValidKind, KIND_VALUES, type Kind } from "@buildinternet/releases-core/kinds";
 import { logger } from "@releases/lib/logger";
 import { writeJson } from "../../lib/output.js";
 import { readContentArg } from "../../lib/input.js";
@@ -46,6 +47,7 @@ export type UpdateSourceOpts = {
   disable?: boolean;
   enable?: boolean;
   changelogPaths?: string | boolean;
+  kind?: string | boolean;
   dryRun?: boolean;
   metadataSet?: string[];
   metadataUnset?: string[];
@@ -209,6 +211,18 @@ export async function updateSourceAction(
   } else if (opts.enable) {
     updates.isHidden = false;
     changes.push("enabled");
+  }
+
+  if (opts.kind === false) {
+    updates.kind = null;
+    changes.push("kind cleared");
+  } else if (typeof opts.kind === "string") {
+    if (!isValidKind(opts.kind)) {
+      logger.error(`Invalid kind "${opts.kind}". Must be one of: ${KIND_VALUES.join(", ")}`);
+      process.exit(1);
+    }
+    updates.kind = opts.kind satisfies Kind;
+    changes.push(`kind → ${opts.kind}`);
   }
 
   const metaUpdates: Record<string, unknown> = {};
@@ -406,6 +420,11 @@ export function attachUpdateOptions(cmd: Command): Command {
     .option("--priority <level>", "Set fetch priority (normal, low, paused)")
     .option("--disable", "Disable source")
     .option("--enable", "Re-enable a disabled source")
+    .option(
+      "--kind <kind>",
+      `Set source taxonomy (${KIND_VALUES.join(", ")}). Resolves through the parent product on content-oriented surfaces (releases feed, search release hits) and matches directly on metadata surfaces (lists, catalog).`,
+    )
+    .option("--no-kind", "Clear the source's kind (falls back to inheriting from parent product)")
     .option(
       "--changelog-paths <paths>",
       "Comma-separated list of CHANGELOG paths (relative to repo root) for monorepo sources, e.g. 'packages/core/CHANGELOG.md,packages/cli/CHANGELOG.md'",

@@ -1,6 +1,7 @@
 import { getApiUrl, getApiKey, isAdminMode } from "../lib/mode.js";
 import { logger } from "@releases/lib/logger";
 import { daysAgoIso } from "@buildinternet/releases-core/dates";
+import type { Kind } from "@buildinternet/releases-core/kinds";
 import { RELEASES_CLI_UA } from "../lib/user-agent.js";
 import type {
   Source,
@@ -366,12 +367,14 @@ export async function unifiedSearch(
     org?: string;
     domain?: string;
     mode?: "lexical" | "semantic" | "hybrid";
+    kind?: Kind;
   },
 ): Promise<UnifiedSearchResponse> {
   const params = new URLSearchParams({ q: query, limit: String(limit) });
   if (opts?.org) params.set("org", opts.org);
   if (opts?.domain) params.set("domain", opts.domain);
   if (opts?.mode) params.set("mode", opts.mode);
+  if (opts?.kind) params.set("kind", opts.kind);
   return apiFetch<UnifiedSearchResponse>(`/v1/search?${params}`);
 }
 
@@ -392,6 +395,7 @@ type ListSourcesOpts = {
   query?: string;
   includeHidden?: boolean;
   category?: string;
+  kind?: Kind;
   limit?: number;
   page?: number;
 };
@@ -410,6 +414,7 @@ export async function listSourcesWithOrg(
   if (opts?.query) params.set("query", opts.query);
   if (opts?.includeHidden) params.set("include_hidden", "true");
   if (opts?.category) params.set("category", opts.category);
+  if (opts?.kind) params.set("kind", opts.kind);
   if (opts?.limit != null) params.set("limit", String(opts.limit));
   if (opts?.page != null) params.set("page", String(opts.page));
   if (opts?.envelope) params.set("envelope", "true");
@@ -824,7 +829,7 @@ export async function unlinkOrgAccount(
 export async function createProduct(
   orgId: string,
   name: string,
-  opts?: { slug?: string; url?: string; description?: string; category?: string },
+  opts?: { slug?: string; url?: string; description?: string; category?: string; kind?: Kind },
 ): Promise<Product> {
   return apiFetch<Product>(`/v1/products`, {
     method: "POST",
@@ -835,6 +840,7 @@ export async function createProduct(
       url: opts?.url,
       description: opts?.description,
       category: opts?.category,
+      kind: opts?.kind,
     }),
   });
 }
@@ -878,6 +884,7 @@ export async function findProduct(identifier: string): Promise<Product | null> {
 
 export async function getProductsByOrg(
   orgId: string,
+  opts?: { kind?: Kind },
 ): Promise<Array<Product & { sourceCount: number }>> {
   // /v1/products returns a paginated envelope; tolerate the legacy bare-array
   // shape too in case an old worker is ever in the path. Without the unwrap,
@@ -885,7 +892,9 @@ export async function getProductsByOrg(
   // iterating an object and yielding nothing — which is what made
   // `releases org get` skip the Products section even when the org had them.
   type Row = Product & { sourceCount: number };
-  const raw = await apiFetch<Row[] | ListResponse<Row>>(`/v1/products?orgId=${orgId}`);
+  const params = new URLSearchParams({ orgId });
+  if (opts?.kind) params.set("kind", opts.kind);
+  const raw = await apiFetch<Row[] | ListResponse<Row>>(`/v1/products?${params}`);
   if (!raw) return [];
   return Array.isArray(raw) ? raw : raw.items;
 }

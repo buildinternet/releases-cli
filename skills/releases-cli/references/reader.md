@@ -10,6 +10,7 @@ Unified search across organizations, the catalog (products + standalone sources)
 releases search "authentication"
 releases search "vercel" --type releases --limit 5
 releases search "react" --type catalog
+releases search "stripe" --kind sdk         # taxonomy filter
 releases search "breaking change" --json
 ```
 
@@ -18,7 +19,8 @@ Flags:
 - `--type <orgs|catalog|releases>` — narrow to one section (default: all three). `products` is accepted as a deprecated alias for `catalog`.
 - `--limit <n>` — max results per section (default: 10).
 - `--mode <lexical|semantic|hybrid>` — pick the release-retrieval strategy. Server default is hybrid; pass `lexical` for pure FTS ranking.
-- `--json` — machine output. Release hits include a `kind: "release" | "changelog_chunk"` discriminator. Catalog hits include `kind: "product" | "source"` so you can route a click to either a product page or a standalone source.
+- `--kind <platform|sdk|mobile|desktop|docs|integration|tool>` — taxonomy filter. Release hits match `COALESCE(source.kind, product.kind)` (a source with no kind inherits from its product); catalog hits match the row's own kind directly.
+- `--json` — machine output. Release hits include a `kind: "release" | "changelog_chunk"` discriminator. Catalog hits include `entryType: "product" | "source"` (the entity discriminator) plus an optional `kind` field carrying the taxonomy classification.
 
 Catalog hits also include the response field `catalog`. Older API deploys will still send the deprecated `products` alias instead — the CLI reads either, but new code should consume `catalog`.
 
@@ -55,6 +57,7 @@ releases list --product nextjs         # filter by product (prod_… or slug)
 releases list --query shadcn           # name / slug / url substring
 releases list --has-feed               # sources with a discovered feed URL
 releases list --category ai            # filter by category
+releases list --kind sdk               # filter by taxonomy (platform|sdk|mobile|desktop|docs|integration|tool)
 releases list --json                   # machine-readable output
 releases list --json --compact         # lightweight JSON (id, slug, name, type, org, date)
 releases list --json --limit 20 --page 2  # pagination (server-side)

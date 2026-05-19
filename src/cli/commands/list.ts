@@ -12,6 +12,7 @@ import {
   formatTruncationWarning,
   type ListResponse,
 } from "@buildinternet/releases-core/cli-contracts";
+import { isValidKind, KIND_VALUES, type Kind } from "@buildinternet/releases-core/kinds";
 
 function getFetchMethod(type: string, meta: Record<string, unknown> | null): string {
   if (type === "github") return "github";
@@ -36,6 +37,10 @@ export function registerListCommand(program: Command) {
     .option("--has-feed", "Only show sources that have a discovered feed URL")
     .option("--query <text>", "Filter by name, slug, or URL")
     .option("--category <category>", "Filter by organization or product category")
+    .option(
+      "--kind <kind>",
+      `Filter by source taxonomy (${KIND_VALUES.join(", ")}). Matches the source's own kind only (no inheritance).`,
+    )
     .option("--include-disabled", "Include disabled sources in the list")
     .option("--compact", "Return lightweight fields only")
     .option("--limit <n>", `Limit the number of results (default ${DEFAULT_PAGE_SIZE})`)
@@ -49,6 +54,7 @@ export function registerListCommand(program: Command) {
           org?: string;
           product?: string;
           category?: string;
+          kind?: string;
           hasFeed?: boolean;
           query?: string;
           includeDisabled?: boolean;
@@ -58,6 +64,11 @@ export function registerListCommand(program: Command) {
           flat?: boolean;
         },
       ) => {
+        if (opts.kind !== undefined && !isValidKind(opts.kind)) {
+          logger.error(`Invalid kind "${opts.kind}". Must be one of: ${KIND_VALUES.join(", ")}`);
+          process.exit(1);
+        }
+        const kind = opts.kind as Kind | undefined;
         // Validate pagination flags before the slug fast path so malformed
         // --limit / --page still error consistently, even when ignored by the
         // single-source branch.
@@ -110,6 +121,7 @@ export function registerListCommand(program: Command) {
           orgSlug: opts.org,
           productSlug: opts.product,
           category: opts.category,
+          kind,
           hasFeed: opts.hasFeed,
           query: opts.query,
           includeHidden: opts.includeDisabled,
