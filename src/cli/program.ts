@@ -39,6 +39,7 @@ import { registerServeCommand } from "./commands/serve.js";
 import { registerWhoamiCommand } from "./commands/whoami.js";
 import { registerWebhookCommand } from "./commands/webhook.js";
 import { registerAgentContextCommand } from "./commands/agent-context.js";
+import { registerCompletionCommand } from "./commands/completion.js";
 import { CATEGORIES } from "@buildinternet/releases-core/categories";
 import { isAdminMode } from "../lib/mode.js";
 import { VERSION } from "./version.js";
@@ -182,6 +183,7 @@ registerCollectionReadCommands(program);
 registerTelemetryCommand(program);
 registerWhoamiCommand(program);
 registerAgentContextCommand(program);
+registerCompletionCommand(program);
 
 const admin = program
   .command("admin")

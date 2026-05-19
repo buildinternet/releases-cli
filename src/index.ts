@@ -4,6 +4,7 @@ import { validateConfig } from "./lib/mode.js";
 import { logger } from "@releases/lib/logger";
 import { recordEvent, maybeShowFirstRunNotice } from "./lib/telemetry.js";
 import { checkForUpdate } from "./lib/update-check.js";
+import { maybeShowCompletionHint } from "./cli/completion/hint.js";
 
 const LEGACY_COMMAND_ALIASES: Record<string, string[]> = {
   add: ["admin", "source", "add"],
@@ -96,6 +97,10 @@ try {
     updateCheckPromise,
   ]);
   if (updateMessage) process.stderr.write(updateMessage + "\n");
+  // Show completion hint after the command output, on successful runs only.
+  // Skip when the user is already configuring completions or running help/version.
+  const isCompletionRelated = argv[2] === "completion" || argv[2] === "telemetry";
+  if (!isCompletionRelated && !skipUpdateCheck) maybeShowCompletionHint();
 } catch (err) {
   await flushTelemetry(1);
   throw err;
