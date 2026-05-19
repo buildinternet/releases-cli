@@ -4,6 +4,7 @@ import { validateConfig } from "./lib/mode.js";
 import { logger } from "@releases/lib/logger";
 import { recordEvent, maybeShowFirstRunNotice } from "./lib/telemetry.js";
 import { checkForUpdate } from "./lib/update-check.js";
+import { checkForSkillsUpdate } from "./lib/skills-update-check.js";
 import { maybeShowCompletionHint } from "./cli/completion/hint.js";
 
 const LEGACY_COMMAND_ALIASES: Record<string, string[]> = {
@@ -90,13 +91,22 @@ const skipUpdateCheck =
   argv.includes("-h");
 const updateCheckPromise = skipUpdateCheck ? null : checkForUpdate();
 
+// Also check whether the installed agent skills are stale vs the repo. Same
+// skip conditions as the CLI update check, plus skip during `skills` itself
+// (the user is already managing skills there). TTY gating happens here so the
+// pure function can be unit-tested without simulating a TTY.
+const skipSkillsCheck = skipUpdateCheck || argv[2] === "skills" || !process.stderr.isTTY;
+const skillsCheckPromise = skipSkillsCheck ? null : checkForSkillsUpdate();
+
 try {
   await program.parseAsync(argv);
-  const [, updateMessage] = await Promise.all([
+  const [, updateMessage, skillsMessage] = await Promise.all([
     flushTelemetry(typeof process.exitCode === "number" ? process.exitCode : 0),
     updateCheckPromise,
+    skillsCheckPromise,
   ]);
   if (updateMessage) process.stderr.write(updateMessage + "\n");
+  if (skillsMessage) process.stderr.write(skillsMessage + "\n");
   // Show completion hint after the command output, on successful runs only.
   // Skip when the user is already configuring completions or running help/version.
   const isCompletionRelated = argv[2] === "completion" || argv[2] === "telemetry";

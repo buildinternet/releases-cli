@@ -2,6 +2,7 @@ import { Command } from "commander";
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import chalk from "chalk";
 import { buildSkillsArgs, SKILLS_SOURCE } from "../skills/build-args.js";
+import { recordSkillsInstallBaseline } from "../../lib/skills-update-check.js";
 
 function exitWithError(message: string, hint: string): never {
   console.error(chalk.red(message) + " " + chalk.dim(hint));
@@ -120,6 +121,12 @@ export function registerSkillsCommand(parent: Command): void {
 
         if (code !== 0) {
           process.exit(code);
+        }
+
+        // Record the post-install baseline so `checkForSkillsUpdate` has a
+        // SHA to compare against later. Skip for --list (no install happened).
+        if (!opts.list) {
+          await recordSkillsInstallBaseline();
         }
 
         if (process.stdout.isTTY && !opts.list) {

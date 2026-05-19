@@ -148,6 +148,7 @@ Nothing is required for reader access. For admin operations (closed beta — see
 - `RELEASED_API_KEY` — Bearer token for write endpoints. Required for any `releases admin …` command that mutates state. Keys are not self-serve right now.
 - `RELEASED_API_URL` — Override the default `https://api.releases.sh` endpoint (useful for staging).
 - `RELEASED_TELEMETRY_DISABLED=1` — Opt out of anonymous usage pings. `DO_NOT_TRACK=1` is also honored.
+- `RELEASES_DISABLE_SKILL_UPDATE_CHECK=1` — Silence the "skills are behind, run `releases skills install`" stderr nag that fires (at most once per 24h) when the GitHub `skills/` tree has moved since your last install.
 
 Copy `.env.example` to `.env` to configure these locally.
 
