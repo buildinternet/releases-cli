@@ -37,6 +37,13 @@ jobs:
           bun build --compile src/index.ts --outfile npm/releases-linux-x64/releases --target=bun-linux-x64
           bun build --compile src/index.ts --outfile npm/releases-linux-arm64/releases --target=bun-linux-arm64
           bun build --compile src/index.ts --outfile npm/releases-windows-x64/releases.exe --target=bun-windows-x64
+          # bun --compile on a Linux runner produces 0644 outputs for cross-targets;
+          # set +x so gzip preserves the bit and downstream installers (Homebrew,
+          # curl|sh, manual gunzip) get an executable file.
+          chmod +x npm/releases-darwin-arm64/releases
+          chmod +x npm/releases-darwin-x64/releases
+          chmod +x npm/releases-linux-x64/releases
+          chmod +x npm/releases-linux-arm64/releases
 
       - name: Configure npm auth
         env:
@@ -157,6 +164,7 @@ jobs:
               # Single-binary .gz decompresses to a platform-suffixed filename
               # (e.g. releases-darwin-arm64). Rename to "releases" on install.
               binary = Dir["releases-*"].find { |f| File.file?(f) }
+              chmod 0755, binary
               bin.install binary => "releases"
 
               generate_completions_from_executable(bin/"releases", "completion", shells: [:bash, :zsh, :fish])
