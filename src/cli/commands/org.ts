@@ -266,6 +266,7 @@ type OrgUpdateOpts = {
   description?: string;
   category?: string | boolean;
   avatar?: string | boolean;
+  paused?: boolean;
   json?: boolean;
   dryRun?: boolean;
 };
@@ -293,6 +294,8 @@ async function orgUpdateAction(identifier: string, opts: OrgUpdateOpts): Promise
   if (opts.avatar === false) updates.avatarUrl = null;
   else if (typeof opts.avatar === "string") updates.avatarUrl = opts.avatar;
 
+  if (opts.paused !== undefined) updates.fetchPaused = opts.paused;
+
   if (Object.keys(updates).length === 0) {
     logger.warn("No fields to update.");
     process.exit(1);
@@ -311,7 +314,13 @@ async function orgUpdateAction(identifier: string, opts: OrgUpdateOpts): Promise
   const updated = await updateOrg(found.slug, updates);
 
   if (opts.json) await writeJson(updated);
-  else logger.info(chalk.green(`Updated organization: ${updated.name} (${updated.slug})`));
+  else {
+    const pausedSuffix =
+      opts.paused === true ? "  — paused" : opts.paused === false ? "  — unpaused" : "";
+    logger.info(
+      chalk.green(`Updated organization: ${updated.name} (${updated.slug})${pausedSuffix}`),
+    );
+  }
 }
 
 type OrgDeleteOpts = { json?: boolean; dryRun?: boolean; hard?: boolean; yes?: boolean };
@@ -613,6 +622,8 @@ Examples:
     .option("--no-category", "Clear category")
     .option("--avatar <url>", "Set avatar image URL")
     .option("--no-avatar", "Clear avatar URL")
+    .option("--paused", "Pause ingest for all of this org's sources (catalog stays visible)")
+    .option("--no-paused", "Resume ingest for this org's sources")
     .option("--json", "Output as JSON")
     .option("--dry-run", "Show what would change without writing")
     .action(orgUpdateAction);
@@ -629,6 +640,8 @@ Examples:
     .option("--no-category", "Clear category")
     .option("--avatar <url>", "Set avatar image URL")
     .option("--no-avatar", "Clear avatar URL")
+    .option("--paused", "Pause ingest for all of this org's sources (catalog stays visible)")
+    .option("--no-paused", "Resume ingest for this org's sources")
     .option("--json", "Output as JSON")
     .option("--dry-run", "Show what would change without writing")
     .action(warnDeprecatedAlias<[string, OrgUpdateOpts]>("edit", "update", orgUpdateAction));
