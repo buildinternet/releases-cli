@@ -4,8 +4,13 @@ import { getDataDir } from "@releases/lib/config";
 import { defaultInstallPath, detectShell } from "./install.js";
 
 const HINT_MARKER = "completion-hint-shown";
+const TRUTHY_CI_VALUES = new Set(["true", "1", "yes"]);
 
 type Env = Record<string, string | undefined>;
+
+function isTruthyEnvFlag(value: string | undefined): boolean {
+  return value !== undefined && TRUTHY_CI_VALUES.has(value.toLowerCase());
+}
 
 export interface HintGate {
   isInteractive: boolean;
@@ -18,8 +23,8 @@ export function shouldShowCompletionHint(gate: HintGate): boolean {
   if (!gate.isInteractive) return false;
   if (gate.hintAlreadyShown) return false;
   if (gate.completionFileExists) return false;
-  if (gate.env.RELEASES_NO_COMPLETION_HINT === "1") return false;
-  if (gate.env.CI === "true" || gate.env.GITHUB_ACTIONS === "true") return false;
+  if (isTruthyEnvFlag(gate.env.RELEASES_NO_COMPLETION_HINT)) return false;
+  if (isTruthyEnvFlag(gate.env.CI) || isTruthyEnvFlag(gate.env.GITHUB_ACTIONS)) return false;
   if (gate.env.RELEASED_CLIENT_KIND && gate.env.RELEASED_CLIENT_KIND !== "external") {
     return false;
   }

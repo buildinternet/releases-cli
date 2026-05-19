@@ -53,4 +53,21 @@ describe("shouldShowCompletionHint", () => {
       }),
     ).toBe(false);
   });
+
+  it("treats common truthy CI flag values case-insensitively", () => {
+    for (const value of ["true", "TRUE", "1", "yes", "YES"]) {
+      expect(
+        shouldShowCompletionHint({
+          ...TTY,
+          env: { SHELL: "/bin/zsh", CI: value },
+        }),
+      ).toBe(false);
+      expect(
+        shouldShowCompletionHint({
+          ...TTY,
+          env: { SHELL: "/bin/zsh", GITHUB_ACTIONS: value },
+        }),
+      ).toBe(false);
+    }
+  });
 });

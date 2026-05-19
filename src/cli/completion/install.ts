@@ -1,8 +1,19 @@
 import { mkdirSync, writeFileSync, existsSync } from "fs";
 import { dirname, basename } from "path";
+import { homedir } from "os";
 import type { SupportedShell } from "./generate.js";
 
 type Env = Record<string, string | undefined>;
+
+function resolveHome(env: Env): string {
+  const home = env.HOME || homedir();
+  if (!home) {
+    throw new Error(
+      "Cannot resolve home directory: $HOME is unset and os.homedir() returned empty.",
+    );
+  }
+  return home;
+}
 
 export function detectShell(env: Env = process.env): SupportedShell | null {
   const shell = env.SHELL;
@@ -15,7 +26,7 @@ export function detectShell(env: Env = process.env): SupportedShell | null {
 }
 
 export function defaultInstallPath(shell: SupportedShell, env: Env = process.env): string {
-  const home = env.HOME ?? "";
+  const home = resolveHome(env);
   switch (shell) {
     case "zsh":
       return `${home}/.zsh/completions/_releases`;

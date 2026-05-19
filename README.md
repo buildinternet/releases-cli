@@ -47,14 +47,14 @@ Every version publishes signed archives for each platform on the [Releases page]
 
 ### Shell completion
 
-Homebrew installs bash, zsh, and fish completions automatically. For all other install paths, run:
+Once the matching tap formula update rolls out, Homebrew will install bash, zsh, and fish completions automatically. Until then, and for all non-Homebrew install paths, run:
 
 ```bash
 releases completion install          # auto-detects $SHELL
 releases completion install zsh      # or pick explicitly
 ```
 
-`install` writes to the conventional location (`~/.zsh/completions/_releases`, `~/.local/share/bash-completion/completions/releases`, or `~/.config/fish/completions/releases.fish`) and prints any rc-file lines you may need to add. To pipe the script somewhere yourself:
+`install` writes to the conventional location (`~/.zsh/completions/_releases`, `~/.local/share/bash-completion/completions/releases`, or `~/.config/fish/completions/releases.fish`) and prints any rc-file lines you may need to add. The bash and fish paths honor `$XDG_DATA_HOME` and `$XDG_CONFIG_HOME` respectively, so the file lands wherever those point if set. Pass `--path <file>` to override the destination. To pipe the script somewhere yourself:
 
 ```bash
 releases completion zsh > /path/to/_releases

@@ -51,6 +51,23 @@ describe("defaultInstallPath", () => {
       "/custom/config/fish/completions/releases.fish",
     );
   });
+
+  it("falls back to os.homedir() when HOME is unset", () => {
+    // With env={} we drop through to os.homedir(). In any normal test env that
+    // returns a real path, so the result is non-empty and ends with the
+    // shell-specific suffix — never a root-prefixed bogus path like /.zsh/...
+    const zshPath = defaultInstallPath("zsh", {});
+    expect(zshPath).toMatch(/.+\/\.zsh\/completions\/_releases$/);
+    expect(zshPath.startsWith("/.")).toBe(false);
+
+    const bashPath = defaultInstallPath("bash", {});
+    expect(bashPath).toMatch(/.+\/bash-completion\/completions\/releases$/);
+    expect(bashPath.startsWith("/.")).toBe(false);
+
+    const fishPath = defaultInstallPath("fish", {});
+    expect(fishPath).toMatch(/.+\/fish\/completions\/releases\.fish$/);
+    expect(fishPath.startsWith("/.")).toBe(false);
+  });
 });
 
 describe("rcSnippet", () => {
