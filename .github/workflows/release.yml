@@ -158,10 +158,13 @@ jobs:
               # (e.g. releases-darwin-arm64). Rename to "releases" on install.
               binary = Dir["releases-*"].find { |f| File.file?(f) }
               bin.install binary => "releases"
+
+              generate_completions_from_executable(bin/"releases", "completion", shells: [:bash, :zsh, :fish])
             end
 
             test do
               assert_match "releases", shell_output("#{bin}/releases --version")
+              assert_match "complete -F _releases releases", shell_output("#{bin}/releases completion bash")
             end
           end
           FORMULA
