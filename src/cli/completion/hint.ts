@@ -1,0 +1,65 @@
+import { existsSync, writeFileSync, chmodSync } from "fs";
+import { join } from "path";
+import { getDataDir } from "@releases/lib/config";
+import { defaultInstallPath, detectShell } from "./install.js";
+
+const HINT_MARKER = "completion-hint-shown";
+
+type Env = Record<string, string | undefined>;
+
+export interface HintGate {
+  isInteractive: boolean;
+  hintAlreadyShown: boolean;
+  completionFileExists: boolean;
+  env: Env;
+}
+
+export function shouldShowCompletionHint(gate: HintGate): boolean {
+  if (!gate.isInteractive) return false;
+  if (gate.hintAlreadyShown) return false;
+  if (gate.completionFileExists) return false;
+  if (gate.env.RELEASES_NO_COMPLETION_HINT === "1") return false;
+  if (gate.env.CI === "true" || gate.env.GITHUB_ACTIONS === "true") return false;
+  if (gate.env.RELEASED_CLIENT_KIND && gate.env.RELEASED_CLIENT_KIND !== "external") {
+    return false;
+  }
+  if (!detectShell(gate.env)) return false;
+  return true;
+}
+
+function markerPath(): string {
+  return join(getDataDir(), HINT_MARKER);
+}
+
+export function markCompletionHintShown(): void {
+  try {
+    writeFileSync(markerPath(), new Date().toISOString(), "utf8");
+    chmodSync(markerPath(), 0o600);
+  } catch {
+    // ignore — hint state is best-effort
+  }
+}
+
+export function maybeShowCompletionHint(): void {
+  const shell = detectShell();
+  if (!shell) return;
+  const completionPath = defaultInstallPath(shell);
+  const gate: HintGate = {
+    isInteractive: process.stderr.isTTY === true,
+    hintAlreadyShown: existsSync(markerPath()),
+    completionFileExists: existsSync(completionPath),
+    env: process.env as Env,
+  };
+  if (!shouldShowCompletionHint(gate)) return;
+
+  process.stderr.write(
+    [
+      "",
+      "\x1b[2mTip: enable shell completion with:\x1b[0m",
+      `\x1b[2m  releases completion install ${shell}\x1b[0m`,
+      "\x1b[2m(set RELEASES_NO_COMPLETION_HINT=1 to silence)\x1b[0m",
+      "",
+    ].join("\n") + "\n",
+  );
+  markCompletionHintShown();
+}

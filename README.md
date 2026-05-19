@@ -45,6 +45,23 @@ Downloads the matching platform binary from npm. Respects `RELEASED_INSTALL_DIR`
 
 Every version publishes signed archives for each platform on the [Releases page](https://github.com/buildinternet/releases-cli/releases) — `releases-{darwin-arm64,darwin-x64,linux-arm64,linux-x64}.gz` and `releases-windows-x64.zip`, each with a matching `.sha256` and a top-level `checksums.txt`. Useful for air-gapped installs, version pinning, or platforms where npm and Homebrew aren't an option.
 
+### Shell completion
+
+Homebrew installs bash, zsh, and fish completions automatically. For all other install paths, run:
+
+```bash
+releases completion install          # auto-detects $SHELL
+releases completion install zsh      # or pick explicitly
+```
+
+`install` writes to the conventional location (`~/.zsh/completions/_releases`, `~/.local/share/bash-completion/completions/releases`, or `~/.config/fish/completions/releases.fish`) and prints any rc-file lines you may need to add. To pipe the script somewhere yourself:
+
+```bash
+releases completion zsh > /path/to/_releases
+```
+
+Set `RELEASES_NO_COMPLETION_HINT=1` to silence the first-run completion hint.
+
 ## Usage
 
 ```bash
