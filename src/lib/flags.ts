@@ -7,7 +7,11 @@ import chalk from "chalk";
  */
 export function parsePositiveIntFlag(label: string, raw: string | undefined): number | undefined {
   if (raw === undefined) return undefined;
-  const n = Number.parseInt(raw, 10);
+  // Strict integer match first — Number.parseInt would silently accept "1.5" → 1
+  // and "10abc" → 10. Allow an optional leading minus so the range check below
+  // produces the same error message for "-1" as it does for "1.5".
+  const isInt = /^-?\d+$/.test(raw);
+  const n = isInt ? Number.parseInt(raw, 10) : NaN;
   if (!Number.isFinite(n) || n <= 0) {
     console.error(chalk.red(`Invalid --${label}: must be a positive integer (got ${raw})`));
     process.exit(2);
