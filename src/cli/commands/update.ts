@@ -300,6 +300,10 @@ export async function updateSourceAction(
   // last-write-wins is documented so we honour it via iteration order).
   if (opts.metadataUnset && opts.metadataUnset.length > 0) {
     for (const key of opts.metadataUnset) {
+      if (key.trim() === "") {
+        logger.error(`Invalid --metadata-unset key: key must be non-empty`);
+        process.exit(2);
+      }
       if (key.includes(".") || key.includes("[")) {
         logger.error(
           `Invalid --metadata-unset key "${key}": nested paths (keys containing "." or "[") are not supported.`,
