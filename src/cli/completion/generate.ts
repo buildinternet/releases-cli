@@ -17,9 +17,7 @@ export function commandToSpec(cmd: Command): CommandSpec {
         flags: [o.short, o.long].filter((f): f is string => Boolean(f)),
         description: o.description ?? "",
       })),
-    children: cmd.commands
-      .filter((c) => !(c as Command & { _hidden?: boolean })._hidden)
-      .map(commandToSpec),
+    children: cmd.commands.map(commandToSpec),
   };
 }
 
@@ -147,7 +145,12 @@ export function generateFishCompletion(root: CommandSpec): string {
   return lines.join("\n") + "\n";
 }
 
-export type SupportedShell = "bash" | "zsh" | "fish";
+export const SUPPORTED_SHELLS = ["bash", "zsh", "fish"] as const;
+export type SupportedShell = (typeof SUPPORTED_SHELLS)[number];
+
+export function isSupportedShell(s: string): s is SupportedShell {
+  return (SUPPORTED_SHELLS as readonly string[]).includes(s);
+}
 
 export function generateCompletion(shell: SupportedShell, spec: CommandSpec): string {
   switch (shell) {

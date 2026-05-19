@@ -1,6 +1,12 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import { commandToSpec, generateCompletion, type SupportedShell } from "../completion/generate.js";
+import {
+  commandToSpec,
+  generateCompletion,
+  isSupportedShell,
+  SUPPORTED_SHELLS,
+  type SupportedShell,
+} from "../completion/generate.js";
 import {
   defaultInstallPath,
   detectShell,
@@ -9,24 +15,26 @@ import {
 } from "../completion/install.js";
 import { markCompletionHintShown } from "../completion/hint.js";
 
-const SHELLS: SupportedShell[] = ["bash", "zsh", "fish"];
+function exitWithError(message: string, hint: string): never {
+  console.error(chalk.red(message) + " " + chalk.dim(hint));
+  process.exit(1);
+}
 
-function parseShell(raw: string | undefined): SupportedShell {
-  if (!raw) {
-    console.error(
-      chalk.red("Missing shell argument.") +
-        " " +
-        chalk.dim("Usage: releases completion <bash|zsh|fish>"),
-    );
-    process.exit(1);
+function resolveShell(shellArg: string | undefined): SupportedShell {
+  if (!shellArg) {
+    const detected = detectShell();
+    if (!detected) {
+      exitWithError(
+        "Could not detect shell.",
+        `Pass one explicitly: releases completion install <${SUPPORTED_SHELLS.join("|")}>`,
+      );
+    }
+    return detected;
   }
-  if (!SHELLS.includes(raw as SupportedShell)) {
-    console.error(
-      chalk.red(`Unsupported shell: ${raw}`) + " " + chalk.dim("Supported: bash, zsh, fish"),
-    );
-    process.exit(1);
+  if (!isSupportedShell(shellArg)) {
+    exitWithError(`Unsupported shell: ${shellArg}`, `Supported: ${SUPPORTED_SHELLS.join(", ")}`);
   }
-  return raw as SupportedShell;
+  return shellArg;
 }
 
 export function registerCompletionCommand(parent: Command): void {
@@ -35,13 +43,12 @@ export function registerCompletionCommand(parent: Command): void {
     .description("Print or install shell completions")
     .showSuggestionAfterError(true);
 
-  for (const shell of SHELLS) {
+  for (const shell of SUPPORTED_SHELLS) {
     completion
       .command(shell)
       .description(`Print the ${shell} completion script to stdout`)
       .action(() => {
-        const spec = commandToSpec(parent);
-        process.stdout.write(generateCompletion(shell, spec));
+        process.stdout.write(generateCompletion(shell, commandToSpec(parent)));
       });
   }
 
@@ -51,19 +58,9 @@ export function registerCompletionCommand(parent: Command): void {
     .option("--path <path>", "Override the install path (defaults vary by shell)")
     .description("Detect your shell and write the completion script")
     .action((shellArg: string | undefined, opts: { path?: string }) => {
-      const shell = shellArg ? parseShell(shellArg) : detectShell();
-      if (!shell) {
-        console.error(
-          chalk.red("Could not detect shell.") +
-            " " +
-            chalk.dim("Pass one explicitly: releases completion install <bash|zsh|fish>"),
-        );
-        process.exit(1);
-      }
-
+      const shell = resolveShell(shellArg);
       const path = opts.path ?? defaultInstallPath(shell);
-      const spec = commandToSpec(parent);
-      const content = generateCompletion(shell, spec);
+      const content = generateCompletion(shell, commandToSpec(parent));
       const result = writeCompletionFile(path, content);
       markCompletionHintShown();
 

@@ -41,16 +41,21 @@ export function markCompletionHintShown(): void {
 }
 
 export function maybeShowCompletionHint(): void {
-  const shell = detectShell();
-  if (!shell) return;
-  const completionPath = defaultInstallPath(shell);
-  const gate: HintGate = {
+  // Cheap checks first so non-TTY / disabled invocations skip the filesystem
+  // entirely — this runs after every successful CLI command.
+  const env = process.env as Env;
+  const cheapGate: HintGate = {
     isInteractive: process.stderr.isTTY === true,
-    hintAlreadyShown: existsSync(markerPath()),
-    completionFileExists: existsSync(completionPath),
-    env: process.env as Env,
+    hintAlreadyShown: false,
+    completionFileExists: false,
+    env,
   };
-  if (!shouldShowCompletionHint(gate)) return;
+  if (!shouldShowCompletionHint(cheapGate)) return;
+
+  const shell = detectShell(env);
+  if (!shell) return;
+  if (existsSync(markerPath())) return;
+  if (existsSync(defaultInstallPath(shell, env))) return;
 
   process.stderr.write(
     [
