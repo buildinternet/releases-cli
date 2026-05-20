@@ -95,7 +95,47 @@ interface OverviewBatchOpts {
   traceDir?: string;
 }
 
+interface OverviewFreshnessInput {
+  generatedAt?: string | null;
+  updatedAt?: string | null;
+  releaseCount: number;
+  citationCount?: number;
+}
+
 // ── Action handlers ───────────────────────────────────────────────────────────
+
+function ageLabel(iso: string | null | undefined): string {
+  return iso ? (timeAgo(iso) ?? "?") : "?";
+}
+
+function timestampsDifferMeaningfully(
+  first: string | null | undefined,
+  second: string | null | undefined,
+): boolean {
+  if (!first || !second) return first !== second;
+
+  const firstMs = Date.parse(first);
+  const secondMs = Date.parse(second);
+  if (!Number.isFinite(firstMs) || !Number.isFinite(secondMs)) return first !== second;
+
+  return firstMs !== secondMs;
+}
+
+export function formatOverviewFreshnessLine(overview: OverviewFreshnessInput): string {
+  const generatedLabel = ageLabel(overview.generatedAt);
+  const releaseLabel = `${overview.releaseCount} releases contributing`;
+  const citationLabel =
+    overview.citationCount === undefined ? "" : ` · ${overview.citationCount} citations`;
+
+  if (
+    overview.updatedAt &&
+    timestampsDifferMeaningfully(overview.updatedAt, overview.generatedAt)
+  ) {
+    return `updated ${ageLabel(overview.updatedAt)} · generated ${generatedLabel} · ${releaseLabel}${citationLabel}`;
+  }
+
+  return `generated ${generatedLabel} · ${releaseLabel}${citationLabel}`;
+}
 
 async function overviewGetAction(orgIdentifier: string, opts: OverviewGetOpts): Promise<void> {
   const org = await findOrg(orgIdentifier);
@@ -131,12 +171,9 @@ async function overviewGetAction(orgIdentifier: string, opts: OverviewGetOpts): 
     return;
   }
 
-  const ageLabel = overview.generatedAt ? (timeAgo(overview.generatedAt) ?? "?") : "?";
   console.log(chalk.bold(`${org.name} — overview`));
   console.log(
-    chalk.dim(
-      `  generated ${ageLabel} · ${overview.releaseCount} releases contributing · ${citations.length} citations`,
-    ),
+    chalk.dim(`  ${formatOverviewFreshnessLine({ ...overview, citationCount: citations.length })}`),
   );
   console.log();
   console.log(overview.content);
