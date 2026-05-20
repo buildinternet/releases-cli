@@ -11,5 +11,10 @@
   "files": [
     "releases.exe"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/buildinternet/releases-cli.git",
+    "directory": "npm/releases-windows-x64"
+  }
 }

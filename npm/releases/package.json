@@ -29,5 +29,10 @@
   "license": "MIT",
   "engines": {
     "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/buildinternet/releases-cli.git",
+    "directory": "npm/releases"
   }
 }
