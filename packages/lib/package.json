@@ -6,7 +6,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/zachdunn/releases-cli.git",
+    "url": "git+https://github.com/buildinternet/releases-cli.git",
     "directory": "packages/lib"
   },
   "exports": {
