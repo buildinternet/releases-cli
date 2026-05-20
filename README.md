@@ -156,11 +156,37 @@ npx skills add buildinternet/releases-cli
 
 Use this path when you only want the skill behavior (auto-triggering on release/CLI questions) without also registering the hosted MCP connection, agents, and `/releases` command that the plugin provides. Skills are symlinked by default, so re-running `releases skills install` (or `npx skills update releases-cli`) refreshes everything atomically.
 
+## Authentication
+
+Admin commands require an API token. You can store one persistently using the `auth` command namespace so you don't need to set `RELEASED_API_KEY` in your shell every time.
+
+```bash
+releases auth login                     # interactive prompt (masked input)
+releases auth login --token <token>     # pass directly
+releases auth login --token -           # read from stdin (pipe-friendly)
+```
+
+The token is verified against `GET /v1/tokens/me` before being saved. If verification fails, nothing is written.
+
+```bash
+releases auth status                    # show current auth state
+releases auth status --json             # machine-readable (authenticated, source, scopes, …)
+releases auth status --verify           # re-check the token against the API live
+releases auth token                     # print the raw token (for scripts)
+releases auth logout                    # remove the stored token
+```
+
+`whoami` is an alias for `auth status`.
+
+**Credential precedence:** if `RELEASED_API_KEY` is set in the environment it takes priority over any stored credential — useful for CI or per-command overrides.
+
+**Storage:** credentials are written to `~/.releases/credentials` with `0600` permissions (owner read/write, rw-------). The file is JSON and contains the token, name, scopes, the API URL the token was verified against, and a `savedAt` timestamp.
+
 ## Environment
 
 Nothing is required for reader access. For admin operations (closed beta — see above):
 
-- `RELEASED_API_KEY` — Bearer token for write endpoints. Required for any `releases admin …` command that mutates state. Keys are not self-serve right now.
+- `RELEASED_API_KEY` — Bearer token for write endpoints. Overrides any stored credential from `releases auth login`. Required for any `releases admin …` command that mutates state if no stored credential is present. Keys are not self-serve right now.
 - `RELEASED_API_URL` — Override the default `https://api.releases.sh` endpoint (useful for staging).
 - `RELEASED_TELEMETRY_DISABLED=1` — Opt out of anonymous usage pings. `DO_NOT_TRACK=1` is also honored.
 - `RELEASES_DISABLE_SKILL_UPDATE_CHECK=1` — Silence the "skills are behind, run `releases skills install`" stderr nag that fires (at most once per 24h) when the GitHub `skills/` tree has moved since your last install.

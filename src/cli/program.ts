@@ -42,7 +42,9 @@ import { registerAgentContextCommand } from "./commands/agent-context.js";
 import { registerCompletionCommand } from "./commands/completion.js";
 import { registerSkillsCommand } from "./commands/skills.js";
 import { CATEGORIES } from "@buildinternet/releases-core/categories";
-import { isAdminMode } from "../lib/mode.js";
+import { isAuthenticated } from "../lib/mode.js";
+import { preflightScopeWarning } from "../lib/preflight.js";
+import { registerAuthCommand } from "./commands/auth.js";
 import { VERSION } from "./version.js";
 import { writeJson } from "../lib/output.js";
 
@@ -55,9 +57,15 @@ function adminKeyError(name = "admin"): never {
   console.error(
     chalk.red(`"${name}" requires an API key.`) +
       " " +
-      chalk.dim("Set RELEASED_API_KEY to enable it."),
+      chalk.dim("Run `releases auth login` or set RELEASED_API_KEY."),
   );
   process.exit(1);
+}
+
+function adminGate(): void {
+  if (!isAuthenticated()) adminKeyError("admin");
+  const warn = preflightScopeWarning();
+  if (warn) console.error(chalk.yellow(`⚠ ${warn}`));
 }
 
 function row(name: string, desc: string, pad = 22): string {
@@ -68,9 +76,7 @@ function row(name: string, desc: string, pad = 22): string {
 function gateAdminSubtree(root: Command): void {
   for (const sub of root.commands) {
     sub.hook("preAction", () => {
-      if (!isAdminMode()) {
-        adminKeyError("admin");
-      }
+      adminGate();
     });
     gateAdminSubtree(sub);
   }
@@ -146,8 +152,8 @@ export const program = new Command()
   // to its own position. (Issue releases-cli#133.)
   .enablePositionalOptions()
   .hook("preAction", (_thisCommand, actionCommand) => {
-    if (actionCommand.name() !== "admin" && isWithinAdminCommand(actionCommand) && !isAdminMode()) {
-      adminKeyError("admin");
+    if (actionCommand.name() !== "admin" && isWithinAdminCommand(actionCommand)) {
+      adminGate();
     }
   })
   .configureHelp({
@@ -183,6 +189,7 @@ registerShowCommand(program);
 registerCollectionReadCommands(program);
 registerTelemetryCommand(program);
 registerWhoamiCommand(program);
+registerAuthCommand(program);
 registerAgentContextCommand(program);
 registerCompletionCommand(program);
 registerSkillsCommand(program);
@@ -192,8 +199,8 @@ const admin = program
   .description("Operator workflows for onboarding, curation, and ingestion")
   .showSuggestionAfterError(true)
   .hook("preAction", (_thisCommand, actionCommand) => {
-    if (!isAdminMode() && actionCommand.name() !== "admin") {
-      adminKeyError("admin");
+    if (actionCommand.name() !== "admin") {
+      adminGate();
     }
   })
   .action(() => {

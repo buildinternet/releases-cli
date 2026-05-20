@@ -9,6 +9,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Least-privilege default token: every job here only reads the repo.
+permissions:
+  contents: read
+
 jobs:
   lint:
     name: Lint & Format
@@ -56,7 +60,7 @@ jobs:
         run: npx tsc --noEmit
 
       - name: Test
-        run: bun test
+        run: bun test --isolate
 
   smoke-windows:
     name: Windows binary smoke test
