@@ -49,7 +49,7 @@ function gateAdminArgv(argv: string[]): void {
     args.length === 1 || args.includes("--help") || args.includes("-h") || args[1] === "help";
 
   if (!isHelpInvocation) {
-    logger.error('"admin" requires an API key. Set RELEASED_API_KEY to enable it.');
+    logger.error('"admin" requires an API key. Run `releases auth login` or set RELEASED_API_KEY.');
     process.exit(1);
   }
 }
