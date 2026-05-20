@@ -1,15 +1,42 @@
 import { logger } from "@releases/lib/logger";
+import { readCredential } from "./credentials.js";
 
 const DEFAULT_API_URL = "https://api.releases.sh";
 
 let _apiUrl: string | null = null;
-let _apiKey: string | null = null;
-let _admin: boolean | null = null;
 
-export function isAdminMode(): boolean {
-  if (_admin === null) _admin = !!process.env.RELEASED_API_KEY;
-  return _admin;
+export interface ResolvedCredential {
+  token: string | null;
+  source: "env" | "file" | "none";
+  scopes?: string[];
+  name?: string;
+  apiUrl?: string;
 }
+
+/** Resolve the active credential: explicit env var wins, then the stored file. */
+export function resolveCredential(): ResolvedCredential {
+  const envKey = process.env.RELEASED_API_KEY;
+  if (envKey) return { token: envKey, source: "env" };
+  const stored = readCredential();
+  if (stored) {
+    return {
+      token: stored.token,
+      source: "file",
+      scopes: stored.scopes,
+      name: stored.name,
+      apiUrl: stored.apiUrl,
+    };
+  }
+  return { token: null, source: "none" };
+}
+
+/** True when any credential resolves (env var or stored file). */
+export function isAuthenticated(): boolean {
+  return resolveCredential().token !== null;
+}
+
+/** Back-compat alias — historically "admin mode" meant "a credential is present". */
+export const isAdminMode = isAuthenticated;
 
 export function getApiUrl(): string {
   if (!_apiUrl) {
@@ -20,25 +47,29 @@ export function getApiUrl(): string {
 }
 
 export function getApiKey(): string {
-  if (!_apiKey) {
-    const key = process.env.RELEASED_API_KEY;
-    if (!key) throw new Error("RELEASED_API_KEY is not set");
-    _apiKey = key;
+  const { token } = resolveCredential();
+  if (!token) {
+    throw new Error("Not authenticated. Run `releases auth login` or set RELEASED_API_KEY.");
   }
-  return _apiKey;
+  return token;
 }
 
 /**
- * Call at CLI startup. If RELEASED_API_URL is explicitly set without an
- * RELEASED_API_KEY we treat that as a misconfigured admin setup and bail.
- * Otherwise we fall through to the default public endpoint.
+ * Call at CLI startup. With stored credentials, a custom RELEASED_API_URL is no
+ * longer fatal (you may be about to `releases auth login`, or doing anonymous
+ * reads) — it downgrades to a warning. Also warns when a stored token was
+ * verified against a different environment than the active URL.
  */
 export function validateConfig(): void {
-  if (process.env.RELEASED_API_URL && !process.env.RELEASED_API_KEY) {
-    logger.error("RELEASED_API_URL is set but RELEASED_API_KEY is missing.");
-    logger.error(
-      "Set RELEASED_API_KEY to authenticate with the remote API, or unset RELEASED_API_URL for public access.",
+  const cred = resolveCredential();
+  if (process.env.RELEASED_API_URL && cred.source === "none") {
+    logger.warn(
+      "RELEASED_API_URL is set but no API token is configured. Requests will be unauthenticated — run `releases auth login` to authenticate.",
     );
-    process.exit(1);
+  }
+  if (cred.source === "file" && cred.apiUrl && cred.apiUrl !== getApiUrl()) {
+    logger.warn(
+      `Stored token was verified against ${cred.apiUrl}, but the active API URL is ${getApiUrl()}. It may not be accepted.`,
+    );
   }
 }

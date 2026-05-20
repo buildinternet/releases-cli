@@ -56,7 +56,7 @@ jobs:
         run: npx tsc --noEmit
 
       - name: Test
-        run: bun test
+        run: bun test --isolate
 
   smoke-windows:
     name: Windows binary smoke test
