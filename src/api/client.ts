@@ -733,9 +733,14 @@ export async function createSource(data: {
   productId?: string | null;
   metadata?: string;
 }): Promise<Source> {
+  // Strip null/undefined values so the API's z.string().optional() schema
+  // doesn't reject an explicit `"productId": null` in the JSON body.
+  const body = Object.fromEntries(
+    Object.entries(data).filter(([, v]) => v !== null && v !== undefined),
+  );
   return apiFetch<Source>("/v1/sources", {
     method: "POST",
-    body: JSON.stringify(data),
+    body: JSON.stringify(body),
   });
 }
 
