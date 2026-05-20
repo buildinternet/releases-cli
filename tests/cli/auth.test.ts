@@ -27,7 +27,12 @@ const server = Bun.serve({
       if (auth !== "Bearer relk_good_token") return new Response("{}", { status: 401 });
       return Response.json({ kind: "token", name: "laptop", scopes: ["read", "write"] });
     }
-    return Response.json({ sources: [] });
+    // Catalog page-based pagination shape, so \`admin source list\` runs to
+    // completion (exits 0) after clearing the admin-key gate.
+    return Response.json({
+      items: [],
+      pagination: { page: 1, pageSize: 50, returned: 0, totalItems: 0, totalPages: 0, hasMore: false },
+    });
   },
 });
 process.stdout.write("READY:" + server.port + "\\n");
@@ -119,8 +124,10 @@ describe("releases auth (e2e)", () => {
 
   it("an admin command is allowed with a stored write-capable token", () => {
     const r = runCli(["admin", "source", "list"], { env: env() });
-    // Not blocked by the admin-key gate (stored token present).
+    // Not blocked by the admin-key gate (stored token present)…
     expect(r.stderr).not.toMatch(/requires an API key/);
+    // …and the command actually ran to completion past the gate.
+    expect(r.exitCode).toBe(0);
   });
 
   it("logout removes the stored token", () => {

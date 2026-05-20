@@ -32,6 +32,13 @@ describe("credentials", () => {
     expect(readCredential()).toBeNull();
   });
 
+  it("returns null when scopes is malformed (not a string array)", () => {
+    writeFileSync(join(dir, "credentials"), JSON.stringify({ token: "relk_x_y", scopes: "read" }));
+    expect(readCredential()).toBeNull();
+    writeFileSync(join(dir, "credentials"), JSON.stringify({ token: "relk_x_y", scopes: [1, 2] }));
+    expect(readCredential()).toBeNull();
+  });
+
   it("clear removes the file and reports it", () => {
     writeCredential({ token: "relk_x_y", apiUrl: "u", savedAt: "t" });
     expect(clearCredential()).toBe(true);

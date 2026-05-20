@@ -9,6 +9,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Least-privilege default token: every job here only reads the repo.
+permissions:
+  contents: read
+
 jobs:
   lint:
     name: Lint & Format

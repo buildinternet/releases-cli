@@ -180,7 +180,7 @@ releases auth logout                    # remove the stored token
 
 **Credential precedence:** if `RELEASED_API_KEY` is set in the environment it takes priority over any stored credential — useful for CI or per-command overrides.
 
-**Storage:** credentials are written to `~/.releases/credentials` with `0600` permissions (owner-read-only). The file is JSON and contains the token, name, scopes, the API URL the token was verified against, and a `savedAt` timestamp.
+**Storage:** credentials are written to `~/.releases/credentials` with `0600` permissions (owner read/write, rw-------). The file is JSON and contains the token, name, scopes, the API URL the token was verified against, and a `savedAt` timestamp.
 
 ## Environment
 

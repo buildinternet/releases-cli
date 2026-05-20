@@ -29,6 +29,15 @@ export function readCredential(): StoredCredential | null {
   try {
     const parsed = JSON.parse(readFileSync(path, "utf8")) as StoredCredential;
     if (typeof parsed?.token !== "string" || !parsed.token) return null;
+    // `scopes` is optional, but if present it must be a string array. A
+    // malformed value (e.g. a hand-edited string) would otherwise crash callers
+    // that iterate or `.join` it (auth status, the admin scope pre-flight).
+    if (
+      parsed.scopes !== undefined &&
+      (!Array.isArray(parsed.scopes) || !parsed.scopes.every((s) => typeof s === "string"))
+    ) {
+      return null;
+    }
     return parsed;
   } catch {
     return null;
