@@ -42,7 +42,7 @@ import { registerAgentContextCommand } from "./commands/agent-context.js";
 import { registerCompletionCommand } from "./commands/completion.js";
 import { registerSkillsCommand } from "./commands/skills.js";
 import { CATEGORIES } from "@buildinternet/releases-core/categories";
-import { isAdminMode, isAuthenticated } from "../lib/mode.js";
+import { isAuthenticated } from "../lib/mode.js";
 import { preflightScopeWarning } from "../lib/preflight.js";
 import { registerAuthCommand } from "./commands/auth.js";
 import { VERSION } from "./version.js";

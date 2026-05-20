@@ -26,6 +26,16 @@ describe("preflightScopeWarning", () => {
     expect(preflightScopeWarning()).toBeNull();
   });
 
+  it("no warning when the file token has admin (admin implies write)", () => {
+    writeCredential({ token: "relk_a_b", scopes: ["admin"], apiUrl: "u", savedAt: "t" });
+    expect(preflightScopeWarning()).toBeNull();
+  });
+
+  it("no warning when the file token has the wildcard scope", () => {
+    writeCredential({ token: "relk_a_b", scopes: ["*"], apiUrl: "u", savedAt: "t" });
+    expect(preflightScopeWarning()).toBeNull();
+  });
+
   it("no warning for env-sourced tokens (scopes unknown)", () => {
     process.env.RELEASED_API_KEY = "env-key";
     expect(preflightScopeWarning()).toBeNull();
