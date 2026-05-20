@@ -28,10 +28,16 @@ export function readCredential(): StoredCredential | null {
   if (!existsSync(path)) return null;
   try {
     const parsed = JSON.parse(readFileSync(path, "utf8")) as StoredCredential;
+    // The file is a trust boundary (it may be hand-edited or corrupt), so
+    // validate the full shape and return null on any mismatch — callers can then
+    // trust the returned StoredCredential matches its declared type.
     if (typeof parsed?.token !== "string" || !parsed.token) return null;
-    // `scopes` is optional, but if present it must be a string array. A
-    // malformed value (e.g. a hand-edited string) would otherwise crash callers
-    // that iterate or `.join` it (auth status, the admin scope pre-flight).
+    if (typeof parsed.apiUrl !== "string" || !parsed.apiUrl) return null;
+    if (typeof parsed.savedAt !== "string" || !parsed.savedAt) return null;
+    if (parsed.name !== undefined && typeof parsed.name !== "string") return null;
+    // `scopes` is optional, but if present it must be a string array — a malformed
+    // value (e.g. a hand-edited string) would crash callers that iterate or
+    // `.join` it (auth status, the admin scope pre-flight).
     if (
       parsed.scopes !== undefined &&
       (!Array.isArray(parsed.scopes) || !parsed.scopes.every((s) => typeof s === "string"))

@@ -33,9 +33,32 @@ describe("credentials", () => {
   });
 
   it("returns null when scopes is malformed (not a string array)", () => {
-    writeFileSync(join(dir, "credentials"), JSON.stringify({ token: "relk_x_y", scopes: "read" }));
+    const base = {
+      token: "relk_x_y",
+      apiUrl: "https://api.releases.sh",
+      savedAt: "2026-05-20T00:00:00.000Z",
+    };
+    writeFileSync(join(dir, "credentials"), JSON.stringify({ ...base, scopes: "read" }));
     expect(readCredential()).toBeNull();
-    writeFileSync(join(dir, "credentials"), JSON.stringify({ token: "relk_x_y", scopes: [1, 2] }));
+    writeFileSync(join(dir, "credentials"), JSON.stringify({ ...base, scopes: [1, 2] }));
+    expect(readCredential()).toBeNull();
+  });
+
+  it("returns null when required fields are missing or wrong-typed", () => {
+    // only token — apiUrl and savedAt missing
+    writeFileSync(join(dir, "credentials"), JSON.stringify({ token: "relk_x_y" }));
+    expect(readCredential()).toBeNull();
+    // apiUrl wrong type (number)
+    writeFileSync(
+      join(dir, "credentials"),
+      JSON.stringify({ token: "relk_x_y", apiUrl: 123, savedAt: "t" }),
+    );
+    expect(readCredential()).toBeNull();
+    // name wrong type (number)
+    writeFileSync(
+      join(dir, "credentials"),
+      JSON.stringify({ token: "relk_x_y", apiUrl: "u", savedAt: "t", name: 42 }),
+    );
     expect(readCredential()).toBeNull();
   });
 
