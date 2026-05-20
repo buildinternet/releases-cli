@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { program } from "./cli/program.js";
-import { validateConfig } from "./lib/mode.js";
+import { validateConfig, isAuthenticated } from "./lib/mode.js";
 import { logger } from "@releases/lib/logger";
 import { recordEvent, maybeShowFirstRunNotice } from "./lib/telemetry.js";
 import { checkForUpdate } from "./lib/update-check.js";
@@ -43,7 +43,7 @@ function rewriteLegacyCommand(argv: string[]): string[] {
 function gateAdminArgv(argv: string[]): void {
   const args = argv.slice(2);
   if (args[0] !== "admin") return;
-  if (process.env.RELEASED_API_KEY) return;
+  if (isAuthenticated()) return;
 
   const isHelpInvocation =
     args.length === 1 || args.includes("--help") || args.includes("-h") || args[1] === "help";
