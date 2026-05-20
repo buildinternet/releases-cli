@@ -9,18 +9,17 @@ let serverProc: ChildProcess | null = null;
 let baseUrl = "";
 let dataDir = "";
 
-const PORT = 19877;
-
 beforeAll(async () => {
   dataDir = mkdtempSync(join(tmpdir(), "rel-authcli-"));
 
-  // Spawn the stub server as a detached child process so spawned CLI
-  // subprocesses can reach it (Bun.serve in-process is network-sandboxed
-  // in some environments, but a detached OS process is always reachable).
+  // Spawned CLI subprocesses can't reach a `Bun.serve` bound inside the
+  // test-runner process in this sandbox, so run the stub as a detached OS
+  // process. It binds an ephemeral port (port: 0) and reports it back via the
+  // READY line to avoid hardcoded-port collisions on shared/CI machines.
   const serverScript = `
 const server = Bun.serve({
-  port: ${PORT},
-  hostname: "0.0.0.0",
+  port: 0,
+  hostname: "127.0.0.1",
   fetch(req) {
     const url = new URL(req.url);
     if (url.pathname === "/v1/tokens/me") {
@@ -31,7 +30,7 @@ const server = Bun.serve({
     return Response.json({ sources: [] });
   },
 });
-process.stdout.write("READY\\n");
+process.stdout.write("READY:" + server.port + "\\n");
 await Bun.sleep(60000);
 `;
   const scriptPath = join(dataDir, "stub-server.ts");
@@ -42,18 +41,20 @@ await Bun.sleep(60000);
     detached: true,
   });
 
-  baseUrl = `http://localhost:${PORT}`;
-
-  // Wait until the server is ready.
+  // Wait until the server is ready and capture the ephemeral port it bound.
   await new Promise<void>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("stub server start timeout")), 5000);
+    let buf = "";
     serverProc!.stdout!.on("data", (d: Buffer) => {
-      if (d.toString().includes("READY")) {
+      buf += d.toString();
+      const m = buf.match(/READY:(\d+)/);
+      if (m) {
+        baseUrl = `http://localhost:${m[1]}`;
         clearTimeout(timer);
         resolve();
       }
     });
-    serverProc!.on("error", (e) => {
+    serverProc!.on("error", (e: Error) => {
       clearTimeout(timer);
       reject(e);
     });
