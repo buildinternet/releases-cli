@@ -48,7 +48,7 @@ Every version publishes signed archives for each platform on the [Releases page]
 
 ### Shell completion
 
-Once the matching tap formula update rolls out, Homebrew will install bash, zsh, and fish completions automatically. Until then, and for all non-Homebrew install paths, run:
+**Homebrew installs bash, zsh, and fish completions automatically** — nothing extra to do. For every other install path (npm, the `curl | bash` installer, and the raw GitHub binaries), enable completions once:
 
 ```bash
 releases completion install          # auto-detects $SHELL
@@ -61,7 +61,7 @@ releases completion install zsh      # or pick explicitly
 releases completion zsh > /path/to/_releases
 ```
 
-Set `RELEASES_NO_COMPLETION_HINT=1` to silence the first-run completion hint.
+On an interactive terminal, a one-time hint nudges you to run this if completions aren't already set up. Set `RELEASES_NO_COMPLETION_HINT=1` to silence it.
 
 ## Usage
 
