@@ -25,6 +25,7 @@ import {
 } from "../../../api/client.js";
 import { orgNotFound } from "../../suggest.js";
 import { writeJson } from "../../../lib/output.js";
+import { trySaveBatchOverviewTrace } from "../../../lib/trace.js";
 import { parseNonNegIntFlag, parsePositiveIntFlag, parseTagList } from "../../../lib/flags.js";
 import { logger } from "@releases/lib/logger";
 import { timeAgo } from "@buildinternet/releases-core/dates";
@@ -91,6 +92,7 @@ interface OverviewBatchOpts {
   maxCostUsd?: string;
   wait?: boolean;
   json?: boolean;
+  traceDir?: string;
 }
 
 // ── Action handlers ───────────────────────────────────────────────────────────
@@ -578,12 +580,17 @@ async function overviewBatchAction(opts: OverviewBatchOpts): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
   }
 
+  const tracePath = trySaveBatchOverviewTrace(last, triggered.instanceId, opts.traceDir);
+
   if (opts.json) {
     await writeJson(last);
-  } else if (last.status === "complete") {
-    console.log(chalk.green(`Done. Final status: ${last.status}`));
   } else {
-    console.log(chalk.red(`Workflow ended in non-success state: ${last.status}`));
+    if (last.status === "complete") {
+      logger.info(chalk.green(`Done. Final status: ${last.status}`));
+    } else {
+      logger.error(chalk.red(`Workflow ended in non-success state: ${last.status}`));
+    }
+    if (tracePath) process.stderr.write(chalk.dim(`  Trace: ${tracePath}\n`));
   }
 
   if (last.status !== "complete") process.exit(1);
@@ -717,6 +724,10 @@ result with \`releases admin overview update\`.`,
     .option("--max-candidates <n>", "Cap on candidate count picked by the workflow (default 100)")
     .option("--max-cost-usd <n>", "Per-run cost ceiling in USD; workflow aborts above this")
     .option("--wait", "Poll the workflow status every 30s until it reaches a terminal state")
+    .option(
+      "--trace-dir <dir>",
+      "With --wait, write the terminal workflow as <dir>/<instanceId>/{trace.json,summary.md} (default: ~/.releases/work/runs)",
+    )
     .option("--json", "Output as JSON")
     .addHelpText(
       "after",

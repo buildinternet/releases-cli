@@ -5,6 +5,8 @@ import { registerOnboardApplyCommand } from "./onboard-apply.js";
 import { apiFetch } from "../../api/client.js";
 import { getApiUrl } from "../../lib/mode.js";
 import { writeJson } from "../../lib/output.js";
+import { trySaveSessionTrace } from "../../lib/trace.js";
+import type { Session } from "@buildinternet/releases-api-types";
 
 interface OnboardOpts {
   domain?: string;
@@ -14,6 +16,7 @@ interface OnboardOpts {
   json?: boolean;
   managedAgents?: boolean;
   sandbox?: boolean;
+  traceDir?: string;
 }
 
 type DiscoveryEngine = "managed-agents" | "sandbox";
@@ -62,6 +65,10 @@ export function registerOnboardCommand(program: Command) {
     )
     .option("--managed-agents", "Use the managed-agents discovery engine (default)")
     .option("--sandbox", "Use the legacy sandbox discovery engine")
+    .option(
+      "--trace-dir <dir>",
+      "Write the terminal session as <dir>/<sessionId>/{trace.json,summary.md} (default: ~/.releases/work/runs)",
+    )
     .option("--json", "Output results as JSON")
     .action(async (company: string, opts: OnboardOpts) => {
       if (opts.managedAgents && opts.sandbox) {
@@ -122,23 +129,22 @@ async function runRemoteDiscovery(
   const startTime = Date.now();
   let lastStep = "";
 
+  // Persist a terminal session as runs/<sessionId>/{trace.json,summary.md}.
+  // Fail-open; a trace breadcrumb only prints in non-JSON mode.
+  const saveTrace = (session: Session): void => {
+    const dir = trySaveSessionTrace(session, opts.traceDir);
+    if (dir && !opts.json) process.stderr.write(chalk.dim(`  Trace: ${dir}\n`));
+  };
+
   // Polling loop — each tick depends on the prior sleep + status fetch.
   while (Date.now() - startTime < MAX_POLL_TIME) {
     // eslint-disable-next-line no-await-in-loop
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL));
 
-    let status: {
-      status: "running" | "complete" | "error" | "cancelled";
-      step?: string;
-      sourcesFound?: number;
-      sourcesValidated?: number;
-      currentAction?: string;
-      result?: object;
-      error?: string;
-    } | null;
+    let status: Session | null;
     try {
       // eslint-disable-next-line no-await-in-loop
-      status = await apiFetch(`/v1/sessions/${sessionId}`);
+      status = await apiFetch<Session>(`/v1/sessions/${sessionId}`);
     } catch (err) {
       logger.error(`Failed to poll status: ${err instanceof Error ? err.message : String(err)}`);
       process.exit(1);
@@ -147,6 +153,7 @@ async function runRemoteDiscovery(
     if (!status) continue;
 
     if (status.status === "complete") {
+      saveTrace(status);
       if (!opts.json) process.stderr.write(chalk.green("\n  Discovery complete.\n"));
 
       if (status.result) {
@@ -169,11 +176,13 @@ async function runRemoteDiscovery(
     }
 
     if (status.status === "error") {
+      saveTrace(status);
       logger.error(`Remote discovery failed: ${status.error ?? "Unknown error"}`);
       process.exit(1);
     }
 
     if (status.status === "cancelled") {
+      saveTrace(status);
       logger.error("Remote discovery was cancelled.");
       process.exit(1);
     }

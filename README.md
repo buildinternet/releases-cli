@@ -190,6 +190,7 @@ Nothing is required for reader access. For admin operations (closed beta — see
 - `RELEASED_API_URL` — Override the default `https://api.releases.sh` endpoint (useful for staging).
 - `RELEASED_TELEMETRY_DISABLED=1` — Opt out of anonymous usage pings. `DO_NOT_TRACK=1` is also honored.
 - `RELEASES_DISABLE_SKILL_UPDATE_CHECK=1` — Silence the "skills are behind, run `releases skills install`" stderr nag that fires (at most once per 24h) when the GitHub `skills/` tree has moved since your last install.
+- `RELEASES_RUN_DIR` — When set, every `releases admin …` write appends one JSONL line (`{timestamp, command, target, result}`) to `$RELEASES_RUN_DIR/mutations.jsonl` — an audit trail for agent-driven maintenance batches. Unset → no-op. Also the default destination for managed-session traces (`--trace-dir` / `--save` override it). Part of the `~/.releases/work/` maintenance workspace.
 
 Copy `.env.example` to `.env` to configure these locally.
 

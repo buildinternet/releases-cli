@@ -1,4 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
+import { mkdtempSync, rmSync, readFileSync, existsSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { SourceWithOrg } from "../../src/api/types.js";
 
 // Mock mode.ts before importing the client — apiFetch calls getApiUrl/getApiKey.
@@ -60,6 +63,51 @@ describe("apiFetch 404 handling", () => {
   it("throws on non-404 errors for GET", async () => {
     mockFetch(500, { message: "Internal Server Error" });
     await expect(client.findSource("test")).rejects.toThrow(/API error \(500\)/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// apiFetch mutation logging when fetch throws before a response
+// ---------------------------------------------------------------------------
+
+describe("apiFetch mutation logging on transport failure", () => {
+  let originalFetch: typeof globalThis.fetch;
+  let dir: string;
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    dir = mkdtempSync(join(tmpdir(), "rel-apifetch-mut-"));
+    process.env.RELEASES_RUN_DIR = dir;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    delete process.env.RELEASES_RUN_DIR;
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("records the attempt when fetch throws on a mutating request", async () => {
+    globalThis.fetch = (async () => {
+      throw new Error("ECONNREFUSED");
+    }) as any;
+
+    await expect(client.addIgnoredUrl("https://example.com", "org_123")).rejects.toThrow(
+      "ECONNREFUSED",
+    );
+
+    const line = JSON.parse(readFileSync(join(dir, "mutations.jsonl"), "utf-8").trim());
+    expect(line.target).toBe("POST /v1/orgs/org_123/ignored-urls");
+    expect(line.result).toContain("error");
+    expect(line.result).toContain("ECONNREFUSED");
+  });
+
+  it("does not record when a GET throws (not a mutation)", async () => {
+    globalThis.fetch = (async () => {
+      throw new Error("ECONNREFUSED");
+    }) as any;
+
+    await expect(client.findOrg("nonexistent")).rejects.toThrow("ECONNREFUSED");
+    expect(existsSync(join(dir, "mutations.jsonl"))).toBe(false);
   });
 });
 

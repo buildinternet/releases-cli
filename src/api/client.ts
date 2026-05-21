@@ -1,4 +1,5 @@
 import { getApiUrl, getApiKey, isAdminMode } from "../lib/mode.js";
+import { shouldRecordMutation, recordMutation } from "../lib/mutation-log.js";
 import { logger } from "@releases/lib/logger";
 import { daysAgoIso } from "@buildinternet/releases-core/dates";
 import type { Kind } from "@buildinternet/releases-core/kinds";
@@ -94,17 +95,45 @@ export async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T> 
   if (isAdminMode()) {
     headers["Authorization"] = `Bearer ${getApiKey()}`;
   }
-  const res = await fetch(url, {
-    ...opts,
-    headers,
-  });
+
+  // Empty string when no method is set — `shouldRecordMutation` rejects it, so
+  // GETs never log and the `method` field is a real verb whenever we do.
+  const method = opts?.method ?? "";
+  const logMutation = shouldRecordMutation(method, path);
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      ...opts,
+      headers,
+    });
+  } catch (err) {
+    // Transport-level failure (DNS, connection refused, abort) — no response,
+    // but the mutating attempt still belongs in the audit trail.
+    if (logMutation) {
+      recordMutation({
+        method,
+        path,
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+    throw err;
+  }
 
   if (res.status === 404 && (!opts?.method || opts.method === "GET")) return null as T;
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ message: res.statusText }));
     const message = (body as { message?: string }).message ?? res.statusText;
+    if (logMutation) {
+      recordMutation({ method, path, ok: false, status: res.status, error: message });
+    }
     throw new Error(`API error (${res.status}) on ${opts?.method ?? "GET"} ${path}: ${message}`);
+  }
+
+  if (logMutation) {
+    recordMutation({ method, path, ok: true, status: res.status });
   }
 
   return res.json();

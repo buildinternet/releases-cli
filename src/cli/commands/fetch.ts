@@ -14,6 +14,7 @@ import {
 import { newCorrelationId } from "@buildinternet/releases-core/id";
 import { orgNotFound, sourceNotFound } from "../suggest.js";
 import { writeJson, writeJsonLine } from "../../lib/output.js";
+import { trySaveSessionTrace } from "../../lib/trace.js";
 import { sleep } from "../../lib/sleep.js";
 import {
   classifySessionTerminalState,
@@ -45,6 +46,10 @@ export function registerFetchCommand(program: Command) {
       `Block until the session reaches a terminal state (default: ${DEFAULT_WAIT_SECONDS}s). ` +
         `Exits non-zero on failure: 2 for managed-agents/provider errors, 1 for our-side errors, 130 for cancellation.`,
     )
+    .option(
+      "--trace-dir <dir>",
+      "With --wait, write the terminal session as <dir>/<sessionId>/{trace.json,summary.md} (default: ~/.releases/work/runs)",
+    )
     .addHelpText(
       "after",
       `
@@ -71,6 +76,7 @@ Examples:
           retryErrors?: boolean;
           org?: string;
           wait?: string | true;
+          traceDir?: string;
         },
       ) => {
         const identifier = slugArg ?? opts.source;
@@ -208,6 +214,7 @@ Examples:
             sessionId: result.sessionId,
             waitSeconds,
             json: opts.json === true,
+            traceDir: opts.traceDir,
           });
         }
       },
@@ -226,10 +233,12 @@ async function waitForSession({
   sessionId,
   waitSeconds,
   json,
+  traceDir,
 }: {
   sessionId: string;
   waitSeconds: number;
   json: boolean;
+  traceDir?: string;
 }): Promise<void> {
   const startedAt = Date.now();
   const deadline = startedAt + waitSeconds * 1000;
@@ -262,13 +271,14 @@ async function waitForSession({
 
     const summary = classifySessionTerminalState(session);
     if (summary) {
+      const tracePath = trySaveSessionTrace(session, traceDir);
       if (json) {
         // oxlint-disable-next-line no-await-in-loop -- terminal write before exiting; not actually a loop iteration
         await writeJson({ ...session, exitCode: summary.exitCode });
-      } else if (summary.exitCode === 0) {
-        logger.info(chalk.green(summary.message));
       } else {
-        logger.error(chalk.red(summary.message));
+        if (summary.exitCode === 0) logger.info(chalk.green(summary.message));
+        else logger.error(chalk.red(summary.message));
+        if (tracePath) process.stderr.write(chalk.dim(`  Trace: ${tracePath}\n`));
       }
       process.exit(summary.exitCode);
     }
