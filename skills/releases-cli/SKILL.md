@@ -33,6 +33,13 @@ releases skills install -g     # user-wide install instead
 
 Skills are symlinked by default — re-running `releases skills install` refreshes everything atomically.
 
+## Command shape
+
+- **Reads (verb-first):** `releases list` · `releases search` · `releases tail` · `releases get` · `releases stats`
+- **Writes (`admin <noun> <verb>`):** `releases admin source update` · `releases admin source create` · `releases admin product create` · `releases admin org create`
+- List sources with `releases list` (also `releases sources` — alias). Do NOT guess `releases sources list`; that path does not exist.
+- Writes live under `releases admin <noun> <verb>`, not at the top level.
+
 ## What this skill covers
 
 - **[Reader commands](references/reader.md)** — Search, inspect, and export changelog data. No API key required.

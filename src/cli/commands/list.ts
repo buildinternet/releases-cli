@@ -26,10 +26,12 @@ function paginateExample(json: boolean): string {
   return `releases list${json ? " --json" : ""} --limit <n> --page <p>`;
 }
 
-export function registerListCommand(program: Command) {
-  program
+export function registerListCommand(program: Command, registerOpts?: { alias?: string }) {
+  const cmd = program
     .command("list")
-    .description("List all configured changelog sources, or show details for a single source")
+    .description("List all configured changelog sources, or show details for a single source");
+  if (registerOpts?.alias) cmd.alias(registerOpts.alias);
+  cmd
     .argument("[source]", "Show details for a specific source (src_… or slug)")
     .option("--json", "Output as JSON")
     .option("--org <org>", "Filter by organization (org_…, slug, domain, name, or handle)")
@@ -46,6 +48,15 @@ export function registerListCommand(program: Command) {
     .option("--limit <n>", `Limit the number of results (default ${DEFAULT_PAGE_SIZE})`)
     .option("--page <n>", "Page number for paginated results")
     .option("--flat", "Legacy: return a bare array instead of the paginated envelope (--json only)")
+    .addHelpText(
+      "after",
+      `
+Examples:
+  releases list                                    List all sources
+  releases list src_abc123                         Show details for a specific source
+  releases list --kind sdk                         Filter by kind
+  releases list --org vercel --category ai         Filter by org and category`,
+    )
     .action(
       async (
         slug: string | undefined,

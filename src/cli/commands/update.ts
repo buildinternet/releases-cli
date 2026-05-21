@@ -461,15 +461,16 @@ export function registerUpdateCommand(program: Command) {
       "after",
       `
 Examples:
-  releases update src_abc123 --primary
-  releases update src_abc123 --parse-instructions-file parse.md
-  cat parse.md | releases update src_abc123 --parse-instructions-file -
-  releases update redis-software-release-notes \\
+  releases admin source update vercel/next-js --kind sdk
+  releases admin source update src_abc123 --primary
+  releases admin source update src_abc123 --parse-instructions-file parse.md
+  cat parse.md | releases admin source update src_abc123 --parse-instructions-file -
+  releases admin source update redis-software-release-notes \\
     --metadata-set crawlEnabled=true \\
     --metadata-set crawlIncludePathPrefix=/docs/latest/operate/rs/release-notes/
-  releases update docker-compose-release-notes \\
+  releases admin source update docker-compose-release-notes \\
     --metadata-set githubUrl=https://github.com/docker/compose
-  releases update some-source --metadata-unset legacyFlag`,
+  releases admin source update some-source --metadata-unset legacyFlag`,
     )
     .action(updateSourceAction);
 }

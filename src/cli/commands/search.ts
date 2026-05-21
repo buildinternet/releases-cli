@@ -132,6 +132,15 @@ export function registerSearchCommand(program: Command) {
       `Filter by taxonomy (${KIND_VALUES.join(", ")}). Release hits use COALESCE(source.kind, product.kind); catalog hits match the row's own kind only.`,
     )
     .option("--json", "Output as JSON")
+    .addHelpText(
+      "after",
+      `
+Examples:
+  releases search "breaking change"               Full-text + semantic search
+  releases search "breaking change" --kind sdk    Narrow to SDK sources
+  releases search vercel --type orgs              Show only org matches
+  releases search shopify/hydrogen                Coordinate lookup (GitHub)`,
+    )
     .action(
       async (
         query: string,
