@@ -12,10 +12,12 @@ let dataDir = "";
 beforeAll(async () => {
   dataDir = mkdtempSync(join(tmpdir(), "rel-authcli-"));
 
-  // Spawned CLI subprocesses can't reach a `Bun.serve` bound inside the
-  // test-runner process in this sandbox, so run the stub as a detached OS
-  // process. It binds an ephemeral port (port: 0) and reports it back via the
-  // READY line to avoid hardcoded-port collisions on shared/CI machines.
+  // The stub API runs as a SEPARATE OS process, not an in-process Bun.serve:
+  // runCli() uses spawnSync (blocking), so an in-process server's fetch handler
+  // could never run while a CLI call is in flight (the test thread is parked in
+  // spawnSync waiting for a response it's supposed to send — a deadlock). It
+  // binds an ephemeral port (port: 0), reported via the READY line so parallel
+  // CI runs never collide.
   const serverScript = `
 const server = Bun.serve({
   port: 0,
@@ -36,13 +38,16 @@ const server = Bun.serve({
   },
 });
 process.stdout.write("READY:" + server.port + "\\n");
-await Bun.sleep(60000);
 `;
   const scriptPath = join(dataDir, "stub-server.ts");
   writeFileSync(scriptPath, serverScript);
 
   serverProc = spawn("bun", [scriptPath], {
-    stdio: ["ignore", "pipe", "pipe"],
+    // stderr ignored so the only pipe is stdout (we read the port off it once,
+    // then drop it below). detached + unref() is the documented child_process
+    // pattern for a background test server — without unref the test-runner
+    // worker waits on this child forever, which is what hung CI for 6h.
+    stdio: ["ignore", "pipe", "ignore"],
     detached: true,
   });
 
@@ -64,13 +69,16 @@ await Bun.sleep(60000);
       reject(e);
     });
   });
+
+  // Port captured: release the last pipe and unref so the test-runner worker
+  // can exit without waiting on this helper.
+  serverProc.stdout?.destroy();
+  serverProc.unref();
 });
 
 afterAll(() => {
-  if (serverProc) {
-    serverProc.kill();
-    serverProc = null;
-  }
+  serverProc?.kill();
+  serverProc = null;
   rmSync(dataDir, { recursive: true, force: true });
 });
 
