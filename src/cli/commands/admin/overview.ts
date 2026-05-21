@@ -586,11 +586,11 @@ async function overviewBatchAction(opts: OverviewBatchOpts): Promise<void> {
     await writeJson(last);
   } else {
     if (last.status === "complete") {
-      console.log(chalk.green(`Done. Final status: ${last.status}`));
+      logger.info(chalk.green(`Done. Final status: ${last.status}`));
     } else {
-      console.log(chalk.red(`Workflow ended in non-success state: ${last.status}`));
+      logger.error(chalk.red(`Workflow ended in non-success state: ${last.status}`));
     }
-    if (tracePath) console.log(chalk.dim(`  Trace: ${tracePath}`));
+    if (tracePath) process.stderr.write(chalk.dim(`  Trace: ${tracePath}\n`));
   }
 
   if (last.status !== "complete") process.exit(1);

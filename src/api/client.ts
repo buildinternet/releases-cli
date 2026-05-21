@@ -95,17 +95,33 @@ export async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T> 
   if (isAdminMode()) {
     headers["Authorization"] = `Bearer ${getApiKey()}`;
   }
-  const res = await fetch(url, {
-    ...opts,
-    headers,
-  });
-
-  if (res.status === 404 && (!opts?.method || opts.method === "GET")) return null as T;
 
   // Empty string when no method is set — `shouldRecordMutation` rejects it, so
   // GETs never log and the `method` field is a real verb whenever we do.
   const method = opts?.method ?? "";
   const logMutation = shouldRecordMutation(method, path);
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      ...opts,
+      headers,
+    });
+  } catch (err) {
+    // Transport-level failure (DNS, connection refused, abort) — no response,
+    // but the mutating attempt still belongs in the audit trail.
+    if (logMutation) {
+      recordMutation({
+        method,
+        path,
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+    throw err;
+  }
+
+  if (res.status === 404 && (!opts?.method || opts.method === "GET")) return null as T;
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ message: res.statusText }));
