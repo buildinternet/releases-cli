@@ -3,19 +3,19 @@ import { mkdtempSync, rmSync, readFileSync, existsSync, writeFileSync } from "no
 import { tmpdir, homedir } from "node:os";
 import { join } from "node:path";
 import type { Session } from "@buildinternet/releases-api-types";
-
-// config caches the data dir on first import, and resolveTraceDir's default
-// branch is getRunsDir() — so the data dir must be set before the import.
-const dataDir = mkdtempSync(join(tmpdir(), "rel-trace-data-"));
-process.env.RELEASED_DATA_DIR = dataDir;
-
-const {
+import {
   resolveTraceDir,
   buildSessionSummaryMarkdown,
   buildBatchOverviewSummaryMarkdown,
   writeSessionTrace,
   trySaveSessionTrace,
-} = await import("../../src/lib/trace.js");
+} from "../../src/lib/trace.js";
+
+// config caches the data dir lazily (first getDataDir() call, not at import),
+// and resolveTraceDir's default branch is getRunsDir() — so a static import is
+// safe as long as the env var is set before any helper runs, which it is.
+const dataDir = mkdtempSync(join(tmpdir(), "rel-trace-data-"));
+process.env.RELEASED_DATA_DIR = dataDir;
 
 const baseSession: Session = {
   sessionId: "abc123-session-id",

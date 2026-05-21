@@ -2,13 +2,13 @@ import { describe, it, expect, afterAll } from "bun:test";
 import { mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir, homedir } from "node:os";
 import { join } from "node:path";
+import { getWorkDir, getRunsDir, expandHome } from "@releases/lib/config";
 
-// config.ts caches the data dir on first read, so the env var must be set
-// before the module is imported.
+// config caches the data dir lazily (on the first getDataDir() call, not at
+// import), so a static import is safe as long as the env var is set before any
+// of the helpers below run — which it is (top-level assignment, then tests).
 const dir = mkdtempSync(join(tmpdir(), "rel-work-"));
 process.env.RELEASED_DATA_DIR = dir;
-
-const { getWorkDir, getRunsDir, expandHome } = await import("@releases/lib/config");
 
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
