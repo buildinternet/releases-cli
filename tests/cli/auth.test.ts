@@ -38,6 +38,11 @@ const server = Bun.serve({
   },
 });
 process.stdout.write("READY:" + server.port + "\\n");
+// Cap our own lifetime as a deterministic backstop: a detached child can
+// outlive a dropped/again-dropped cleanup signal on a CI runner, and that
+// stranded server is what hung the test job. The suite runs in ~1s, far
+// under this, so self-exit only fires if cleanup never reached us.
+setTimeout(() => process.exit(0), 30000);
 `;
   const scriptPath = join(dataDir, "stub-server.ts");
   writeFileSync(scriptPath, serverScript);
@@ -77,7 +82,10 @@ process.stdout.write("READY:" + server.port + "\\n");
 });
 
 afterAll(() => {
-  serverProc?.kill();
+  // SIGKILL, not the default SIGTERM: it can't be ignored, so cleanup can't be
+  // dropped the way TERM was on the GitHub runner. The child's own self-exit
+  // timer is the final backstop if even this doesn't reach it.
+  serverProc?.kill("SIGKILL");
   serverProc = null;
   rmSync(dataDir, { recursive: true, force: true });
 });
