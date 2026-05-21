@@ -2,6 +2,7 @@ import { Command } from "commander";
 import chalk from "chalk";
 import * as apiClient from "../../api/client.js";
 import { writeJson } from "../../lib/output.js";
+import { writeSessionTrace } from "../../lib/trace.js";
 import { logger } from "@releases/lib/logger";
 import {
   DEFAULT_PAGE_SIZE,
@@ -139,13 +140,31 @@ export function registerTaskCommand(program: Command) {
     .description("Show full detail for a single session (timing, usage, error, agent state)")
     .argument("<sessionId>", "Session ID (or unique prefix)")
     .option("--json", "Output as JSON")
-    .action(async (sessionIdArg: string, opts: { json?: boolean }) => {
+    .option(
+      "--save [dir]",
+      "Snapshot the session as <dir>/<sessionId>/{trace.json,summary.md} (default: ~/.releases/work/runs)",
+    )
+    .action(async (sessionIdArg: string, opts: { json?: boolean; save?: string | boolean }) => {
       const sessionId = await resolveSessionIdFromPrefix(sessionIdArg);
 
       const session = (await apiClient.getSession(sessionId)) as Session | null;
       if (!session) {
         console.error(chalk.red(`Session not found: ${sessionId}`));
         process.exit(1);
+      }
+
+      if (opts.save) {
+        // Explicit request — surface failures rather than failing open.
+        try {
+          const dir = writeSessionTrace(
+            session,
+            typeof opts.save === "string" ? opts.save : undefined,
+          );
+          process.stderr.write(chalk.dim(`Saved trace to ${dir}\n`));
+        } catch (err) {
+          logger.error(`Failed to save trace: ${err instanceof Error ? err.message : String(err)}`);
+          process.exit(1);
+        }
       }
 
       if (opts.json) {
