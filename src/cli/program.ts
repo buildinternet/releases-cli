@@ -172,7 +172,16 @@ export const program = new Command()
     },
   })
   .showSuggestionAfterError(true)
-  .action(() => {
+  // allowExcessArguments lets us detect unknown tokens in the action below
+  // rather than having Commander throw "too many arguments" before we can
+  // surface a did-you-mean suggestion.
+  .allowExcessArguments(true)
+  .action((_opts, cmd) => {
+    if (cmd.args.length > 0) {
+      // Delegate to Commander's unknownCommand() so showSuggestionAfterError
+      // can fire a did-you-mean hint for the unrecognised token.
+      cmd.unknownCommand();
+    }
     console.log(printStyledHelp());
     process.exit(0);
   });
@@ -182,7 +191,7 @@ registerSearchCommand(program);
 registerLookupCommand(program);
 registerTailCommand(program);
 registerStatsCommand(program);
-registerListCommand(program);
+registerListCommand(program, { alias: "sources" });
 // Canonical verb: get. Deprecated alias: show (emits a warning).
 registerGetCommand(program);
 registerShowCommand(program);

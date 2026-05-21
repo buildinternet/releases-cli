@@ -324,6 +324,14 @@ export function registerProductCommand(program: Command) {
     .option("--tags <tags>", "Comma-separated tags")
     .option("--json", "Output as JSON")
     .option("--dry-run", "Show what would be created without writing")
+    .addHelpText(
+      "after",
+      `
+Examples:
+  releases admin product create "Next.js" --org vercel --kind sdk
+  releases admin product create "CLI" --org acme --category developer-tools
+  releases admin product create "Mobile SDK" --org stripe --kind mobile --dry-run`,
+    )
     .action(productCreateAction);
 
   product
@@ -358,6 +366,14 @@ export function registerProductCommand(program: Command) {
     .option("--no-kind", "Clear product kind")
     .option("--json", "Output as JSON")
     .option("--dry-run", "Show what would change without writing")
+    .addHelpText(
+      "after",
+      `
+Examples:
+  releases admin product update next-js --kind sdk
+  releases admin product update prod_abc123 --name "Next.js" --category developer-tools
+  releases admin product update next-js --no-kind`,
+    )
     .action(productUpdateAction);
 
   product
