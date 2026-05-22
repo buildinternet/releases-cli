@@ -269,4 +269,18 @@ describe("parseTimeWindowFlag", () => {
       expect(() => parseTimeWindowFlag("until", "not-a-date")).toThrow("process.exit called");
     });
   });
+
+  it("rejects a datetime without a timezone (server would parse it as local time)", () => {
+    withExitTrap(() => {
+      expect(() => parseTimeWindowFlag("since", "2026-01-01T12:30:00")).toThrow(
+        "process.exit called",
+      );
+    });
+  });
+
+  it("accepts a timezone offset", () => {
+    expect(parseTimeWindowFlag("since", "2026-01-01T12:30:00+05:00")).toBe(
+      "2026-01-01T12:30:00+05:00",
+    );
+  });
 });
