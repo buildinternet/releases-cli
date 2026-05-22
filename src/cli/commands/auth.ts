@@ -2,6 +2,7 @@ import { Command } from "commander";
 import chalk from "chalk";
 import { join } from "node:path";
 import { getDataDir } from "@releases/lib/config";
+import { legacyEnv } from "@releases/lib/legacy-env";
 import { getApiUrl, resolveCredential } from "../../lib/mode.js";
 import { writeCredential, clearCredential, type StoredCredential } from "../../lib/credentials.js";
 import { hiddenPromptReader } from "../../lib/prompt-hidden.js";
@@ -144,10 +145,10 @@ export function registerAuthCommand(parent: Command): void {
     .description("Remove the stored API token")
     .action(() => {
       const removed = clearCredential();
-      if (process.env.RELEASED_API_KEY) {
+      if (legacyEnv("RELEASES_API_KEY", "RELEASED_API_KEY")) {
         console.log(
           chalk.yellow(
-            "Removed any stored token, but RELEASED_API_KEY is still set in your environment.",
+            "Removed any stored token, but RELEASES_API_KEY is still set in your environment.",
           ),
         );
       } else if (removed) {
@@ -173,7 +174,7 @@ export function registerAuthCommand(parent: Command): void {
       const { token } = resolveCredential();
       if (!token) {
         console.error(
-          chalk.red("Not authenticated. Run `releases auth login` or set RELEASED_API_KEY."),
+          chalk.red("Not authenticated. Run `releases auth login` or set RELEASES_API_KEY."),
         );
         process.exit(1);
       }

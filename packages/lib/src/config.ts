@@ -1,12 +1,13 @@
 import { mkdirSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
+import { legacyEnv } from "./legacy-env";
 
 let _dataDir: string | null = null;
 
 export function getDataDir(): string {
   if (!_dataDir) {
-    _dataDir = process.env.RELEASED_DATA_DIR || join(homedir(), ".releases");
+    _dataDir = legacyEnv("RELEASES_DATA_DIR", "RELEASED_DATA_DIR") || join(homedir(), ".releases");
     mkdirSync(_dataDir, { recursive: true });
   }
   return _dataDir;

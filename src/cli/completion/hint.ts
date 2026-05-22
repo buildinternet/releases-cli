@@ -26,7 +26,8 @@ export function shouldShowCompletionHint(gate: HintGate): boolean {
   if (gate.completionFileExists) return false;
   if (isTruthyEnvFlag(gate.env.RELEASES_NO_COMPLETION_HINT)) return false;
   if (isTruthyEnvFlag(gate.env.CI) || isTruthyEnvFlag(gate.env.GITHUB_ACTIONS)) return false;
-  if (gate.env.RELEASED_CLIENT_KIND && gate.env.RELEASED_CLIENT_KIND !== "external") {
+  const clientKind = gate.env.RELEASES_CLIENT_KIND ?? gate.env.RELEASED_CLIENT_KIND;
+  if (clientKind && clientKind !== "external") {
     return false;
   }
   if (!detectShell(gate.env)) return false;
@@ -50,7 +51,8 @@ export interface NoticeGate {
 export function shouldShowCompletionNotice(gate: NoticeGate): boolean {
   if (!gate.shell) return false;
   if (isTruthyEnvFlag(gate.env.RELEASES_NO_COMPLETION_HINT)) return false;
-  if (gate.env.RELEASED_CLIENT_KIND && gate.env.RELEASED_CLIENT_KIND !== "external") {
+  const clientKind = gate.env.RELEASES_CLIENT_KIND ?? gate.env.RELEASED_CLIENT_KIND;
+  if (clientKind && clientKind !== "external") {
     return false;
   }
   if (gate.userCompletionExists) return false;
