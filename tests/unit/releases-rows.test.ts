@@ -80,6 +80,22 @@ describe("renderReleaseRows (search)", () => {
     expect(lines[1].startsWith(" ")).toBe(true); // indented continuation
   });
 
+  it("skips the excerpt continuation when it just repeats the title", () => {
+    const hit: ReleaseRow[] = [
+      {
+        id: "rel_r",
+        title: "Better Webhooks, Better Service Settings",
+        version: null,
+        summary: "Better Webhooks, Better Service Settings",
+        publishedAt: null,
+        sourceName: "Railway",
+        sourceSlug: "railway",
+      },
+    ];
+    const out = stripAnsi(renderReleaseRows(hit, { mode: "search", isTTY: true, maxWidth: 100 }));
+    expect(out.split("\n")).toHaveLength(1); // no redundant continuation line
+  });
+
   it("non-TTY: one plain line per hit, no continuation", () => {
     const hit: ReleaseRow[] = [
       {

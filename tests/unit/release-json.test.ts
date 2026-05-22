@@ -35,7 +35,7 @@ describe("slimReleaseDetail", () => {
       contentTokens: 24,
       full: false,
     }) as Record<string, unknown>;
-    expect(Object.keys(out).sort()).toEqual(
+    expect(Object.keys(out).toSorted()).toEqual(
       [
         "contentChars",
         "contentTokens",
@@ -48,7 +48,7 @@ describe("slimReleaseDetail", () => {
         "title",
         "url",
         "version",
-      ].sort(),
+      ].toSorted(),
     );
     expect(out.source).toEqual({ slug: "posthog", name: "PostHog" });
     expect(out.org).toEqual({ slug: "posthog", name: "PostHog" });
