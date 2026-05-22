@@ -4,18 +4,30 @@
  * We capture console.log output and verify the lookup rail renders correctly
  * for each LookupStatus value.
  */
-import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "bun:test";
 import type { LookupResultPayload } from "../../src/api/types.js";
 
 // ---------------------------------------------------------------------------
-// Mock dependencies before importing the command module
+// Drive the real mode.ts via env instead of a process-global mock.module
+// (which leaked mode.js across files and forced `bun test --isolate`).
+// unifiedSearch → apiFetch reads getApiUrl/getApiKey lazily; the assertions
+// below only inspect the returned lookup payload, so the auth/admin values
+// don't matter. Restored in afterAll so the key never bleeds into other files.
 // ---------------------------------------------------------------------------
 
-mock.module("../../src/lib/mode.js", () => ({
-  getApiUrl: () => "https://test.example.com",
-  getApiKey: () => "test-key",
-  isAdminMode: () => false,
-}));
+const prevEnv: { url?: string; key?: string } = {};
+beforeAll(() => {
+  prevEnv.url = process.env.RELEASES_API_URL;
+  prevEnv.key = process.env.RELEASES_API_KEY;
+  process.env.RELEASES_API_URL = "https://test.example.com";
+  process.env.RELEASES_API_KEY = "test-key";
+});
+afterAll(() => {
+  if (prevEnv.url === undefined) delete process.env.RELEASES_API_URL;
+  else process.env.RELEASES_API_URL = prevEnv.url;
+  if (prevEnv.key === undefined) delete process.env.RELEASES_API_KEY;
+  else process.env.RELEASES_API_KEY = prevEnv.key;
+});
 
 // We'll inject a controlled response via fetch mock
 function mockSearch(response: unknown) {

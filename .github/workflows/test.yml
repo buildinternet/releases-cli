@@ -74,7 +74,11 @@ jobs:
         run: npx tsc --noEmit
 
       - name: Test
-        run: bun test --isolate
+        # Single-process runner. `--isolate` (per-file VM isolation) was dropped
+        # in favor of de-leaking the mode.js mocks (see api-client.test.ts /
+        # search-lookup.test.ts) — its runner intermittently wedged a per-file
+        # isolate on the 2-vCPU runner, hanging the job to the 10m cap (#211).
+        run: bun test
 
   smoke-windows:
     name: Windows binary smoke test

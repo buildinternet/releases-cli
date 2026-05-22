@@ -1,15 +1,29 @@
-import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "bun:test";
 import { mkdtempSync, rmSync, readFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { SourceWithOrg } from "../../src/api/types.js";
 
-// Mock mode.ts before importing the client — apiFetch calls getApiUrl/getApiKey.
-mock.module("../../src/lib/mode.js", () => ({
-  getApiUrl: () => "https://test.example.com",
-  getApiKey: () => "test-key",
-  isAdminMode: () => true,
-}));
+// Drive the real mode.ts via env rather than mocking the module. A top-level
+// mock.module("mode.js") is process-global — it leaks into every other test
+// file (e.g. mode-credential.test.ts), which was the sole reason the suite
+// needed `bun test --isolate`. apiFetch reads getApiUrl/getApiKey/isAdminMode
+// lazily, so setting env before the tests run reproduces the old stub
+// (getApiUrl → test URL, getApiKey → test-key, isAdminMode → true). Restored in
+// afterAll so the key never bleeds into resolveCredential tests.
+const prevEnv: { url?: string; key?: string } = {};
+beforeAll(() => {
+  prevEnv.url = process.env.RELEASES_API_URL;
+  prevEnv.key = process.env.RELEASES_API_KEY;
+  process.env.RELEASES_API_URL = "https://test.example.com";
+  process.env.RELEASES_API_KEY = "test-key";
+});
+afterAll(() => {
+  if (prevEnv.url === undefined) delete process.env.RELEASES_API_URL;
+  else process.env.RELEASES_API_URL = prevEnv.url;
+  if (prevEnv.key === undefined) delete process.env.RELEASES_API_KEY;
+  else process.env.RELEASES_API_KEY = prevEnv.key;
+});
 
 const client = await import("../../src/api/client.js");
 
