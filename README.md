@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![skills.sh](https://skills.sh/b/buildinternet/releases-cli)](https://skills.sh/buildinternet/releases-cli)
 
-Changelog registry for AI agents and developers. A lean HTTP client for [releases.sh](https://releases.sh) — search and browse release notes from GitHub, RSS/Atom/JSON feeds, and product changelog pages without any local infrastructure.
+The changelog & release-notes registry for developers and AI agents. A lean HTTP client for [releases.sh](https://releases.sh) — search and browse release notes from GitHub, RSS/Atom/JSON feeds, and product changelog pages without any local infrastructure.
 
 The CLI talks to the hosted registry at `api.releases.sh`. Reader commands work out of the box with no configuration.
 
@@ -61,7 +61,7 @@ releases completion install zsh      # or pick explicitly
 releases completion zsh > /path/to/_releases
 ```
 
-On an interactive terminal, a one-time hint nudges you to run this if completions aren't already set up. Set `RELEASES_NO_COMPLETION_HINT=1` to silence it.
+On an interactive terminal, a persistent, self-resolving notice on the landing screen and `--help` reminds you to run this until shell completion is detected — and stops on its own once completions are set up (including the automatic Homebrew install). Set `RELEASES_NO_COMPLETION_HINT=1` to silence it.
 
 ## Usage
 

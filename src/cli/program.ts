@@ -106,7 +106,7 @@ function printStyledHelp(): string {
 
   lines.push("");
   lines.push(`${chalk.bold("releases")} ${chalk.dim(`v${VERSION_DISPLAY}`)}`);
-  lines.push(chalk.dim("Changelog indexer and registry for AI agents and developers"));
+  lines.push(chalk.dim("The changelog & release-notes registry for developers and AI agents"));
   lines.push(chalk.dim("Web catalog: ") + chalk.cyan("https://releases.sh"));
   lines.push("");
 
@@ -157,7 +157,7 @@ function printStyledHelp(): string {
 
 export const program = new Command()
   .name("releases")
-  .description("Changelog indexer and registry for AI agents and developers")
+  .description("The changelog & release-notes registry for developers and AI agents")
   .version(VERSION_DISPLAY, "-v, --version")
   // `admin overview` declares a deprecated bare form (`overview <org>`) on the
   // parent command alongside subcommands like `overview inputs <org>`. Without

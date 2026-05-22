@@ -164,7 +164,7 @@ jobs:
           mkdir -p tap/Formula
           cat > tap/Formula/releases.rb <<'FORMULA'
           class Releases < Formula
-            desc "Changelog indexer and registry for AI agents and developers"
+            desc "Changelog and release-notes registry for developers and AI agents"
             homepage "https://releases.sh"
             version "__VERSION__"
             license "MIT"
