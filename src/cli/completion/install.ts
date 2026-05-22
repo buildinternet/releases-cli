@@ -67,6 +67,36 @@ export function rcSnippet(shell: SupportedShell, path: string): string {
   }
 }
 
+/**
+ * Locations a package manager (Homebrew, apt, the system) would drop a
+ * `releases` completion file — distinct from the per-user path
+ * `defaultInstallPath` writes to. Used to suppress the first-run hint when
+ * completions are already wired up by the install method (e.g. `brew install`
+ * runs `generate_completions_from_executable`).
+ */
+export function systemCompletionPaths(shell: SupportedShell, env: Env = process.env): string[] {
+  const prefixes = ["/opt/homebrew", "/usr/local", "/usr", "/home/linuxbrew/.linuxbrew"];
+  if (env.HOMEBREW_PREFIX) prefixes.unshift(env.HOMEBREW_PREFIX);
+  const unique = [...new Set(prefixes)];
+  switch (shell) {
+    case "zsh":
+      return unique.map((p) => `${p}/share/zsh/site-functions/_releases`);
+    case "bash":
+      return unique
+        .flatMap((p) => [
+          `${p}/etc/bash_completion.d/releases`,
+          `${p}/share/bash-completion/completions/releases`,
+        ])
+        .concat(["/etc/bash_completion.d/releases"]);
+    case "fish":
+      return unique.map((p) => `${p}/share/fish/vendor_completions.d/releases.fish`);
+  }
+}
+
+export function systemCompletionInstalled(shell: SupportedShell, env: Env = process.env): boolean {
+  return systemCompletionPaths(shell, env).some((p) => existsSync(p));
+}
+
 export interface InstallResult {
   path: string;
   alreadyExisted: boolean;

@@ -46,7 +46,10 @@ describe("CLI command gating (public mode)", () => {
   it("keeps admin workflows behind the admin entrypoint in public help", () => {
     const { stdout } = runCli(["--help"], { env: publicEnv });
     expect(stdout).not.toContain("Admin:");
-    expect(stdout).not.toContain("onboard");
+    // Admin subgroups/subcommands must not surface as top-level entries. (Note:
+    // the `admin` entry's own description mentions "onboarding", so we assert on
+    // the `discovery` subgroup token rather than "onboard".)
+    expect(stdout).not.toContain("discovery");
     expect(stdout).not.toContain("Manage organizations");
   });
 

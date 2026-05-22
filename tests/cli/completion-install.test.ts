@@ -1,5 +1,10 @@
 import { describe, it, expect } from "bun:test";
-import { detectShell, defaultInstallPath, rcSnippet } from "../../src/cli/completion/install.js";
+import {
+  detectShell,
+  defaultInstallPath,
+  rcSnippet,
+  systemCompletionPaths,
+} from "../../src/cli/completion/install.js";
 
 describe("detectShell", () => {
   it("detects zsh from $SHELL", () => {
@@ -67,6 +72,32 @@ describe("defaultInstallPath", () => {
     const fishPath = defaultInstallPath("fish", {});
     expect(fishPath).toMatch(/.+\/fish\/completions\/releases\.fish$/);
     expect(fishPath.startsWith("/.")).toBe(false);
+  });
+});
+
+describe("systemCompletionPaths", () => {
+  it("zsh: covers Homebrew and system site-functions dirs", () => {
+    const paths = systemCompletionPaths("zsh", {});
+    expect(paths).toContain("/opt/homebrew/share/zsh/site-functions/_releases");
+    expect(paths).toContain("/usr/local/share/zsh/site-functions/_releases");
+    expect(paths).toContain("/usr/share/zsh/site-functions/_releases");
+  });
+
+  it("bash: covers Homebrew etc + bash-completion dirs and /etc", () => {
+    const paths = systemCompletionPaths("bash", {});
+    expect(paths).toContain("/opt/homebrew/etc/bash_completion.d/releases");
+    expect(paths).toContain("/opt/homebrew/share/bash-completion/completions/releases");
+    expect(paths).toContain("/etc/bash_completion.d/releases");
+  });
+
+  it("fish: covers Homebrew vendor_completions.d", () => {
+    const paths = systemCompletionPaths("fish", {});
+    expect(paths).toContain("/opt/homebrew/share/fish/vendor_completions.d/releases.fish");
+  });
+
+  it("honors $HOMEBREW_PREFIX first", () => {
+    const paths = systemCompletionPaths("zsh", { HOMEBREW_PREFIX: "/custom/brew" });
+    expect(paths[0]).toBe("/custom/brew/share/zsh/site-functions/_releases");
   });
 });
 

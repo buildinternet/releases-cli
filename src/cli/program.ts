@@ -1,4 +1,4 @@
-import { Command, Help } from "commander";
+import { Command } from "commander";
 import chalk from "chalk";
 import { registerAddCommand } from "./commands/add.js";
 import { registerCreateCommand } from "./commands/create.js";
@@ -40,6 +40,7 @@ import { registerWhoamiCommand } from "./commands/whoami.js";
 import { registerWebhookCommand } from "./commands/webhook.js";
 import { registerAgentContextCommand } from "./commands/agent-context.js";
 import { registerCompletionCommand } from "./commands/completion.js";
+import { completionNotice } from "./completion/hint.js";
 import { registerSkillsCommand } from "./commands/skills.js";
 import { CATEGORIES } from "@buildinternet/releases-core/categories";
 import { isAuthenticated } from "../lib/mode.js";
@@ -91,12 +92,22 @@ function isWithinAdminCommand(command: Command): boolean {
   return false;
 }
 
+// Styled completion notice for help surfaces, or null when completions are set
+// up or output isn't a TTY (so piped/scripted output stays clean). Persistent
+// until completions are installed, then self-resolves.
+function styledCompletionNotice(): string | null {
+  if (!process.stdout.isTTY) return null;
+  const notice = completionNotice();
+  return notice ? chalk.dim(notice) : null;
+}
+
 function printStyledHelp(): string {
   const lines: string[] = [];
 
   lines.push("");
   lines.push(`${chalk.bold("releases")} ${chalk.dim(`v${VERSION_DISPLAY}`)}`);
-  lines.push(chalk.dim("Changelog indexer and registry for AI agents and developers"));
+  lines.push(chalk.dim("The changelog & release-notes registry for developers and AI agents"));
+  lines.push(chalk.dim("Web catalog: ") + chalk.cyan("https://releases.sh"));
   lines.push("");
 
   lines.push("Search and browse changelogs from the registry:");
@@ -114,7 +125,7 @@ function printStyledHelp(): string {
 
   lines.push(chalk.cyan("Commands:"));
   lines.push(row("search <query>", "Full-text search across releases"));
-  lines.push(row("latest [slug]", "Show latest releases"));
+  lines.push(row("tail [slug]", "Show the most recent releases (add -f to follow)"));
   lines.push(row("list [slug]", "List sources or inspect one"));
   lines.push(row("get <id|slug>", "Get any entity by ID or slug"));
   lines.push(row("stats", "Show database statistics"));
@@ -131,18 +142,22 @@ function printStyledHelp(): string {
 
   lines.push(
     chalk.dim(
-      `Use ${chalk.white('"releases <command> --help"')} for more information about a command.`,
+      `Run ${chalk.white('"releases --help"')} to see all commands, or ${chalk.white('"releases <command> --help"')} for details on one.`,
     ),
   );
-  lines.push("");
-  lines.push(chalk.dim("Exit codes: see README.md#exit-codes"));
+
+  const notice = styledCompletionNotice();
+  if (notice) {
+    lines.push("");
+    lines.push(notice);
+  }
 
   return lines.join("\n");
 }
 
 export const program = new Command()
   .name("releases")
-  .description("Changelog indexer and registry for AI agents and developers")
+  .description("The changelog & release-notes registry for developers and AI agents")
   .version(VERSION_DISPLAY, "-v, --version")
   // `admin overview` declares a deprecated bare form (`overview <org>`) on the
   // parent command alongside subcommands like `overview inputs <org>`. Without
@@ -156,12 +171,11 @@ export const program = new Command()
       adminGate();
     }
   })
-  .configureHelp({
-    formatHelp: (cmd, helper) => {
-      if (cmd.name() === "releases" && cmd.parent === null) return printStyledHelp() + "\n";
-      return new Help().formatHelp(cmd, helper);
-    },
-  })
+  // Bare `releases` (no args) prints the curated quick-start via the default
+  // action below. Any explicit help request (`--help`, `-h`, `releases help`)
+  // falls through to Commander's default renderer, which lists every
+  // registered command — so advanced commands (lookup, collection, auth,
+  // completion, …) stay discoverable without cluttering the landing screen.
   .configureOutput({
     outputError: (str, write) => {
       write(str);
@@ -185,6 +199,16 @@ export const program = new Command()
     console.log(printStyledHelp());
     process.exit(0);
   });
+
+// Surface the web catalog on the full `--help` listing too (the curated
+// landing carries it in the header). Position "after" scopes it to the root
+// command, so subcommand help stays clean.
+program.addHelpText("after", () => {
+  let out = `\n${chalk.dim("Web catalog: ")}${chalk.cyan("https://releases.sh")}`;
+  const notice = styledCompletionNotice();
+  if (notice) out += `\n${notice}`;
+  return out;
+});
 
 // Public commands — available to all users
 registerSearchCommand(program);
@@ -282,7 +306,9 @@ program
         process.exit(1);
       }
     } else {
-      console.log(printStyledHelp());
+      // `releases help` with no argument is an explicit help request, so mirror
+      // `releases --help` (full command list) rather than the curated landing.
+      program.outputHelp();
       process.exit(0);
     }
   });
