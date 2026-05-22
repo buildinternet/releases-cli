@@ -16,7 +16,8 @@ import type { CollectionListItem } from "@buildinternet/releases-api-types";
 import type { Source } from "@buildinternet/releases-core/schema";
 import { stripAnsi } from "../../lib/sanitize.js";
 import { logger } from "@releases/lib/logger";
-import { renderLatestReleasesTable } from "../render/releases-table.js";
+import { renderReleaseRows } from "../render/releases-table.js";
+import { slimReleaseDetail } from "../render/release-json.js";
 import { getEntityType, normalizeReleaseId, isLikelyBareId } from "@buildinternet/releases-core/id";
 import { countTokensSafe } from "@buildinternet/releases-core/tokens";
 import { writeJson } from "../../lib/output.js";
@@ -33,7 +34,7 @@ function formatSize(text: string): string {
   return `${charsFmt} chars (~${tokens.toLocaleString()} tokens)`;
 }
 
-export type GetEntityOpts = { json?: boolean };
+export type GetEntityOpts = { json?: boolean; full?: boolean };
 
 /**
  * Default count for the "Latest releases" preview embedded in get responses.
@@ -86,10 +87,16 @@ async function getRelease_(id: string, opts: GetEntityOpts) {
   const contentChars = rel.content?.length ?? 0;
   const contentTokens = rel.content ? countTokensSafe(rel.content) : 0;
 
+  if (opts.full && !opts.json) logger.warn("--full only affects --json output; ignoring.");
+
   if (opts.json) {
-    // Computed-size annotations land on the JSON shape too so agents don't
-    // have to re-encode the body just to decide whether to pull it.
-    await writeJson({ ...rel, contentChars, contentTokens });
+    // Slim by default (drops storage/pipeline internals + redundant title
+    // variants); --full returns the complete unprojected payload. Computed
+    // size annotations land on both shapes so agents can decide whether to
+    // pull the body. #215.
+    await writeJson(
+      slimReleaseDetail(rel, { contentChars, contentTokens, full: opts.full === true }),
+    );
     return;
   }
   console.log(chalk.dim("Release"));
@@ -229,7 +236,7 @@ async function renderSource(rawSource: unknown, opts: GetEntityOpts) {
         `Latest ${latest.length} release${latest.length === 1 ? "" : "s"} (most recent first):`,
       ),
     );
-    console.log(renderLatestReleasesTable(latest));
+    console.log(renderReleaseRows(latest, { mode: "feed" }));
   }
 
   printFooterHint([
@@ -319,7 +326,7 @@ async function renderOrg(
         `Latest ${releases.length} release${releases.length === 1 ? "" : "s"} (most recent first):`,
       ),
     );
-    console.log(renderLatestReleasesTable(releases));
+    console.log(renderReleaseRows(releases, { mode: "feed" }));
   }
 
   printFooterHint([
@@ -415,5 +422,6 @@ export function registerGetCommand(program: Command) {
     .description("Get details for any entity by ID or slug")
     .argument("<identifier>", "ID (rel_/src_/org_/prod_) or slug")
     .option("--json", "Output as JSON")
+    .option("--full", "With --json on a release, return the complete unprojected payload")
     .action(getEntityAction);
 }
