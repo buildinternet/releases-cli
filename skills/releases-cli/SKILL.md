@@ -43,7 +43,7 @@ Skills are symlinked by default — re-running `releases skills install` refresh
 ## What this skill covers
 
 - **[Reader commands](references/reader.md)** — Search, inspect, and export changelog data. No API key required.
-- **[Admin commands](references/admin.md)** — Add/edit sources, manage orgs and products, fetch releases, run policies. Requires `RELEASED_API_KEY`.
+- **[Admin commands](references/admin.md)** — Add/edit sources, manage orgs and products, fetch releases, run policies. Requires `RELEASES_API_KEY`.
 
 ## Quick Reference
 
@@ -59,7 +59,7 @@ releases get org_abc123                         # typed IDs are accepted
 releases stats                                  # registry overview
 releases categories                             # list valid category values
 
-# Admin (requires RELEASED_API_KEY)
+# Admin (requires RELEASES_API_KEY)
 releases admin source create "Linear" --url https://linear.app/changelog
 releases admin source fetch <source> --max 50   # source = src_… or slug
 releases admin org create "Acme" --category cloud
@@ -85,15 +85,15 @@ Reader access is unauthenticated and may be rate-limited per IP.
 If a key is available:
 
 ```bash
-export RELEASED_API_KEY=your_key
-export RELEASED_API_URL=https://api.releases.sh   # optional, this is the default
+export RELEASES_API_KEY=your_key
+export RELEASES_API_URL=https://api.releases.sh   # optional, this is the default
 ```
 
 These can also go in a `.env` file — Bun auto-loads it when running from source.
 
 ## Common Mistakes
 
-- `releases admin …` without `RELEASED_API_KEY` set fails fast with a clear error — don't retry the same command. Note that keys are not self-serve yet (see Authentication).
+- `releases admin …` without `RELEASES_API_KEY` set fails fast with a clear error — don't retry the same command. Note that keys are not self-serve yet (see Authentication).
 - Slug renames (`admin source update <identifier> --slug new-slug`) require `--confirm-slug-change` because they break web links.
 - `releases admin source fetch` with no source or filter is blocked in remote mode. Use `--stale`, `--unfetched`, `--retry-errors`, `--changed`, or a source identifier (src_… or slug).
 - Default fetch cap is 200 releases per source (GitHub pagination limits). Use `--max <n>` or `--all` to override.

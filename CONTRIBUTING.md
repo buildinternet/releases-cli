@@ -41,9 +41,9 @@ That monorepo is currently private (we plan to open-source it down the road), so
 
 Reader commands work against `https://api.releases.sh` out of the box. Admin commands need a bearer token — copy `.env.example` to `.env` and fill in:
 
-- `RELEASED_API_KEY` — bearer token for write endpoints (closed beta; open an issue if you need access).
-- `RELEASED_API_URL` — override the default endpoint (useful for staging).
-- `RELEASED_TELEMETRY_DISABLED=1` — opt out of anonymous usage pings. `DO_NOT_TRACK=1` is also honored.
+- `RELEASES_API_KEY` — bearer token for write endpoints (closed beta; open an issue if you need access).
+- `RELEASES_API_URL` — override the default endpoint (useful for staging).
+- `RELEASES_TELEMETRY_DISABLED=1` — opt out of anonymous usage pings. `DO_NOT_TRACK=1` is also honored.
 
 ## Testing
 

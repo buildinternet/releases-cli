@@ -40,7 +40,7 @@ Always include the `@latest` tag — bare `npx @buildinternet/releases` caches t
 curl -fsSL https://releases.sh/install | bash
 ```
 
-Downloads the matching platform binary from npm. Respects `RELEASED_INSTALL_DIR` (default: `/usr/local/bin`). Windows users should use npm or the GitHub Releases archive below.
+Downloads the matching platform binary from npm. Respects `RELEASES_INSTALL_DIR` (default: `/usr/local/bin`). Windows users should use npm or the GitHub Releases archive below.
 
 ### Precompiled binaries (GitHub Releases)
 
@@ -158,7 +158,7 @@ Use this path when you only want the skill behavior (auto-triggering on release/
 
 ## Authentication
 
-Admin commands require an API token. You can store one persistently using the `auth` command namespace so you don't need to set `RELEASED_API_KEY` in your shell every time.
+Admin commands require an API token. You can store one persistently using the `auth` command namespace so you don't need to set `RELEASES_API_KEY` in your shell every time.
 
 ```bash
 releases auth login                     # interactive prompt (masked input)
@@ -178,7 +178,7 @@ releases auth logout                    # remove the stored token
 
 `whoami` is an alias for `auth status`.
 
-**Credential precedence:** if `RELEASED_API_KEY` is set in the environment it takes priority over any stored credential — useful for CI or per-command overrides.
+**Credential precedence:** if `RELEASES_API_KEY` is set in the environment it takes priority over any stored credential — useful for CI or per-command overrides.
 
 **Storage:** credentials are written to `~/.releases/credentials` with `0600` permissions (owner read/write, rw-------). The file is JSON and contains the token, name, scopes, the API URL the token was verified against, and a `savedAt` timestamp.
 
@@ -186,9 +186,9 @@ releases auth logout                    # remove the stored token
 
 Nothing is required for reader access. For admin operations (closed beta — see above):
 
-- `RELEASED_API_KEY` — Bearer token for write endpoints. Overrides any stored credential from `releases auth login`. Required for any `releases admin …` command that mutates state if no stored credential is present. Keys are not self-serve right now.
-- `RELEASED_API_URL` — Override the default `https://api.releases.sh` endpoint (useful for staging).
-- `RELEASED_TELEMETRY_DISABLED=1` — Opt out of anonymous usage pings. `DO_NOT_TRACK=1` is also honored.
+- `RELEASES_API_KEY` — Bearer token for write endpoints. Overrides any stored credential from `releases auth login`. Required for any `releases admin …` command that mutates state if no stored credential is present. Keys are not self-serve right now.
+- `RELEASES_API_URL` — Override the default `https://api.releases.sh` endpoint (useful for staging).
+- `RELEASES_TELEMETRY_DISABLED=1` — Opt out of anonymous usage pings. `DO_NOT_TRACK=1` is also honored.
 - `RELEASES_DISABLE_SKILL_UPDATE_CHECK=1` — Silence the "skills are behind, run `releases skills install`" stderr nag that fires (at most once per 24h) when the GitHub `skills/` tree has moved since your last install.
 - `RELEASES_RUN_DIR` — When set, every `releases admin …` write appends one JSONL line (`{timestamp, command, target, result}`) to `$RELEASES_RUN_DIR/mutations.jsonl` — an audit trail for agent-driven maintenance batches. Unset → no-op. Also the default destination for managed-session traces (`--trace-dir` / `--save` override it). Part of the `~/.releases/work/` maintenance workspace.
 
