@@ -1,5 +1,9 @@
 import { describe, it, expect } from "bun:test";
-import { validateMessage, buildFeedbackPayload } from "../../src/cli/commands/feedback.js";
+import {
+  validateMessage,
+  buildFeedbackPayload,
+  resolveTelemetry,
+} from "../../src/cli/commands/feedback.js";
 
 describe("validateMessage", () => {
   it("rejects messages shorter than 5 chars", () => {
@@ -55,5 +59,35 @@ describe("buildFeedbackPayload", () => {
       { telemetryEnabled: true, anonId: "anon-1" },
     );
     expect(p.type).toBe("general");
+  });
+});
+
+describe("resolveTelemetry", () => {
+  it("does not touch the anon id when telemetry is disabled", () => {
+    let called = false;
+    const r = resolveTelemetry({
+      isEnabled: () => false,
+      getAnonId: () => {
+        called = true;
+        return "anon-1";
+      },
+    });
+    expect(called).toBe(false);
+    expect(r.telemetryEnabled).toBe(false);
+    expect(r.anonId).toBe("");
+  });
+
+  it("resolves the anon id when telemetry is enabled", () => {
+    let called = false;
+    const r = resolveTelemetry({
+      isEnabled: () => true,
+      getAnonId: () => {
+        called = true;
+        return "anon-1";
+      },
+    });
+    expect(called).toBe(true);
+    expect(r.telemetryEnabled).toBe(true);
+    expect(r.anonId).toBe("anon-1");
   });
 });

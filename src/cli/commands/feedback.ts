@@ -8,6 +8,7 @@ import { VERSION } from "../version.js";
 import { isTelemetryEnabled, getOrCreateAnonId } from "../../lib/telemetry.js";
 import { apiFetch } from "../../api/client.js";
 import { stripAnsi } from "../../lib/sanitize.js";
+import { logger } from "@releases/lib/logger";
 
 const MIN_MESSAGE = 5;
 const MAX_MESSAGE = 4000;
@@ -72,6 +73,22 @@ export function buildFeedbackPayload(
     runtime: detectRuntime(),
     surface: "cli",
   };
+}
+
+/**
+ * Resolve the telemetry context for the payload. Only touches the anon-id file
+ * when telemetry is enabled — calling getOrCreateAnonId() unconditionally would
+ * create and persist an ID even for users who have opted out of telemetry.
+ * Deps are injectable for testing.
+ */
+export function resolveTelemetry(deps?: { isEnabled?: () => boolean; getAnonId?: () => string }): {
+  telemetryEnabled: boolean;
+  anonId: string;
+} {
+  const isEnabled = deps?.isEnabled ?? isTelemetryEnabled;
+  const getAnonId = deps?.getAnonId ?? getOrCreateAnonId;
+  const telemetryEnabled = isEnabled();
+  return { telemetryEnabled, anonId: telemetryEnabled ? getAnonId() : "" };
 }
 
 async function resolveMessage(arg: string | undefined): Promise<string | null> {
@@ -141,18 +158,18 @@ export function registerFeedbackCommand(parent: Command): void {
         opts: { contact?: string; type?: string; json?: boolean; dryRun?: boolean },
       ) => {
         if (opts.type && !FEEDBACK_TYPES_SET.has(opts.type)) {
-          console.error(chalk.red(`--type must be one of: ${FEEDBACK_TYPES.join(", ")}`));
+          logger.error(`--type must be one of: ${FEEDBACK_TYPES.join(", ")}`);
           process.exit(1);
         }
 
         const raw = await resolveMessage(messageArg);
         if (raw === null) {
-          console.error(chalk.dim("Cancelled — no feedback sent."));
+          logger.info(chalk.dim("Cancelled — no feedback sent."));
           process.exit(0);
         }
         const validated = validateMessage(raw);
         if (!validated.ok) {
-          console.error(chalk.red(validated.error));
+          logger.error(validated.error);
           process.exit(1);
         }
 
@@ -160,12 +177,12 @@ export function registerFeedbackCommand(parent: Command): void {
         const payload = buildFeedbackPayload(
           validated.message,
           { type: opts.type, contact },
-          { telemetryEnabled: isTelemetryEnabled(), anonId: getOrCreateAnonId() },
+          resolveTelemetry(),
         );
 
         if (opts.dryRun) {
           if (opts.json) await writeJson({ dryRun: true, payload });
-          else console.log(chalk.dim("[dry-run] would POST:\n") + JSON.stringify(payload, null, 2));
+          else logger.info(chalk.dim("[dry-run] would POST:\n") + JSON.stringify(payload, null, 2));
           return;
         }
 
@@ -173,15 +190,15 @@ export function registerFeedbackCommand(parent: Command): void {
         if (result.ok) {
           if (opts.json) await writeJson({ ok: true, id: result.id });
           else
-            console.log(
+            logger.info(
               chalk.green("Thanks — feedback received ") + chalk.dim(`(id: ${result.id})`),
             );
           return;
         }
         if (opts.json) await writeJson({ ok: false, error: result.error });
         else {
-          console.error(chalk.red(`Couldn't send feedback: ${result.error}`));
-          console.error(chalk.dim(`You can open an issue instead: ${ISSUES_URL}`));
+          logger.error(`Couldn't send feedback: ${result.error}`);
+          logger.info(chalk.dim(`You can open an issue instead: ${ISSUES_URL}`));
         }
         process.exit(1);
       },
@@ -234,7 +251,7 @@ export function registerFeedbackAdminCommand(parent: Command): void {
           return;
         }
         if (!data.items.length) {
-          console.log(chalk.dim("No feedback yet."));
+          logger.info(chalk.dim("No feedback yet."));
           return;
         }
         for (const r of data.items) {
@@ -244,12 +261,11 @@ export function registerFeedbackAdminCommand(parent: Command): void {
           const when = new Date(r.createdAt).toISOString().slice(0, 16).replace("T", " ");
           const head = `${chalk.bold(r.id)}  ${chalk.dim(when)}  ${chalk.cyan(r.type)}/${r.status}`;
           const contact = r.contact ? chalk.dim(` <${stripAnsi(r.contact)}>`) : "";
-          console.log(`${head}${contact}`);
-          console.log(`  ${stripAnsi(r.message).replace(/\s+/g, " ").slice(0, 200)}`);
+          logger.info(`${head}${contact}`);
+          logger.info(`  ${stripAnsi(r.message).replace(/\s+/g, " ").slice(0, 200)}`);
         }
         if (data.nextCursor) {
-          console.log("");
-          console.log(chalk.dim(`More: releases admin feedback list --cursor ${data.nextCursor}`));
+          logger.info(chalk.dim(`More: releases admin feedback list --cursor ${data.nextCursor}`));
         }
       },
     );
