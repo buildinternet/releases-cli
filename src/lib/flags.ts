@@ -38,6 +38,44 @@ export function parseNonNegIntFlag(label: string, raw: string | undefined): numb
   return n;
 }
 
+/** Relative time-window shorthand accepted by the API: `<n><unit>` (d/w/m/y). */
+const TIME_WINDOW_RELATIVE_RE = /^(\d+)([dwmy])$/i;
+/**
+ * ISO accepted by the API's resolver: a date or a timezone-qualified datetime.
+ * Kept in lockstep with `ISO_DATE_RE` in @buildinternet/releases-core/dates so
+ * the CLI rejects the same shapes the server would (bare numbers, `2026/01/01`,
+ * and tz-less datetimes, which the server parses ambiguously as local time).
+ */
+const TIME_WINDOW_ISO_RE =
+  /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}(:?\d{2})?))?$/;
+
+/**
+ * Validate a `--since`/`--until` flag value. The API resolves relative
+ * shorthand server-side, so the CLI only fast-fails on obviously-malformed
+ * input and forwards the trimmed value verbatim as a query param. Accepts an
+ * ISO date (`2026-01-01`), a timezone-qualified datetime (`…Z` / `…+05:00`),
+ * or relative shorthand (`90d`, `4w`, `6m`, `2y`). Returns `undefined` when the
+ * flag was omitted; exits with code 2 on a malformed value (matches the other
+ * flag parsers here). A bare number, `2026/01/01`, and a tz-less datetime are
+ * rejected so the local check matches the server contract.
+ */
+export function parseTimeWindowFlag(label: string, raw: string | undefined): string | undefined {
+  if (raw === undefined) return undefined;
+  const trimmed = raw.trim();
+  const valid =
+    TIME_WINDOW_RELATIVE_RE.test(trimmed) ||
+    (TIME_WINDOW_ISO_RE.test(trimmed) && !Number.isNaN(new Date(trimmed).getTime()));
+  if (!valid) {
+    console.error(
+      chalk.red(
+        `Invalid --${label}: "${raw}" — must be an ISO date (e.g. 2026-01-01) or relative shorthand (90d, 4w, 6m, 2y)`,
+      ),
+    );
+    process.exit(2);
+  }
+  return trimmed;
+}
+
 /** Parse a comma-separated `--tags foo,bar` flag into a trimmed, non-empty list. */
 export function parseTagList(raw: string | undefined): string[] {
   if (!raw) return [];

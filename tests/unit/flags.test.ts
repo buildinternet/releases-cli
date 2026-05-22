@@ -4,6 +4,7 @@ import {
   parseNonNegIntFlag,
   coerceMetadataValue,
   parseMetadataSetFlag,
+  parseTimeWindowFlag,
 } from "../../src/lib/flags.js";
 
 // Intercept process.exit so invalid-input tests don't kill the runner.
@@ -231,5 +232,55 @@ describe("parseMetadataSetFlag", () => {
     withExitTrap(() => {
       expect(() => parseMetadataSetFlag("foo[0]=value")).toThrow("process.exit called");
     });
+  });
+});
+
+describe("parseTimeWindowFlag", () => {
+  it("returns undefined when the flag is not supplied", () => {
+    expect(parseTimeWindowFlag("since", undefined)).toBeUndefined();
+  });
+
+  it("forwards an ISO date verbatim (trimmed)", () => {
+    expect(parseTimeWindowFlag("since", "2026-01-01")).toBe("2026-01-01");
+    expect(parseTimeWindowFlag("since", "  2026-01-01T12:30:00Z ")).toBe("2026-01-01T12:30:00Z");
+  });
+
+  it("forwards relative shorthand verbatim (resolved server-side)", () => {
+    expect(parseTimeWindowFlag("since", "90d")).toBe("90d");
+    expect(parseTimeWindowFlag("since", "4w")).toBe("4w");
+    expect(parseTimeWindowFlag("since", "6M")).toBe("6M");
+    expect(parseTimeWindowFlag("until", "2y")).toBe("2y");
+  });
+
+  it("rejects a bare number (ambiguous — neither date nor shorthand)", () => {
+    withExitTrap(() => {
+      expect(() => parseTimeWindowFlag("since", "90")).toThrow("process.exit called");
+    });
+  });
+
+  it("rejects an unknown unit", () => {
+    withExitTrap(() => {
+      expect(() => parseTimeWindowFlag("since", "90x")).toThrow("process.exit called");
+    });
+  });
+
+  it("rejects unparseable garbage", () => {
+    withExitTrap(() => {
+      expect(() => parseTimeWindowFlag("until", "not-a-date")).toThrow("process.exit called");
+    });
+  });
+
+  it("rejects a datetime without a timezone (server would parse it as local time)", () => {
+    withExitTrap(() => {
+      expect(() => parseTimeWindowFlag("since", "2026-01-01T12:30:00")).toThrow(
+        "process.exit called",
+      );
+    });
+  });
+
+  it("accepts a timezone offset", () => {
+    expect(parseTimeWindowFlag("since", "2026-01-01T12:30:00+05:00")).toBe(
+      "2026-01-01T12:30:00+05:00",
+    );
   });
 });

@@ -287,3 +287,51 @@ describe("embed backfill routes", () => {
     expect(capturedUrl).toBe("https://test.example.com/v1/admin/embed/status");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Time-window (since/until) query-param passthrough
+// ---------------------------------------------------------------------------
+
+describe("since/until query params", () => {
+  let originalFetch: typeof globalThis.fetch;
+  let capturedUrl = "";
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    capturedUrl = "";
+  });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  function captureWith(body: unknown) {
+    globalThis.fetch = (async (url: string) => {
+      capturedUrl = url;
+      return new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as any;
+  }
+
+  it("unifiedSearch forwards since and until", async () => {
+    captureWith({ orgs: [], catalog: [], releases: [], collections: [] });
+    await client.unifiedSearch("q", 10, { since: "90d", until: "2026-05-01" });
+    expect(capturedUrl).toContain("since=90d");
+    expect(capturedUrl).toContain("until=2026-05-01");
+  });
+
+  it("unifiedSearch omits since/until when not supplied", async () => {
+    captureWith({ orgs: [], catalog: [], releases: [], collections: [] });
+    await client.unifiedSearch("q", 10);
+    expect(capturedUrl).not.toContain("since=");
+    expect(capturedUrl).not.toContain("until=");
+  });
+
+  it("getLatestReleases forwards since and until", async () => {
+    captureWith({ releases: [] });
+    await client.getLatestReleases({ count: 10, since: "30d", until: "2026-05-01" });
+    expect(capturedUrl).toContain("since=30d");
+    expect(capturedUrl).toContain("until=2026-05-01");
+  });
+});

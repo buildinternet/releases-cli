@@ -7,6 +7,7 @@ import { stripAnsi } from "../../lib/sanitize.js";
 import { sleep } from "../../lib/sleep.js";
 import { renderLatestReleasesTable } from "../render/releases-table.js";
 import { writeJson, writeJsonLine } from "../../lib/output.js";
+import { parseTimeWindowFlag } from "../../lib/flags.js";
 
 function renderStreamLine(row: LatestRelease): string {
   const version = row.version ? chalk.yellow(stripAnsi(row.version)) : "";
@@ -46,6 +47,14 @@ export function registerTailCommand(program: Command) {
       "--include-coverage",
       "Include releases that are coverage of another (hidden by default)",
     )
+    .option(
+      "--since <when>",
+      "Only releases published on/after this date. ISO (2026-01-01) or shorthand (90d, 4w, 6m, 2y).",
+    )
+    .option(
+      "--until <when>",
+      "Only releases published on/before this date. Same formats as --since.",
+    )
     .option("-f, --follow", "Poll for new releases and stream them as they arrive")
     .option("--interval <seconds>", "Poll interval in seconds when following (min 5)", "60")
     .option("--json", "Output as JSON")
@@ -56,6 +65,7 @@ Examples:
   releases tail                         Latest releases across all sources
   releases tail my-source               Latest releases from one source
   releases tail --org acme --count 20   Latest 20 releases from an org
+  releases tail --since 30d             Releases from the last 30 days
   releases tail -f                      Follow new releases as they arrive (60s interval)
   releases tail -f --interval 30        Follow with a 30s poll interval
   releases tail --json                  Output as JSON
@@ -68,6 +78,8 @@ Examples:
           count: string;
           org?: string;
           includeCoverage?: boolean;
+          since?: string;
+          until?: string;
           follow?: boolean;
           interval: string;
           json?: boolean;
@@ -75,6 +87,9 @@ Examples:
       ) => {
         const count = parseInt(opts.count, 10);
         const intervalSeconds = Math.max(5, parseInt(opts.interval, 10) || 60);
+        // Validate locally; the API resolves relative shorthand server-side.
+        const since = parseTimeWindowFlag("since", opts.since);
+        const until = parseTimeWindowFlag("until", opts.until);
 
         if (sourceArg) {
           const source = await findSource(sourceArg);
@@ -93,6 +108,8 @@ Examples:
           org: orgSlug,
           count,
           includeCoverage: opts.includeCoverage,
+          since,
+          until,
         };
         const rows = await getLatestReleases(fetchOpts);
 
@@ -115,9 +132,11 @@ Examples:
 
         if (!opts.follow) return;
 
-        // Follow mode polls the same unfiltered request each tick so the response
-        // collapses onto the shared KV cache key — a server-side `since` filter
-        // would fork the cache and defeat the point. De-dupe via seen-id set.
+        // Follow mode re-issues the same request each tick and de-dupes via the
+        // seen-id set. The unfiltered default collapses onto the shared KV cache
+        // key; a `--since`/`--until` window forks off it, but the API marks
+        // windowed requests non-cacheable (BYPASS) so polling one is bounded —
+        // and a relative bound (e.g. `30d`) re-anchors to "now" on each tick.
         const seen = new Set<string>();
         rememberSeen(
           seen,
