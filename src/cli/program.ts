@@ -35,6 +35,7 @@ import { registerEvaluateCommand } from "./commands/admin/evaluate.js";
 import { registerPlaybookCommand } from "./commands/admin/playbook.js";
 import { registerOverviewCommands } from "./commands/admin/overview.js";
 import { registerTelemetryCommand } from "./commands/telemetry.js";
+import { registerFeedbackCommand, registerFeedbackAdminCommand } from "./commands/feedback.js";
 import { registerServeCommand } from "./commands/serve.js";
 import { registerWhoamiCommand } from "./commands/whoami.js";
 import { registerWebhookCommand } from "./commands/webhook.js";
@@ -221,6 +222,7 @@ registerGetCommand(program);
 registerShowCommand(program);
 registerCollectionReadCommands(program);
 registerTelemetryCommand(program);
+registerFeedbackCommand(program);
 registerWhoamiCommand(program);
 registerAuthCommand(program);
 registerAgentContextCommand(program);
@@ -285,6 +287,7 @@ const mcpAdmin = admin.command("mcp").description("MCP server management");
 registerServeCommand(mcpAdmin);
 
 registerWebhookCommand(admin);
+registerFeedbackAdminCommand(admin);
 
 gateAdminSubtree(admin);
 
