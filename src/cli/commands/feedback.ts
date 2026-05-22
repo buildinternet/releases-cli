@@ -12,6 +12,7 @@ const MIN_MESSAGE = 5;
 const MAX_MESSAGE = 4000;
 const POST_TIMEOUT_MS = 10_000;
 const FEEDBACK_TYPES = ["bug", "idea", "other"] as const;
+const FEEDBACK_TYPES_SET = new Set<string>(FEEDBACK_TYPES);
 const ISSUES_URL = "https://github.com/buildinternet/releases-cli/issues";
 
 export type ValidateResult = { ok: true; message: string } | { ok: false; error: string };
@@ -54,8 +55,7 @@ export function buildFeedbackPayload(
   opts: { type?: string; contact?: string },
   telemetry: { telemetryEnabled: boolean; anonId: string },
 ): FeedbackPayload {
-  const type =
-    opts.type && (FEEDBACK_TYPES as readonly string[]).includes(opts.type) ? opts.type : "general";
+  const type = opts.type && FEEDBACK_TYPES_SET.has(opts.type) ? opts.type : "general";
   return {
     message,
     type,
@@ -106,7 +106,7 @@ async function postFeedback(
   payload: FeedbackPayload,
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), POST_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), POST_TIMEOUT_MS);
   try {
     const res = await fetch(`${getApiUrl()}/v1/feedback`, {
       method: "POST",
@@ -121,7 +121,7 @@ async function postFeedback(
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   } finally {
-    clearTimeout(t);
+    clearTimeout(timer);
   }
 }
 
@@ -139,7 +139,7 @@ export function registerFeedbackCommand(parent: Command): void {
         messageArg: string | undefined,
         opts: { contact?: string; type?: string; json?: boolean; dryRun?: boolean },
       ) => {
-        if (opts.type && !(FEEDBACK_TYPES as readonly string[]).includes(opts.type)) {
+        if (opts.type && !FEEDBACK_TYPES_SET.has(opts.type)) {
           console.error(chalk.red(`--type must be one of: ${FEEDBACK_TYPES.join(", ")}`));
           process.exit(1);
         }
@@ -224,8 +224,9 @@ export function registerFeedbackAdminCommand(parent: Command): void {
         if (opts.type) qs.set("type", opts.type);
         if (opts.limit) qs.set("limit", opts.limit);
         if (opts.cursor) qs.set("cursor", opts.cursor);
-        const q = qs.toString();
-        const data = await apiFetch<FeedbackListResponse>(`/v1/admin/feedback${q ? `?${q}` : ""}`);
+        const data = await apiFetch<FeedbackListResponse>(
+          `/v1/admin/feedback${qs.size ? `?${qs}` : ""}`,
+        );
 
         if (opts.json) {
           await writeJson(data);
