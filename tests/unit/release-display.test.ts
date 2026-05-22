@@ -1,5 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import { relativeDate, cleanExcerpt } from "../../src/lib/release-display.js";
+import {
+  relativeDate,
+  cleanExcerpt,
+  releaseIdentity,
+  releaseDescription,
+} from "../../src/lib/release-display.js";
 
 describe("relativeDate", () => {
   const now = new Date("2026-05-22T12:00:00.000Z").getTime();
@@ -34,5 +39,46 @@ describe("cleanExcerpt", () => {
   it("strips fenced code and truncates with ellipsis", () => {
     const md = "Intro text\n```ts\nconst x = 1;\n```\nmore";
     expect(cleanExcerpt(md, 12)).toBe("Intro text…");
+  });
+});
+
+describe("releaseIdentity", () => {
+  it("uses version when package-qualified (@ or /)", () => {
+    expect(releaseIdentity({ version: "@ai-sdk/google@3.0.79", sourceName: "AI SDK" })).toBe(
+      "@ai-sdk/google@3.0.79",
+    );
+    expect(releaseIdentity({ version: "vercel@54.4.0", sourceName: "Vercel CLI" })).toBe(
+      "vercel@54.4.0",
+    );
+  });
+  it("falls back to source name for plain/empty versions", () => {
+    expect(releaseIdentity({ version: "agent-skills-v0.107.0", sourceName: "PostHog" })).toBe(
+      "PostHog",
+    );
+    expect(releaseIdentity({ version: "v1.2.3", sourceName: "Render Blog" })).toBe("Render Blog");
+    expect(releaseIdentity({ version: null, sourceName: "LangChain" })).toBe("LangChain");
+  });
+});
+
+describe("releaseDescription", () => {
+  const base = {
+    id: "rel_x",
+    title: "Raw Title",
+    version: null,
+    summary: null,
+    publishedAt: null,
+    sourceName: "S",
+    sourceSlug: "s",
+  };
+  it("prefers summary, cleaned", () => {
+    expect(releaseDescription({ ...base, summary: "**Bold** summary" })).toBe("Bold summary");
+  });
+  it("falls back through titleShort → titleGenerated → content excerpt → title", () => {
+    expect(releaseDescription({ ...base, titleShort: "Short" })).toBe("Short");
+    expect(releaseDescription({ ...base, titleGenerated: "Generated" })).toBe("Generated");
+    expect(releaseDescription({ ...base, content: "## Heading\nbody text" })).toBe(
+      "Heading body text",
+    );
+    expect(releaseDescription({ ...base })).toBe("Raw Title");
   });
 });

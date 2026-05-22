@@ -42,3 +42,35 @@ export function cleanExcerpt(md: string | null | undefined, maxChars = 280): str
   if (text.length <= maxChars) return text;
   return text.slice(0, maxChars - 1).trimEnd() + "…";
 }
+
+export interface ReleaseRow {
+  id: string;
+  title: string;
+  version: string | null;
+  summary: string | null;
+  titleGenerated?: string | null;
+  titleShort?: string | null;
+  content?: string | null;
+  publishedAt: string | null;
+  sourceName: string;
+  sourceSlug: string;
+}
+
+/** Identity column: a package-qualified version (contains `@` or `/`) wins; else the source name. */
+export function releaseIdentity(row: Pick<ReleaseRow, "version" | "sourceName">): string {
+  const v = row.version?.trim();
+  if (v && /[@/]/.test(v)) return v;
+  return row.sourceName;
+}
+
+/** Description column: summary → titleShort → titleGenerated → cleaned content excerpt → title. Always cleaned. */
+export function releaseDescription(row: ReleaseRow): string {
+  const candidates = [row.summary, row.titleShort, row.titleGenerated];
+  for (const c of candidates) {
+    const cleaned = cleanExcerpt(c);
+    if (cleaned) return cleaned;
+  }
+  const fromContent = cleanExcerpt(row.content);
+  if (fromContent) return fromContent;
+  return cleanExcerpt(row.title) || row.title;
+}
