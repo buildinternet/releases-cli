@@ -67,20 +67,39 @@ On an interactive terminal, a persistent, self-resolving notice on the landing s
 
 ```bash
 releases search "authentication"
+releases search "slack integration" --since 90d   # filter release hits by publish date
 releases tail next-js                    # or `releases tail -f` to follow new releases
 releases tail src_abc123                 # IDs work everywhere a slug does
+releases tail --since 30d                # only releases from the last 30 days
 releases list --category ai
 releases get vercel                      # org, product, or source
 releases get org_abc123                  # typed IDs are accepted
 releases org overview vercel             # full AI-generated overview for an org
 releases stats
+releases feedback "great tool, here's an idea…"   # send feedback to the maintainers
 ```
 
 Every command that takes an org / product / source / release identifier accepts the typed ID form (`org_…`, `prod_…`, `src_…`, `rel_…`) interchangeably with the slug. IDs are stable across renames; slugs are friendlier when typing. Sources and products also accept the `org/slug` coordinate form (e.g. `vercel/next-js`).
 
+`search` and `tail`/`latest` accept `--since` and `--until` to bound releases by publish date — an ISO date (`2026-01-01`) or relative shorthand (`90d`, `4w`, `6m`, `2y`). On `search` the window applies to release hits only.
+
 Every reader command supports `--json` for machine-readable output. List commands emit a `{ items, pagination }` envelope — parse with `jq '.items[]'`, and check `.pagination.hasMore` before assuming you've seen every row. Nested `metadata` fields are returned as parsed objects (no `fromjson` needed). `org get` includes a short overview preview (with a stale warning when more than 30 days old); `org overview <identifier>` prints the full body.
 
 Tabular reader commands fit themselves to the terminal width when stdout is a TTY (column truncation with `…`) and switch to bare TSV when piped — no headers, no color, no truncation — so `releases org list | cut -f2` works without parsing ANSI. `COLUMNS=<n>` overrides the detected width. For complete, parseable output prefer `--json`.
+
+### Feedback
+
+Tell the maintainers about a bug, an idea, or anything else. No API key or account required:
+
+```bash
+releases feedback "tail -f reconnects slowly on flaky wifi"   # one-shot message
+releases feedback --type bug                                  # prompt for the text (interactive)
+echo "longer write-up…" | releases feedback                   # pipe from stdin
+releases feedback "love the tool" --contact you@example.com   # optional reply-to
+releases feedback "draft" --dry-run --json                    # preview the payload, send nothing
+```
+
+With no message argument in an interactive terminal, `feedback` prompts for the text (and an optional contact); otherwise pass it inline or pipe via stdin. `--type` accepts `bug`, `idea`, or `other`. Maintainers with admin access review submissions via `releases admin feedback list` (filter by `--type` / `--status`, paginate with `--cursor`).
 
 ### MCP
 
