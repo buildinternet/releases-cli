@@ -7,6 +7,9 @@ import { isValidKind, KIND_VALUES, type Kind } from "@buildinternet/releases-cor
 import type { LookupResultPayload, UnifiedSearchResponse } from "../../api/types.js";
 import { writeJson } from "../../lib/output.js";
 import { parseTimeWindowFlag } from "../../lib/flags.js";
+import { renderReleaseRows } from "../render/releases-table.js";
+import { slimSearchHit } from "../render/release-json.js";
+import type { ReleaseRow } from "../../lib/release-display.js";
 
 const SEARCH_MODES = ["lexical", "semantic", "hybrid"] as const;
 type SearchMode = (typeof SEARCH_MODES)[number];
@@ -141,6 +144,7 @@ export function registerSearchCommand(program: Command) {
       "Only release hits published on/before this date. Same formats as --since.",
     )
     .option("--json", "Output as JSON")
+    .option("--full", "With --json, return complete unprojected release hits")
     .addHelpText(
       "after",
       `
@@ -163,9 +167,11 @@ Examples:
           since?: string;
           until?: string;
           json?: boolean;
+          full?: boolean;
         },
       ) => {
         const limit = parseInt(opts.limit, 10);
+        if (opts.full && !opts.json) logger.warn("--full only affects --json output; ignoring.");
 
         let mode: SearchMode | undefined;
         try {
@@ -256,6 +262,8 @@ Examples:
           for (const t of types) {
             if (t === "catalog") filtered[t] = catalog;
             else if (t === "collections") filtered[t] = collections;
+            else if (t === "releases")
+              filtered[t] = response.releases.map((h) => slimSearchHit(h, opts.full === true));
             else filtered[t] = response[t];
           }
           if (response.mode !== undefined) filtered.mode = response.mode;
@@ -327,18 +335,20 @@ Examples:
 
         if (types.includes("releases") && response.releases.length > 0) {
           console.log(chalk.bold.underline("Releases"));
-          for (const r of response.releases) {
-            const idLabel = r.id ? ` ${chalk.dim(r.id)}` : "";
-            console.log(`  ${chalk.cyan.bold(stripAnsi(r.title))}${idLabel}`);
-            console.log(
-              chalk.dim(
-                `  Source: ${stripAnsi(r.sourceName)} (${r.sourceSlug})  |  Published: ${r.publishedAt ?? "No date"}`,
-              ),
-            );
-            const summary = stripAnsi(r.summary);
-            console.log(`  ${summary}${summary.length >= 150 ? "..." : ""}`);
-            console.log();
-          }
+          const rows: ReleaseRow[] = response.releases.map((r) => ({
+            id: r.id,
+            title: r.title,
+            version: r.version,
+            summary: r.summary ?? null,
+            titleGenerated: r.titleGenerated ?? null,
+            titleShort: r.titleShort ?? null,
+            content: r.content ?? null,
+            publishedAt: r.publishedAt,
+            sourceName: r.sourceName,
+            sourceSlug: r.sourceSlug,
+          }));
+          console.log(renderReleaseRows(rows, { mode: "search" }));
+          console.log();
           totalResults += response.releases.length;
         }
 
