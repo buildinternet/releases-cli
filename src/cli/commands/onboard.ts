@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import { logger } from "@releases/lib/logger";
+import { legacyEnv } from "@releases/lib/legacy-env";
 import { registerOnboardApplyCommand } from "./onboard-apply.js";
 import { apiFetch } from "../../api/client.js";
 import { getApiUrl } from "../../lib/mode.js";
@@ -24,7 +25,7 @@ type DiscoveryEngine = "managed-agents" | "sandbox";
 function resolveDiscoveryEngine(opts: OnboardOpts): DiscoveryEngine {
   if (opts.managedAgents) return "managed-agents";
   if (opts.sandbox) return "sandbox";
-  const env = process.env.RELEASED_DISCOVERY_ENGINE?.toLowerCase();
+  const env = legacyEnv("RELEASES_DISCOVERY_ENGINE", "RELEASED_DISCOVERY_ENGINE")?.toLowerCase();
   if (env === "sandbox") return "sandbox";
   return "managed-agents";
 }

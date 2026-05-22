@@ -11,6 +11,7 @@
   },
   "exports": {
     "./config": "./src/config.ts",
+    "./legacy-env": "./src/legacy-env.ts",
     "./logger": "./src/logger.ts"
   },
   "files": [

@@ -58,7 +58,7 @@ function adminKeyError(name = "admin"): never {
   console.error(
     chalk.red(`"${name}" requires an API key.`) +
       " " +
-      chalk.dim("Run `releases auth login` or set RELEASED_API_KEY."),
+      chalk.dim("Run `releases auth login` or set RELEASES_API_KEY."),
   );
   process.exit(1);
 }

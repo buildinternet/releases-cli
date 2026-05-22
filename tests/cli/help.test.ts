@@ -29,8 +29,15 @@ describe("CLI help", () => {
 });
 
 describe("CLI command gating (public mode)", () => {
-  // Clear both URL and KEY so the CLI falls back to the default public URL.
-  const publicEnv = { RELEASED_API_URL: "", RELEASED_API_KEY: "" };
+  // Clear both URL and KEY (both prefixes) so the CLI falls back to the default
+  // public URL and an inherited RELEASES_/RELEASED_ key can't leak through the
+  // legacyEnv fallback and defeat the public-mode gate.
+  const publicEnv = {
+    RELEASED_API_URL: "",
+    RELEASED_API_KEY: "",
+    RELEASES_API_URL: "",
+    RELEASES_API_KEY: "",
+  };
 
   it("shows public commands in help", () => {
     const { stdout } = runCli(["--help"], { env: publicEnv });
@@ -63,7 +70,7 @@ describe("CLI command gating (public mode)", () => {
       const { stderr, exitCode } = runCli(args, { env: publicEnv });
       expect(exitCode).toBe(1);
       expect(stderr).toContain(`"admin" requires an API key`);
-      expect(stderr).toContain("RELEASED_API_KEY");
+      expect(stderr).toContain("RELEASES_API_KEY");
     }
   });
 

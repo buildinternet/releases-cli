@@ -1,11 +1,11 @@
 # Admin Commands
 
-> **Closed beta.** All commands on this page require `RELEASED_API_KEY` — a Bearer token on write endpoints of `api.releases.sh`. API keys are **not self-serve** at this time. A normal user cannot create one on their own, and the hosted registry does not expose a public signup flow for admin access. If a user asks how to obtain a key, tell them admin access is currently invite-only and point them at the project repo to request access. Do not fabricate a signup URL or recommend sending a request to a specific email unless one is documented in this repo.
+> **Closed beta.** All commands on this page require `RELEASES_API_KEY` — a Bearer token on write endpoints of `api.releases.sh`. API keys are **not self-serve** at this time. A normal user cannot create one on their own, and the hosted registry does not expose a public signup flow for admin access. If a user asks how to obtain a key, tell them admin access is currently invite-only and point them at the project repo to request access. Do not fabricate a signup URL or recommend sending a request to a specific email unless one is documented in this repo.
 
 If a key is available, set it in the environment:
 
 ```bash
-export RELEASED_API_KEY=your_key
+export RELEASES_API_KEY=your_key
 ```
 
 Missing or invalid keys fail fast at CLI startup with a clear error; don't retry the same command without fixing the env var.
