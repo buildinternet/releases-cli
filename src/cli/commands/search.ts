@@ -6,6 +6,7 @@ import { logger } from "@releases/lib/logger";
 import { isValidKind, KIND_VALUES, type Kind } from "@buildinternet/releases-core/kinds";
 import type { LookupResultPayload, UnifiedSearchResponse } from "../../api/types.js";
 import { writeJson } from "../../lib/output.js";
+import { parseTimeWindowFlag } from "../../lib/flags.js";
 
 const SEARCH_MODES = ["lexical", "semantic", "hybrid"] as const;
 type SearchMode = (typeof SEARCH_MODES)[number];
@@ -131,6 +132,14 @@ export function registerSearchCommand(program: Command) {
       "--kind <kind>",
       `Filter by taxonomy (${KIND_VALUES.join(", ")}). Release hits use COALESCE(source.kind, product.kind); catalog hits match the row's own kind only.`,
     )
+    .option(
+      "--since <when>",
+      "Only release hits published on/after this date. ISO (2026-01-01) or shorthand (90d, 4w, 6m, 2y).",
+    )
+    .option(
+      "--until <when>",
+      "Only release hits published on/before this date. Same formats as --since.",
+    )
     .option("--json", "Output as JSON")
     .addHelpText(
       "after",
@@ -138,6 +147,7 @@ export function registerSearchCommand(program: Command) {
 Examples:
   releases search "breaking change"               Full-text + semantic search
   releases search "breaking change" --kind sdk    Narrow to SDK sources
+  releases search "slack integration" --since 90d Only hits from the last 90 days
   releases search vercel --type orgs              Show only org matches
   releases search shopify/hydrogen                Coordinate lookup (GitHub)`,
     )
@@ -150,6 +160,8 @@ Examples:
           mode?: string;
           domain?: string;
           kind?: string;
+          since?: string;
+          until?: string;
           json?: boolean;
         },
       ) => {
@@ -181,10 +193,23 @@ Examples:
           process.exit(1);
         }
 
-        const searchOpts: { mode?: SearchMode; domain?: string; kind?: Kind } = {};
+        // Validate the window locally for a fast, clear error; the API resolves
+        // relative shorthand (90d/4w/6m/2y) server-side, so we forward verbatim.
+        const since = parseTimeWindowFlag("since", opts.since);
+        const until = parseTimeWindowFlag("until", opts.until);
+
+        const searchOpts: {
+          mode?: SearchMode;
+          domain?: string;
+          kind?: Kind;
+          since?: string;
+          until?: string;
+        } = {};
         if (mode) searchOpts.mode = mode;
         if (opts.domain) searchOpts.domain = opts.domain;
         if (kind) searchOpts.kind = kind;
+        if (since) searchOpts.since = since;
+        if (until) searchOpts.until = until;
         const response = await unifiedSearch(
           query,
           limit,

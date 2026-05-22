@@ -397,6 +397,9 @@ export async function unifiedSearch(
     domain?: string;
     mode?: "lexical" | "semantic" | "hybrid";
     kind?: Kind;
+    /** ISO date or relative shorthand (90d/4w/6m/2y); resolved server-side. */
+    since?: string;
+    until?: string;
   },
 ): Promise<UnifiedSearchResponse> {
   const params = new URLSearchParams({ q: query, limit: String(limit) });
@@ -404,6 +407,8 @@ export async function unifiedSearch(
   if (opts?.domain) params.set("domain", opts.domain);
   if (opts?.mode) params.set("mode", opts.mode);
   if (opts?.kind) params.set("kind", opts.kind);
+  if (opts?.since) params.set("since", opts.since);
+  if (opts?.until) params.set("until", opts.until);
   return apiFetch<UnifiedSearchResponse>(`/v1/search?${params}`);
 }
 
@@ -633,12 +638,17 @@ export async function getLatestReleases(opts: {
   org?: string;
   count: number;
   includeCoverage?: boolean;
+  /** ISO date or relative shorthand (90d/4w/6m/2y); resolved server-side. */
+  since?: string;
+  until?: string;
 }): Promise<LatestRelease[]> {
   const qs = new URLSearchParams();
   qs.set("count", String(opts.count));
   if (opts.source) qs.set("source", opts.source);
   if (opts.org) qs.set("org", opts.org);
   if (opts.includeCoverage) qs.set("include_coverage", "true");
+  if (opts.since) qs.set("since", opts.since);
+  if (opts.until) qs.set("until", opts.until);
 
   const data = await apiFetch<LatestReleasesResponse>(`/v1/releases/latest?${qs.toString()}`);
   if (!data) return [];
