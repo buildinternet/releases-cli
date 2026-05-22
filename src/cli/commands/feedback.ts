@@ -7,6 +7,7 @@ import { RELEASES_CLI_UA } from "../../lib/user-agent.js";
 import { VERSION } from "../version.js";
 import { isTelemetryEnabled, getOrCreateAnonId } from "../../lib/telemetry.js";
 import { apiFetch } from "../../api/client.js";
+import { stripAnsi } from "../../lib/sanitize.js";
 
 const MIN_MESSAGE = 5;
 const MAX_MESSAGE = 4000;
@@ -237,11 +238,14 @@ export function registerFeedbackAdminCommand(parent: Command): void {
           return;
         }
         for (const r of data.items) {
+          // Defense-in-depth: the API strips control chars at ingest, but
+          // stripAnsi here protects the operator's terminal from any
+          // pre-existing or otherwise-ingested rows that carry escapes.
           const when = new Date(r.createdAt).toISOString().slice(0, 16).replace("T", " ");
           const head = `${chalk.bold(r.id)}  ${chalk.dim(when)}  ${chalk.cyan(r.type)}/${r.status}`;
-          const contact = r.contact ? chalk.dim(` <${r.contact}>`) : "";
+          const contact = r.contact ? chalk.dim(` <${stripAnsi(r.contact)}>`) : "";
           console.log(`${head}${contact}`);
-          console.log(`  ${r.message.replace(/\s+/g, " ").slice(0, 200)}`);
+          console.log(`  ${stripAnsi(r.message).replace(/\s+/g, " ").slice(0, 200)}`);
         }
         if (data.nextCursor) {
           console.log("");
