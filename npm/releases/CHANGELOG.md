@@ -1,5 +1,12 @@
 # @buildinternet/releases
 
+## 0.44.0
+
+### Minor Changes
+
+- 4a72ff1: Add `releases feedback` to send feedback about the CLI (arg, stdin, or interactive; `--contact`, `--type`, `--json`, `--dry-run`), and `releases admin feedback list` to review submissions.
+- 62f7f78: Add `--since` / `--until` time-window filters to `releases search` and `releases tail|latest`. Each accepts an ISO date (`2026-01-01`) or relative shorthand (`90d`, `4w`, `6m`, `2y`) and filters releases by publish date, composing with the existing filters. Enables capability-discovery queries like `releases search "slack integration" --since 90d`.
+
 ## 0.43.0
 
 ### Minor Changes
