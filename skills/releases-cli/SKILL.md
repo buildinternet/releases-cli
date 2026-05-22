@@ -74,6 +74,8 @@ Every command that takes an org / product / source / release identifier accepts 
 
 Tabular reader commands fit themselves to the terminal width when stdout is a TTY (column truncation with `…`) and switch to bare TSV (no headers, no color, no truncation) when stdout is piped — so `releases org list | cut -f2` works without parsing ANSI. Set `COLUMNS=<n>` to override the detected width. Use `--json` whenever you need stable, complete output for parsing.
 
+The release readers (`get`, `search`, `tail`/`latest`) return a **slim** JSON shape by default — core fields plus a markdown-stripped `excerpt` and `contentChars`/`contentTokens` size hints — to keep agent token usage down; pass `--full` for the complete payload. (This is the inverse of `list`, which is verbose by default with an opt-in `--compact`.) See `references/reader.md`.
+
 Every mutating admin command accepts `--dry-run` to print the planned write (with all validations applied) without calling the API. Pair with `--json` for a machine-readable plan. See `references/admin.md` for the full coverage list.
 
 ## Authentication
