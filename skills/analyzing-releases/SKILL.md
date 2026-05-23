@@ -24,7 +24,7 @@ This is a **reader** workflow — it uses only the public, unauthenticated tools
 | Latest releases (source or org) | `releases tail <slug> --json` · `releases tail --org <org> --json` | `get_latest_releases` (`organization` / `product`, `since`/`until`) |
 | Keyword/semantic release search | `releases search <query> --json` | `search` with `type: ["releases"]` |
 | Read one release in full | `releases get <rel_id> --json` | `get_release` |
-| Read a tracked CHANGELOG slice | `releases admin source changelog <slug> --tokens <n>` (public endpoint) | `get_catalog_entry` with `changelog_tokens` / `changelog_offset` |
+| Read a tracked CHANGELOG slice | `releases admin source changelog <slug> --tokens <n>` (key-gated) | `get_catalog_entry` with `changelog_tokens` / `changelog_offset` (keyless) |
 
 All releases are indexed already — you don't need to (and as a reader can't) trigger fetches. If a company isn't in the registry at all, say so rather than trying to onboard it; onboarding is an operator task.
 
