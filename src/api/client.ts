@@ -604,6 +604,65 @@ export async function getFetchLogs(opts: {
   }));
 }
 
+// ── Stuck sources ──
+
+export interface StuckSource {
+  sourceId: string;
+  sourceSlug: string;
+  name: string;
+  type: "github" | "scrape" | "feed" | "agent";
+  url: string;
+  kind: string | null;
+  orgSlug: string | null;
+  orgName: string | null;
+  fetchPriority: "normal" | "low" | "paused";
+  isPrimary: boolean;
+  isHidden: boolean;
+  recentAttempts: number;
+  recentErrors: number;
+  lastAttemptAt: string | null;
+  lastError: string | null;
+  lastErrorCategory: string | null;
+  /** null = the source has NEVER fetched successfully */
+  lastSuccessAt: string | null;
+  lastFetchedAt: string | null;
+  sourceCreatedAt: string | null;
+}
+
+export interface StuckSourcesResponse {
+  items: StuckSource[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    returned: number;
+    totalItems?: number;
+    totalPages?: number;
+    hasMore: boolean;
+  };
+  meta: {
+    window: number;
+    minAttempts: number;
+    includePaused: boolean;
+  };
+}
+
+export async function getStuckSources(opts?: {
+  window?: number;
+  minAttempts?: number;
+  includePaused?: boolean;
+  limit?: number;
+  page?: number;
+}): Promise<StuckSourcesResponse> {
+  const params = new URLSearchParams();
+  if (opts?.window != null) params.set("window", String(opts.window));
+  if (opts?.minAttempts != null) params.set("minAttempts", String(opts.minAttempts));
+  if (opts?.includePaused) params.set("includePaused", "true");
+  if (opts?.limit != null) params.set("limit", String(opts.limit));
+  if (opts?.page != null) params.set("page", String(opts.page));
+  const qs = params.toString();
+  return apiFetch<StuckSourcesResponse>(`/v1/admin/sources/stuck${qs ? `?${qs}` : ""}`);
+}
+
 // ── Latest releases ──
 
 function toMediaItems(
