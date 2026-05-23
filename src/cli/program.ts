@@ -22,6 +22,7 @@ import { registerStatsCommand } from "./commands/stats.js";
 import { registerReleaseCommand } from "./commands/release.js";
 import { registerCheckCommand } from "./commands/check.js";
 import { registerFetchLogCommand } from "./commands/fetch-log.js";
+import { registerStuckCommand } from "./commands/stuck.js";
 import { registerOnboardCommand } from "./commands/onboard.js";
 import { registerIgnoreCommand } from "./commands/ignore.js";
 import { registerBlockCommand } from "./commands/block.js";
@@ -257,6 +258,7 @@ registerRemoveCommand(sourceAdmin);
 registerImportCommand(sourceAdmin);
 registerFetchCommand(sourceAdmin);
 registerFetchLogCommand(sourceAdmin);
+registerStuckCommand(sourceAdmin);
 registerCheckCommand(sourceAdmin);
 registerChangelogCommand(sourceAdmin);
 
