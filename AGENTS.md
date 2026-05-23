@@ -34,8 +34,8 @@ bun test                      # bun test
 - **`@buildinternet/releases-core`** — runtime-neutral helpers (schema, categories, slicing, IDs, slugs, tokens, CLI contracts). Published from the private [`buildinternet/releases`](https://github.com/buildinternet/releases) monorepo (canonical source in `packages/core/`), consumed here as a regular npm dependency. Bump the pin in `package.json` when adopting a new schema.
 - **`packages/lib/`** (`@buildinternet/releases-lib`) — logger, errors, trimmed config.
 - **`packages/skills/`** (`@buildinternet/releases-skills`) — thin wrapper around top-level `skills/` for consumers who want to load the bundled playbooks programmatically.
-- **`skills/`** — source of truth for agent skills. The Claude plugin in `plugins/claude/releases/skills/` is generated via `bun scripts/sync-plugin-skills.ts`. Cross-agent install runs through `releases skills install`, which shells out to `npx skills add buildinternet/releases-cli` (the `vercel-labs/skills` ecosystem). Wiring is in `src/cli/commands/skills.ts`; pure argv construction in `src/cli/skills/build-args.ts`.
-- **`plugins/claude/releases/`** — Claude Code plugin. Bundles the hosted MCP connection + synced skills.
+- **`skills/`** — single source of truth for agent skills; there is no generated copy. The Claude plugin references these folders directly through `.claude-plugin/marketplace.json` (each plugin's `skills` array lists `./skills/<name>` paths, resolved against the repo root via `source: "./"`), so editing a skill is the whole change — nothing to re-sync. Cross-agent install runs through `releases skills install`, which shells out to `npx skills add buildinternet/releases-cli` (the `vercel-labs/skills` ecosystem). Wiring is in `src/cli/commands/skills.ts`; pure argv construction in `src/cli/skills/build-args.ts`.
+- **`plugins/claude/releases/`** — Claude Code plugin. Bundles the hosted MCP connection + the skills referenced from `skills/` via `marketplace.json`.
 - **`npm/`** — meta package (`@buildinternet/releases`) + four platform binary packages. CI writes the compiled binary into each platform package before publishing.
 
 ## Conventions

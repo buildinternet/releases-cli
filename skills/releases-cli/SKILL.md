@@ -1,102 +1,62 @@
 ---
 name: releases-cli
-description: Use the `releases` CLI to search, inspect, and manage the Releases.sh changelog registry from the terminal. Activate when the user mentions "releases CLI", runs a `releases` command, asks how to install the CLI, or wants to add/edit/fetch sources or organizations programmatically.
+description: Use the `releases` CLI to search, browse, and read the Releases.sh changelog registry from the terminal — the keyless, agent-friendly peer of the Releases MCP. Activate when the user mentions "releases CLI", runs a `releases` command, asks how to install it, or wants to look up releases, sources, orgs, collections, or changelogs from a shell.
 ---
 
 # releases CLI
 
-The `releases` CLI does two things: lets anyone search and browse the public changelog registry at [releases.sh](https://releases.sh), and lets API-key holders manage orgs, products, sources, and releases through `releases admin` subcommands.
+The `releases` CLI is a first-class, **keyless** way to query the public changelog registry at [releases.sh](https://releases.sh) — the terminal peer of the Releases MCP. Anyone can search, tail, list, and inspect releases with no account and no API key; it talks to `api.releases.sh` by default with zero configuration. (A separate, invite-only `admin` surface exists for maintainers — see the short note at the end — but reads never need it.)
+
+Reach for the CLI when the user is working in a shell or wants piped/scriptable output; reach for the MCP when you're answering conversationally with typed tools. They cover the same registry.
 
 ## Install
 
 ```bash
 brew install buildinternet/tap/releases    # recommended on macOS / Linux
-npm install -g @buildinternet/releases     # or via npm
+npm install -g @buildinternet/releases      # or via npm
+npx @buildinternet/releases search "react"  # one-off, no install
 ```
 
-Or run one-off without installing:
+## Reader commands (no auth, no key)
+
+Full reference: **[references/reader.md](references/reader.md)**. The shape is verb-first, and every command takes `--json`.
 
 ```bash
-npx @buildinternet/releases search "react"
+releases search "breaking change"      # unified search: orgs, catalog, collections, releases
+releases tail next-js                  # latest releases from one source (slug or src_…)
+releases tail --org vercel --count 20  # latest across a whole org
+releases list --category ai            # browse sources (alias: `releases sources`)
+releases list --query shadcn           # name / slug / url substring
+releases get vercel                    # inspect any entity by id or slug
+releases lookup domain vercel.com      # resolve a domain/URL to its registry entry
+releases collection list               # browse curated cross-org playlists
+releases collection releases frontier-ai-labs   # the feed for one collection
+releases stats                         # registry overview
+releases categories                    # valid --category values (fixed taxonomy)
 ```
 
-The CLI talks to `api.releases.sh` by default — no configuration needed for reader commands.
+Two commands built for agents specifically:
 
-### Refreshing this skill
+- `releases agent-context` — emits a versioned JSON document describing every command, argument, and option. When in doubt about exact flags, call this instead of guessing; it's the CLI's machine-readable source of truth.
+- `releases skills install` — installs/refreshes the bundled skills (`-g` for user-wide). Symlinked by default, so re-running refreshes atomically.
 
-To install or refresh the bundled releases skills (this one + `releases-mcp`, `finding-changelogs`, etc.) for any supported agent:
+### Conventions worth knowing (all in the reader reference)
 
-```bash
-releases skills install        # detected agent (auto), current project
-releases skills install -g     # user-wide install instead
-```
+- **IDs and slugs are interchangeable** wherever an identifier is expected (`org_…`, `prod_…`, `src_…`, `rel_…`); IDs are stable across renames. Source/product commands also take an `org/slug` coordinate (e.g. `vercel/vercel-ai-sdk`), which skips a resolver round-trip.
+- **`--json` everywhere** for stable output. Release readers (`get`, `search`, `tail`) return a **slim** shape by default (core fields + markdown-stripped `excerpt` + `contentTokens` hint) to save tokens; pass `--full` for the complete payload. (`list` is the inverse: verbose by default, `--compact` for less.)
+- **Piped output is bare TSV** (no headers/color/truncation), so `releases list | cut -f2` works without parsing ANSI — but note release rows repeat the title across several columns, so check the layout or just use `--json` before slicing by column number. `COLUMNS=<n>` overrides detected width.
 
-Skills are symlinked by default — re-running `releases skills install` refreshes everything atomically.
+### Reading a tracked changelog
 
-## Command shape
-
-- **Reads (verb-first):** `releases list` · `releases search` · `releases tail` · `releases get` · `releases stats`
-- **Writes (`admin <noun> <verb>`):** `releases admin source update` · `releases admin source create` · `releases admin product create` · `releases admin org create`
-- List sources with `releases list` (also `releases sources` — alias). Do NOT guess `releases sources list`; that path does not exist.
-- Writes live under `releases admin <noun> <verb>`, not at the top level.
-
-## What this skill covers
-
-- **[Reader commands](references/reader.md)** — Search, inspect, and export changelog data. No API key required.
-- **[Admin commands](references/admin.md)** — Add/edit sources, manage orgs and products, fetch releases, run policies. Requires `RELEASES_API_KEY`.
-
-## Quick Reference
-
-```bash
-# Reader (no auth required)
-releases search "breaking change"               # hybrid FTS + semantic search
-releases tail next-js                           # latest releases from one source
-releases tail src_abc123                        # IDs work anywhere a slug does
-releases tail --org vercel --count 20           # latest from a whole org
-releases list --category ai                     # browse sources
-releases get vercel                             # dispatch by id or slug
-releases get org_abc123                         # typed IDs are accepted
-releases stats                                  # registry overview
-releases categories                             # list valid category values
-
-# Admin (requires RELEASES_API_KEY)
-releases admin source create "Linear" --url https://linear.app/changelog
-releases admin source fetch <source> --max 50   # source = src_… or slug
-releases admin org create "Acme" --category cloud
-releases admin product create "CLI" --org acme  # --org accepts org_…, slug, domain, name, or handle
-releases admin discovery onboard "Stripe"       # AI-powered discovery agent
-
-# Local stdio MCP bridge (proxies to api.releases.sh)
-releases admin mcp serve
-```
-
-Every command that takes an org / product / source / release identifier accepts the typed ID (`org_…`, `prod_…`, `src_…`, `rel_…`) interchangeably with the slug — including `--org`, `--product`, `--source` flags. IDs are stable across renames; slugs are friendlier to type. Source and product commands also accept an `org/slug` coordinate (e.g. `vercel/vercel-ai-sdk`); coordinates and typed IDs are unambiguous and skip an extra resolver round-trip that bare slugs require. Every reader command accepts `--json` for machine-readable output.
-
-Tabular reader commands fit themselves to the terminal width when stdout is a TTY (column truncation with `…`) and switch to bare TSV (no headers, no color, no truncation) when stdout is piped — so `releases org list | cut -f2` works without parsing ANSI. Set `COLUMNS=<n>` to override the detected width. Use `--json` whenever you need stable, complete output for parsing.
-
-The release readers (`get`, `search`, `tail`/`latest`) return a **slim** JSON shape by default — core fields plus a markdown-stripped `excerpt` and `contentChars`/`contentTokens` size hints — to keep agent token usage down; pass `--full` for the complete payload. (This is the inverse of `list`, which is verbose by default with an opt-in `--compact`.) See `references/reader.md`.
-
-Every mutating admin command accepts `--dry-run` to print the planned write (with all validations applied) without calling the API. Pair with `--json` for a machine-readable plan. See `references/admin.md` for the full coverage list.
-
-## Authentication
-
-Reader access is unauthenticated and may be rate-limited per IP.
-
-**Admin access is closed beta.** `releases admin …` commands require a Bearer token, but the hosted registry does not currently expose a self-serve flow for generating keys — an external user cannot create one on their own. If the user asks how to get an API key, explain this and point them at the project repo to request access. Don't invent a signup URL.
-
-If a key is available:
-
-```bash
-export RELEASES_API_KEY=your_key
-export RELEASES_API_URL=https://api.releases.sh   # optional, this is the default
-```
-
-These can also go in a `.env` file — Bun auto-loads it when running from source.
+`releases get <source> --json` reports `hasChangelogFile` and the `changelogUrl` keyless, so you can tell whether a source maintains a checked-in CHANGELOG.md. To read the **sliced content** keyless, use the MCP's `get_catalog_entry` (with `changelog_tokens` / `nextOffset`) or fetch the `changelogUrl` directly — the CLI's `releases admin source changelog` wrapper is key-gated and won't run without auth.
 
 ## Common Mistakes
 
-- `releases admin …` without `RELEASES_API_KEY` set fails fast with a clear error — don't retry the same command. Note that keys are not self-serve yet (see Authentication).
-- Slug renames (`admin source update <identifier> --slug new-slug`) require `--confirm-slug-change` because they break web links.
-- `releases admin source fetch` with no source or filter is blocked in remote mode. Use `--stale`, `--unfetched`, `--retry-errors`, `--changed`, or a source identifier (src_… or slug).
-- Default fetch cap is 200 releases per source (GitHub pagination limits). Use `--max <n>` or `--all` to override.
-- `summary` and `compare` are *not* in this CLI. Those commands require AI provider calls and live in the private maintainer tooling. Use the hosted MCP tools `summarize_changes` / `compare_products` at `mcp.releases.sh` instead.
+- `releases list` lists sources (alias `releases sources`). Do NOT write `releases sources list` — it reads `list` as a source slug and fails with "Source not found: list".
+- Default read cap is 200 releases per source; use `--max <n>` or `--all` to override.
+- There is **no** `summary` or `compare` command in this CLI, and **no** AI summarization tools on the hosted MCP (`summarize_changes` / `compare_products` do not exist). To summarize or compare, read each entity with `releases get` / `releases tail` (or `--json`) and synthesize the answer yourself.
+- Don't reach for `admin` commands to do reads — every read above is keyless. `admin` is only for registry maintenance and requires a key (below).
+
+## Admin surface (invite-only — reads never need it)
+
+`releases admin <noun> <verb>` manages the registry (create/update sources, orgs, products; fetch; discovery; policies). It requires `RELEASES_API_KEY`, and **keys are not self-serve** — there's no public signup. Admin commands fail fast at startup without a key, so don't retry them unauthenticated, and don't fall back to them for read tasks. If a user asks how to get a key, tell them access is currently invite-only and point them at the project repo; don't invent a signup URL. Full operator reference: **[references/admin.md](references/admin.md)**.
