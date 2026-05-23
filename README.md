@@ -85,7 +85,9 @@ Every command that takes an org / product / source / release identifier accepts 
 
 Every reader command supports `--json` for machine-readable output. List commands emit a `{ items, pagination }` envelope — parse with `jq '.items[]'`, and check `.pagination.hasMore` before assuming you've seen every row. Nested `metadata` fields are returned as parsed objects (no `fromjson` needed). `org get` includes a short overview preview (with a stale warning when more than 30 days old); `org overview <identifier>` prints the full body.
 
-Tabular reader commands fit themselves to the terminal width when stdout is a TTY (column truncation with `…`) and switch to bare TSV when piped — no headers, no color, no truncation — so `releases org list | cut -f2` works without parsing ANSI. `COLUMNS=<n>` overrides the detected width. For complete, parseable output prefer `--json`.
+The release reader commands (`get`, `search`, `tail`/`latest`) return a **slim** release shape by default — `id`, `version`, `title`, `summary`, a markdown-stripped `excerpt`, `url`, `publishedAt`, nested `source`/`org`, and `contentChars`/`contentTokens` size hints — so agents aren't billed tokens for storage/pipeline internals. Pass `--full` to recover the complete payload (`content`, `contentHash`, `composition`, the `title*` variants, …). Note this is the inverse of the catalog `list` command, which is verbose by default and opts _into_ a lightweight shape with `--compact`.
+
+Tabular reader commands fit themselves to the terminal width when stdout is a TTY (column truncation with `…`) and switch to bare TSV when piped — no headers, no color, no truncation — so `releases org list | cut -f2` works without parsing ANSI. `COLUMNS=<n>` overrides the detected width. For complete, parseable output prefer `--json`. The `search` / `tail`/`latest` human view is a single aligned row per release (identity · description · relative age · dimmed `rel_…`); `search` adds a cleaned, markdown-stripped excerpt under each hit.
 
 ### Feedback
 

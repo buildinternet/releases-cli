@@ -11,6 +11,14 @@ export interface ColumnSpec {
 export interface RenderTableInput {
   head: (string | ColumnSpec)[];
   rows: string[][];
+  /**
+   * Optional per-row continuation lines (TTY only). When `subRows[i]` is set,
+   * a second line is printed under row `i`, indented to the start of column 1
+   * (col-0 width + one delimiter). Dropped entirely in non-TTY/TSV output.
+   */
+  subRows?: (string | null | undefined)[];
+  /** Print the uppercased header row. Default `true`. */
+  showHeader?: boolean;
   maxWidth?: number;
   isTTY?: boolean;
 }
@@ -144,31 +152,50 @@ function renderTSV(rows: string[][]): string {
   return rows.map((r) => r.map((c) => stripAnsi(c)).join("\t")).join("\n");
 }
 
-function renderTTY(cols: ColumnSpec[], rows: string[][], maxWidth: number): string {
+function renderTTY(
+  cols: ColumnSpec[],
+  rows: string[][],
+  maxWidth: number,
+  opts: { showHeader: boolean; subRows?: (string | null | undefined)[] },
+): string {
   const headerRow = cols.map((c) => chalk.cyan(c.label.toUpperCase()));
-  const allRows = [headerRow, ...rows];
-  const colWidths = calculateColumnWidths(allRows, cols, maxWidth);
+  const widthRows = opts.showHeader ? [headerRow, ...rows] : rows;
+  const colWidths = calculateColumnWidths(widthRows, cols, maxWidth);
   const numCols = cols.length;
   const lastCol = numCols - 1;
 
-  return allRows
-    .map((row) => {
-      const parts: string[] = [];
-      for (let c = 0; c < numCols; c++) {
-        const cell = row[c] ?? "";
-        const w = colWidths[c];
-        const truncated =
-          cols[c].noTruncate || stringWidth(cell) <= w ? cell : truncateToWidth(cell, w);
-        // Skip right-padding the last column to avoid trailing whitespace; the
-        // final replace() also strips it as a belt-and-braces guard.
-        let rendered = truncated;
-        if (cols[c].alignRight) rendered = padLeft(truncated, w);
-        else if (c < lastCol) rendered = padRight(truncated, w);
-        parts.push(rendered);
-      }
-      return parts.join(DELIM).replace(/\s+$/, "");
-    })
-    .join("\n");
+  const renderRow = (row: string[]): string => {
+    const parts: string[] = [];
+    for (let c = 0; c < numCols; c++) {
+      const cell = row[c] ?? "";
+      const w = colWidths[c];
+      const truncated =
+        cols[c].noTruncate || stringWidth(cell) <= w ? cell : truncateToWidth(cell, w);
+      // Skip right-padding the last column to avoid trailing whitespace; the
+      // final replace() also strips it as a belt-and-braces guard.
+      let rendered = truncated;
+      if (cols[c].alignRight) rendered = padLeft(truncated, w);
+      else if (c < lastCol) rendered = padRight(truncated, w);
+      parts.push(rendered);
+    }
+    return parts.join(DELIM).replace(/\s+$/, "");
+  };
+
+  // Continuation lines indent to the start of column 1 (col-0 width + one delim).
+  const subIndent = colWidths[0] + DELIM.length;
+  const subWidth = Math.max(8, maxWidth - subIndent);
+
+  const out: string[] = [];
+  if (opts.showHeader) out.push(renderRow(headerRow));
+  rows.forEach((row, i) => {
+    out.push(renderRow(row));
+    const sub = opts.subRows?.[i];
+    if (sub) {
+      const clipped = stringWidth(sub) <= subWidth ? sub : truncateToWidth(sub, subWidth);
+      out.push(" ".repeat(subIndent) + clipped);
+    }
+  });
+  return out.join("\n");
 }
 
 export function renderTable(input: RenderTableInput): string {
@@ -177,5 +204,8 @@ export function renderTable(input: RenderTableInput): string {
   const isTTY = detectIsTTY(input.isTTY);
   if (!isTTY) return renderTSV(input.rows);
   const maxWidth = detectMaxWidth(input.maxWidth);
-  return renderTTY(cols, input.rows, maxWidth);
+  return renderTTY(cols, input.rows, maxWidth, {
+    showHeader: input.showHeader ?? true,
+    subRows: input.subRows,
+  });
 }

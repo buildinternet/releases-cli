@@ -5,7 +5,9 @@ import type { LatestRelease } from "../../api/types.js";
 import { orgNotFound, sourceNotFound } from "../suggest.js";
 import { stripAnsi } from "../../lib/sanitize.js";
 import { sleep } from "../../lib/sleep.js";
-import { renderLatestReleasesTable } from "../render/releases-table.js";
+import { renderReleaseRows } from "../render/releases-table.js";
+import { slimLatest } from "../render/release-json.js";
+import { logger } from "@releases/lib/logger";
 import { writeJson, writeJsonLine } from "../../lib/output.js";
 import { parseTimeWindowFlag } from "../../lib/flags.js";
 
@@ -58,6 +60,7 @@ export function registerTailCommand(program: Command) {
     .option("-f, --follow", "Poll for new releases and stream them as they arrive")
     .option("--interval <seconds>", "Poll interval in seconds when following (min 5)", "60")
     .option("--json", "Output as JSON")
+    .option("--full", "With --json, return the complete unprojected payload")
     .addHelpText(
       "after",
       `
@@ -83,10 +86,12 @@ Examples:
           follow?: boolean;
           interval: string;
           json?: boolean;
+          full?: boolean;
         },
       ) => {
         const count = parseInt(opts.count, 10);
         const intervalSeconds = Math.max(5, parseInt(opts.interval, 10) || 60);
+        if (opts.full && !opts.json) logger.warn("--full only affects --json output; ignoring.");
         // Validate locally; the API resolves relative shorthand server-side.
         const since = parseTimeWindowFlag("since", opts.since);
         const until = parseTimeWindowFlag("until", opts.until);
@@ -114,7 +119,7 @@ Examples:
         const rows = await getLatestReleases(fetchOpts);
 
         if (opts.json) {
-          await writeJson(rows);
+          await writeJson(rows.map((row) => slimLatest(row, opts.full === true)));
         } else if (rows.length === 0) {
           console.log(chalk.yellow("No releases found."));
         } else if (opts.follow) {
@@ -122,7 +127,7 @@ Examples:
             console.log(renderStreamLine(row));
           }
         } else {
-          console.log(renderLatestReleasesTable(rows, { withSummary: true }));
+          console.log(renderReleaseRows(rows, { mode: "feed" }));
           console.log(
             chalk.dim(
               `\n  More: "releases get <rel_id>" for full content · "releases tail <source>" to filter by source (src_… or slug)`,
@@ -161,7 +166,7 @@ Examples:
           if (opts.json) {
             // Preserve stream ordering; writes must land in order.
             // eslint-disable-next-line no-await-in-loop
-            for (const row of ordered) await writeJsonLine(row);
+            for (const row of ordered) await writeJsonLine(slimLatest(row, opts.full === true));
           } else {
             for (const row of ordered) console.log(renderStreamLine(row));
           }

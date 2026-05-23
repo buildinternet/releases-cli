@@ -624,6 +624,10 @@ type LatestReleasesResponse = {
     type: string;
     title: string;
     summary: string | null;
+    titleGenerated?: string | null;
+    titleShort?: string | null;
+    contentChars?: number | null;
+    contentTokens?: number | null;
     publishedAt: string | null;
     url: string | null;
     media: Array<{ type: string; url: string; alt?: string; r2Url?: string }>;
@@ -660,6 +664,12 @@ export async function getLatestReleases(opts: {
     sourceName: r.source.name,
     sourceSlug: r.source.slug,
     summary: r.summary ?? null,
+    // Carried so the shared renderer's description fallback chain and the slim
+    // JSON size hints have data without an extra round-trip. #215.
+    titleGenerated: r.titleGenerated ?? null,
+    titleShort: r.titleShort ?? null,
+    contentChars: r.contentChars ?? null,
+    contentTokens: r.contentTokens ?? null,
     media: toMediaItems(r.media),
   }));
 }

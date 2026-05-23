@@ -122,4 +122,40 @@ describe("renderTable", () => {
     // "xx" should always render in full (its natural width fits trivially)
     expect(line.startsWith("xx")).toBe(true);
   });
+
+  it("omits the header row when showHeader is false", () => {
+    const out = renderTable({
+      head: ["A", "B"],
+      rows: [["x", "y"]],
+      isTTY: true,
+      maxWidth: 80,
+      showHeader: false,
+    });
+    expect(stripAnsi(out)).toBe("x  y");
+  });
+
+  it("renders TTY subRows indented under the first column", () => {
+    const out = renderTable({
+      head: [{ label: "ID", noTruncate: true }, "Desc"],
+      rows: [["alpha", "title"]],
+      subRows: ["a continuation line"],
+      isTTY: true,
+      maxWidth: 80,
+      showHeader: false,
+    });
+    const lines = stripAnsi(out).split("\n");
+    expect(lines[0]).toBe("alpha  title");
+    // indent = width("alpha") + 2-space delim = 7
+    expect(lines[1]).toBe("       a continuation line");
+  });
+
+  it("drops subRows entirely in non-TTY mode", () => {
+    const out = renderTable({
+      head: ["A", "B"],
+      rows: [["x", "y"]],
+      subRows: ["nope"],
+      isTTY: false,
+    });
+    expect(out).toBe("x\ty");
+  });
 });

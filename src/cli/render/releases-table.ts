@@ -1,73 +1,91 @@
 import chalk from "chalk";
-import type { LatestRelease } from "../../api/types.js";
 import { stripAnsi } from "../../lib/sanitize.js";
+import {
+  type ReleaseRow,
+  relativeDate,
+  releaseIdentity,
+  releaseDescription,
+  cleanExcerpt,
+} from "../../lib/release-display.js";
 import { renderTable } from "./table.js";
 
-function truncate(s: string, max: number): string {
-  return s.length > max ? s.slice(0, max - 1) + "…" : s;
+export type ReleaseRowMode = "feed" | "search";
+
+export interface RenderReleaseRowsOptions {
+  mode?: ReleaseRowMode;
+  isTTY?: boolean;
+  maxWidth?: number;
+}
+
+/** Collapse whitespace (incl. tabs/newlines) to single spaces so a search
+ *  title can't break the one-row-per-release TSV/TTY contract. The `feed`
+ *  description already runs through `cleanExcerpt`, which collapses too. */
+function singleLine(s: string): string {
+  return s.replace(/\s+/g, " ").trim();
 }
 
 /**
- * Compact token-count formatter — "1.5K", "12K", "87". `null` / `0` / missing
- * → empty string so the renderer can `${size ? ` ${size}` : ""}` without a
- * branch. Mirrors how Sentry and OpenAI's chat surfaces show "tokens".
+ * Shared renderer for the `latest` feed and the `search` releases section.
+ * Both produce the same column-aligned grid (identity / description / age /
+ * dimmed id); `search` puts the release title in the description column and
+ * adds a cleaned, markdown-stripped excerpt as an aligned continuation line
+ * (TTY only). `feed` uses the summary→…→title fallback as the description and
+ * has no continuation. Non-TTY: feed → bare TSV; search → one plain line/hit.
  */
-function formatTokenCount(n: number | null | undefined): string {
-  if (!n || n < 0) return "";
-  if (n < 1000) return `~${n} tokens`;
-  if (n < 100_000) return `~${(n / 1000).toFixed(1).replace(/\.0$/, "")}K tokens`;
-  return `~${Math.round(n / 1000)}K tokens`;
-}
+export function renderReleaseRows(rows: ReleaseRow[], opts: RenderReleaseRowsOptions = {}): string {
+  const mode = opts.mode ?? "feed";
+  if (rows.length === 0) return "";
 
-export interface RenderOptions {
-  /** Append a dimmed summary preview under each title (for tail/latest listings). */
-  withSummary?: boolean;
-}
+  const isTTY = opts.isTTY ?? Boolean(process.stdout?.isTTY);
 
-export function renderLatestReleasesTable(rows: LatestRelease[], opts: RenderOptions = {}): string {
+  // Machine path: bare TSV, one row per release, no color, no excerpt
+  // continuation. id-first with ISO dates and a version column so pipelines
+  // (`cut -f1`) stay stable — distinct from the TTY layout, which dims the id
+  // last and shows relative age. `--json` remains the richest machine format.
+  if (!isTTY) {
+    return rows
+      .map((r) => {
+        const identity = stripAnsi(releaseIdentity(r));
+        const description =
+          mode === "search" ? singleLine(stripAnsi(r.title)) : stripAnsi(releaseDescription(r));
+        return [r.id, identity, description, r.version ?? "", r.publishedAt ?? ""].join("\t");
+      })
+      .join("\n");
+  }
+
+  const head = [
+    { label: "Item", noTruncate: true },
+    { label: "Description" },
+    { label: "Age", noTruncate: true },
+    { label: "ID", noTruncate: true },
+  ];
+
+  const tableRows = rows.map((r) => {
+    const identity = stripAnsi(releaseIdentity(r));
+    const description = mode === "search" ? singleLine(stripAnsi(r.title)) : releaseDescription(r);
+    const age = relativeDate(r.publishedAt);
+    return [identity, description, age, chalk.dim(r.id)];
+  });
+
+  const subRows =
+    mode === "search"
+      ? rows.map((r) => {
+          const ex = cleanExcerpt(r.summary) || cleanExcerpt(r.content);
+          if (!ex) return null;
+          // Drop the continuation when it just repeats the title (common when
+          // the summary IS the title) — pure noise in the scanning path.
+          const title = cleanExcerpt(r.title) || r.title;
+          if (ex.toLowerCase() === title.toLowerCase()) return null;
+          return chalk.dim(ex);
+        })
+      : undefined;
+
   return renderTable({
-    head: [
-      { label: "ID", noTruncate: true },
-      { label: "Source" },
-      { label: "Title" },
-      { label: "Version", noTruncate: true },
-      { label: opts.withSummary ? "Published At" : "Published", noTruncate: true },
-    ],
-    rows: rows.map((row) => {
-      const title = stripAnsi(row.title);
-      // Append size hint to the title cell when present so the field doesn't
-      // need its own column. Skip in compact mode unless body is large enough
-      // to matter (~1K tokens) — small releases would just add noise. #958.
-      //
-      // `contentTokens` is declared on `LatestRelease` from api-types ≥0.19;
-      // the CLI's pin (^0.16) accepts older shapes too, so the cast keeps
-      // the renderer running before the registry publishes the field. Older
-      // payloads land `undefined` and the hint is dropped.
-      const contentTokens = (row as LatestRelease & { contentTokens?: number | null })
-        .contentTokens;
-      const sizeHint = formatTokenCount(contentTokens);
-      const showSize = sizeHint && (opts.withSummary || (contentTokens ?? 0) >= 1000);
-      const titleWithSize = showSize ? `${title} ${chalk.dim(sizeHint)}` : title;
-      const titleCell =
-        opts.withSummary && row.summary
-          ? `${titleWithSize}\n${chalk.dim(truncate(row.summary, 120))}`
-          : titleWithSize;
-      const publishedCell = opts.withSummary
-        ? (row.publishedAt ?? "-")
-        : (row.publishedAt?.slice(0, 10) ?? chalk.dim("—"));
-
-      let versionCell: string;
-      if (row.version) versionCell = stripAnsi(row.version);
-      else if (opts.withSummary) versionCell = "-";
-      else versionCell = chalk.dim("—");
-
-      return [
-        chalk.dim(row.id),
-        `${stripAnsi(row.sourceName)} ${chalk.dim(`(${row.sourceSlug})`)}`,
-        titleCell,
-        versionCell,
-        publishedCell,
-      ];
-    }),
+    head,
+    rows: tableRows,
+    subRows,
+    showHeader: false,
+    isTTY: true,
+    maxWidth: opts.maxWidth,
   });
 }

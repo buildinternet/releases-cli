@@ -2,6 +2,8 @@
 
 Reader commands are unauthenticated — no API key required. They talk to `api.releases.sh` over HTTPS and all support `--json` for machine-readable output.
 
+**Release JSON is slim by default.** `get`, `search`, and `tail`/`latest` return a lean release shape — `id`, `version`, `title`, `summary`, a markdown-stripped `excerpt`, `url`, `publishedAt`, nested `source`/`org`, and `contentChars`/`contentTokens` size hints. This drops storage internals (`contentHash`, `sourceId`, `versionSort`, `fetchedAt`, …) and the redundant `title*` variants to keep token usage low. Add `--full` when you need the complete payload (including the full `content` body). `summary` may be `null`; lean on `excerpt` / `contentChars` to decide whether to pull more.
+
 ## Search
 
 Unified search across organizations, the catalog (products + standalone sources), and releases.
@@ -20,7 +22,8 @@ Flags:
 - `--limit <n>` — max results per section (default: 10).
 - `--mode <lexical|semantic|hybrid>` — pick the release-retrieval strategy. Server default is hybrid; pass `lexical` for pure FTS ranking.
 - `--kind <platform|sdk|mobile|desktop|docs|integration|tool>` — taxonomy filter. Release hits match `COALESCE(source.kind, product.kind)` (a source with no kind inherits from its product); catalog hits match the row's own kind directly.
-- `--json` — machine output. Release hits include a `kind: "release" | "changelog_chunk"` discriminator. Catalog hits include `entryType: "product" | "source"` (the entity discriminator) plus an optional `kind` field carrying the taxonomy classification.
+- `--json` — machine output (slim release hits by default; `--full` for the complete shape). Release hits include a `kind: "release" | "changelog_chunk"` discriminator. Catalog hits include `entryType: "product" | "source"` (the entity discriminator) plus an optional `kind` field carrying the taxonomy classification.
+- `--full` — with `--json`, return complete unprojected release hits (full `content`, `score`, `sourceType`, `title*` variants, …).
 
 Catalog hits also include the response field `catalog`. Older API deploys will still send the deprecated `products` alias instead — the CLI reads either, but new code should consume `catalog`.
 
@@ -44,7 +47,8 @@ releases tail src_abc123               # one source (typed id)
 releases tail --org vercel --count 20  # whole org (org_…, slug, domain, name, or handle)
 releases tail --product nextjs         # one product (prod_… or slug)
 releases tail --type feature           # filter by release type
-releases tail --json
+releases tail --json                   # slim shape
+releases tail --json --full            # complete payload
 ```
 
 ## List sources
