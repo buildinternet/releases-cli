@@ -117,6 +117,27 @@ describe("renderReleaseRows (search)", () => {
     expect(tty.split("\n")[0]).toContain("Multi line title");
   });
 
+  it("prefixes the identity with the owning org (Org/Source) when the hit carries one", () => {
+    const hit: ReleaseRow[] = [
+      {
+        id: "rel_o",
+        title: "Custom webhooks",
+        version: null,
+        summary: "Axiom introduces custom webhooks.",
+        publishedAt: null,
+        sourceName: "Changelog",
+        sourceSlug: "changelog",
+        orgName: "Axiom",
+        orgSlug: "axiom",
+      },
+    ];
+    const tty = stripAnsi(renderReleaseRows(hit, { mode: "search", isTTY: true, maxWidth: 100 }));
+    expect(tty.split("\n")[0].startsWith("Axiom/Changelog")).toBe(true);
+    // Same coordinate leads the machine TSV identity column.
+    const tsv = renderReleaseRows(hit, { mode: "search", isTTY: false });
+    expect(tsv.split("\t")[1]).toBe("Axiom/Changelog");
+  });
+
   it("non-TTY: one plain line per hit, no continuation", () => {
     const hit: ReleaseRow[] = [
       {

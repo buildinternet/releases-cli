@@ -11,6 +11,7 @@ import {
   deleteReleasesForSource,
 } from "../../api/client.js";
 import { stripAnsi } from "../../lib/sanitize.js";
+import { humanDate } from "../../lib/release-display.js";
 import { normalizeReleaseId } from "@buildinternet/releases-core/id";
 import { writeJson, writeJsonLine } from "../../lib/output.js";
 import { warnDeprecatedAlias } from "../../lib/deprecated-alias.js";
@@ -49,7 +50,7 @@ async function releaseGetAction(rawId: string, opts: ReleaseGetOpts): Promise<vo
   console.log(
     `  Source:    ${rel.sourceName ? stripAnsi(rel.sourceName) : chalk.dim("—")} (${rel.sourceSlug ?? chalk.dim("—")})`,
   );
-  if (rel.publishedAt) console.log(`  Published: ${rel.publishedAt}`);
+  if (rel.publishedAt) console.log(`  Published: ${humanDate(rel.publishedAt) || rel.publishedAt}`);
   console.log(`  Fetched:   ${rel.fetchedAt}`);
   if (rel.suppressed)
     console.log(

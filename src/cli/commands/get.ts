@@ -18,6 +18,7 @@ import { stripAnsi } from "../../lib/sanitize.js";
 import { logger } from "@releases/lib/logger";
 import { renderReleaseRows } from "../render/releases-table.js";
 import { slimReleaseDetail } from "../render/release-json.js";
+import { humanDate } from "../../lib/release-display.js";
 import { getEntityType, normalizeReleaseId, isLikelyBareId } from "@buildinternet/releases-core/id";
 import { countTokensSafe } from "@buildinternet/releases-core/tokens";
 import { writeJson } from "../../lib/output.js";
@@ -99,14 +100,13 @@ async function getRelease_(id: string, opts: GetEntityOpts) {
     );
     return;
   }
-  console.log(chalk.dim("Release"));
   console.log(chalk.bold(stripAnsi(rel.title)));
   console.log(`  ID:        ${rel.id}`);
   if (rel.version) console.log(`  Version:   ${stripAnsi(rel.version)}`);
   console.log(
     `  Source:    ${rel.sourceName ? stripAnsi(rel.sourceName) : chalk.dim("—")} (${rel.sourceSlug ?? chalk.dim("—")})`,
   );
-  if (rel.publishedAt) console.log(`  Published: ${rel.publishedAt}`);
+  if (rel.publishedAt) console.log(`  Published: ${humanDate(rel.publishedAt) || rel.publishedAt}`);
   if (rel.url) console.log(`  URL:       ${rel.url}`);
   if (rel.content) console.log(`  Content:   ${formatSize(rel.content)}`);
   if (rel.suppressed) {
@@ -124,11 +124,11 @@ async function getRelease_(id: string, opts: GetEntityOpts) {
   //      pivots to `release get`.
   if (rel.summary) {
     console.log("");
-    console.log(chalk.dim("Summary  · AI-generated, abbreviated"));
+    console.log(chalk.dim("AI summary"));
     console.log(stripAnsi(rel.summary));
   } else if (rel.titleGenerated || rel.titleShort) {
     console.log("");
-    console.log(chalk.dim("Headline  · AI-generated (no full summary on file yet)"));
+    console.log(chalk.dim("AI headline"));
     console.log(stripAnsi(rel.titleGenerated ?? rel.titleShort!));
   } else if (rel.content && rel.content.trim().length > 0) {
     const PREVIEW_CHARS = 280;
