@@ -101,7 +101,7 @@ releases feedback "love the tool" --contact you@example.com   # optional reply-t
 releases feedback "draft" --dry-run --json                    # preview the payload, send nothing
 ```
 
-With no message argument in an interactive terminal, `feedback` prompts for the text (and an optional contact); otherwise pass it inline or pipe via stdin. `--type` accepts `bug`, `idea`, or `other`. Maintainers with admin access review submissions via `releases admin feedback list` (filter by `--type` / `--status`, paginate with `--cursor`).
+With no message argument in an interactive terminal, `feedback` prompts for the text (and an optional contact); otherwise pass it inline or pipe via stdin. `--type` accepts `bug`, `idea`, or `other`. Maintainers with admin access review submissions via `releases admin feedback list` (filter by `--type` / `--status`, `--include-archived`, paginate with `--cursor`) and triage them: `releases admin feedback triage <id> --status closed`, `releases admin feedback archive <id>` (`--undo` to restore), and `releases admin feedback delete <id>` (permanent — type the id to confirm, or pass `--yes`).
 
 ### MCP
 
