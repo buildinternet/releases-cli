@@ -4,6 +4,8 @@ Reader commands are unauthenticated — no API key required. They talk to `api.r
 
 **Release JSON is slim by default.** `get`, `search`, and `tail`/`latest` return a lean release shape — `id`, `version`, `title`, `summary`, a markdown-stripped `excerpt`, `url`, `publishedAt`, nested `source`/`org`, and `contentChars`/`contentTokens` size hints. This drops storage internals (`contentHash`, `sourceId`, `versionSort`, `fetchedAt`, …) and the redundant `title*` variants to keep token usage low. Add `--full` when you need the complete payload (including the full `content` body). `summary` may be `null`; lean on `excerpt` / `contentChars` to decide whether to pull more.
 
+> **Piping note:** in the default (non-`--json`) TSV output, release rows repeat the title across several columns (raw title, normalized title, version). Don't assume `cut -f2` lands on a unique field — check the row layout first, or just use `--json` for stable parsing.
+
 ## Search
 
 Unified search across organizations, the catalog (products + standalone sources), and releases.
@@ -100,15 +102,40 @@ releases categories --json
 
 The category list is fixed — adding a new category requires a code change in `@buildinternet/releases-core`.
 
-## Changelog slicing (admin CLI, reader endpoint)
+## Reading a tracked changelog
 
-The stored CHANGELOG.md for a GitHub source can be sliced from the reader API. The CLI wrapper lives under admin for discoverability but the endpoint itself is public:
+`releases get <source> --json` reports `hasChangelogFile` and `changelogUrl` keyless, so you can detect whether a source maintains a checked-in CHANGELOG.md. This only exists for **sources that track one** — tag-only repos (e.g. Next.js, which ships GitHub releases but no CHANGELOG file) and products report `hasChangelogFile: false`.
+
+To read the **sliced content** without a key, use one of:
+
+- The MCP tool `get_catalog_entry` with `changelog_tokens` (heading-aligned; recommended brackets 2000 / 5000 / 10000 / 20000) and chain via the returned `nextOffset`. Every response reports `totalTokens` so you can budget calls upfront.
+- Fetch the `changelogUrl` directly (it points at the raw file on GitHub).
+
+> The CLI also has a `releases admin source changelog <slug>` wrapper, but it lives under `admin` and is **key-gated** — it fails with `"admin" requires an API key` for keyless users. Prefer the two keyless paths above unless you already hold an admin key.
+
+## Collections
+
+Curated cross-org "playlists" (e.g. Frontier AI Labs, Coding Agents), keyless:
 
 ```bash
-releases admin source changelog apollo-client                      # full file
-releases admin source changelog apollo-client --limit 10000        # first 10k chars, heading-aligned
-releases admin source changelog apollo-client --tokens 5000        # first ~5k cl100k_base tokens
-releases admin source changelog apollo-client --offset 10000 --json
+releases collection list                       # all collections
+releases collection get frontier-ai-labs       # members of one collection
+releases collection releases frontier-ai-labs  # interleaved cross-org release feed (--limit <n>, --json)
 ```
 
-`tokens` and `limit` are both heading-aware; `tokens` wins when both are passed. Chain successive calls via the returned `nextOffset` to reconstruct the file exactly. Recommended token brackets: 2000 / 5000 / 10000 / 20000.
+## Domain lookup
+
+Resolve a domain or URL to the org/product that owns it (keyless):
+
+```bash
+releases lookup domain vercel.com
+releases lookup domain https://tailwindcss.com/blog
+```
+
+## Agent self-discovery
+
+```bash
+releases agent-context        # versioned JSON: every command, argument, and option
+```
+
+When unsure of exact flags or subcommands, call `agent-context` rather than guessing — it's the CLI's own machine-readable contract, versioned via `schemaVersion`.

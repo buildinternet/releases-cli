@@ -13,16 +13,20 @@ description: >
 
 Turn changelog data into competitive intelligence by analyzing release patterns across a cohort of related companies.
 
-## Key Operations
+This is a **reader** workflow — it uses only the public, unauthenticated tools. There is no AI summarize/compare tool on the hosted MCP and no `summary`/`compare` command in the CLI; you fetch the raw release data and synthesize the analysis yourself.
 
-| Operation | CLI | Typed tool |
-|-----------|-----|------------|
-| Check existing sources | `releases list --query <company> --json` | `list_catalog` with query param; `list_sources` is a deprecated alias |
-| Fetch releases | `releases admin source fetch <slug> --max 50` | `manage_source` action "fetch" with identifier (ID or slug) |
-| Get latest releases | `releases tail <slug> --json` | `get_latest_releases` with source/org and limit |
-| Search releases | `releases search <query> --json` | `search` with `type: ["releases"]`; `search_releases` is a deprecated alias |
-| Summarize | `releases summary <slug> --json` | (not available as typed tool) |
-| Compare | `releases compare <slugA> <slugB> --json` | (not available as typed tool) |
+## Tools for each step
+
+| Operation | CLI (reader) | MCP tool |
+|-----------|--------------|----------|
+| Find what's indexed for a company | `releases search <company> --json` | `search` (with `type: ["orgs","catalog"]`) |
+| List a company's sources | `releases list --query <company> --json` | `list_catalog` (scope with `organization`) |
+| Latest releases (source or org) | `releases tail <slug> --json` · `releases tail --org <org> --json` | `get_latest_releases` (`organization` / `product`, `since`/`until`) |
+| Keyword/semantic release search | `releases search <query> --json` | `search` with `type: ["releases"]` |
+| Read one release in full | `releases get <rel_id> --json` | `get_release` |
+| Read a tracked CHANGELOG slice | `releases admin source changelog <slug> --tokens <n>` (key-gated; readers use MCP) | `get_catalog_entry` with `changelog_tokens` / `changelog_offset` (keyless) |
+
+All releases are indexed already — you don't need to (and as a reader can't) trigger fetches. If a company isn't in the registry at all, say so rather than trying to onboard it; onboarding is an operator task.
 
 ## Workflow
 
@@ -30,45 +34,40 @@ Turn changelog data into competitive intelligence by analyzing release patterns 
 
 Pick 3-6 companies in the same competitive space. Good cohorts share a common buyer or technical layer (e.g., developer databases, frontend frameworks, observability tools).
 
-### 2. Check existing sources
+### 2. See what's indexed
 
-Search for each company to see what sources are indexed. If a company isn't in the system, it needs to be onboarded first.
+Resolve each company with `search` (or `releases search`). For discovery-style cohorts ("find observability vendors with edge offerings"), `search` with `type: ["orgs","catalog"]` is vector-backed and matches on description and category — better than a slug-substring `list_catalog --query`. If a company isn't found, note it as a gap rather than fabricating data.
 
-### 3. Fetch recent releases
+### 3. Pull latest releases with dates
 
-Fetch each source. The system skips unchanged feeds automatically.
+Get structured release data per source or per org. Scope by `organization` for a whole-company view, or by a single source/product for a narrower one. Use a `since` window (e.g. `"6m"`) or a count limit to bound the set. Dates are what you'll count for velocity, so keep them.
 
-### 4. Get latest releases
+### 4. Search and cross-reference
 
-Get structured release data with dates for each source. Use a limit (e.g., 50) to cap results. For org-wide views, filter by organization instead of individual source.
-
-### 5. Search and cross-reference
-
-Search across all indexed releases to find specific features, breaking changes, or patterns. The unified `search` tool (with `type: ["releases"]`) is hybrid (lexical + semantic) by default — natural-language queries like "auth refresh tokens" or "cold start improvements" work without exact keyword matches. Pass `mode: "lexical"` if you need strict keyword behavior.
+Search across all indexed releases to find a specific feature, breaking change, or pattern. Release search is hybrid (lexical + semantic) by default, so natural-language queries like "auth refresh tokens" or "cold start improvements" work without exact keyword matches. Pass `mode: "lexical"` (CLI `--mode lexical`) when you need strict keyword behavior.
 
 **Result shape:** every hit carries a `kind` discriminator:
-- `kind: "release"` — a normal release row, use as-is.
-- `kind: "changelog_chunk"` — a passage from a stored CHANGELOG.md file. The hit includes `sourceSlug`, `chunkOffset`, and `chunkLength`. Chain into `get_source_changelog({ slug: sourceSlug, offset: chunkOffset, limit: chunkLength * 3 })` to read the surrounding section before quoting it. Chunk hits often surface older or more granular notes than what's in the indexed release rows, so they're useful for "when did X first ship" questions.
 
-For org/product/source discovery (e.g. "find observability vendors with edge offerings"), use `search` with `type: ["orgs", "catalog"]` instead of `list_catalog --query` — it's vector-backed and matches on description and category, not just slug substring.
+- `kind: "release"` — a normal release row; use it directly.
+- `kind: "changelog_chunk"` — a passage from a stored CHANGELOG.md. The hit includes the source id and the chunk's `offset` and `length`. To read the surrounding section before quoting, call `get_catalog_entry` with that source id and `changelog_offset` set to the chunk offset (add `changelog_tokens`, e.g. 2000, for a heading-aligned slice). Chunk hits often surface older or more granular notes than the indexed release rows, so they're useful for "when did X first ship" questions.
 
-### 6. Synthesize
+### 5. Synthesize
 
-Combine summaries and comparisons into a structured analysis:
+Combine the raw data into a structured analysis:
 
-- **Release velocity table** — releases per company, cadence pattern
+- **Release velocity table** — releases per company over the window, cadence pattern
 - **Trends adopted across the board** — features 3+ companies shipped in the same window
 - **Differentiating bets** — what each company is investing in that others aren't
-- **Gaps** — what competitors shipped that a company hasn't
-- **Forecasts** — specific predictions based on pre-release tracks, deprecations, and trajectory
+- **Gaps** — what competitors shipped that a given company hasn't
+- **Forecasts** — predictions grounded in pre-release tracks, deprecations, and trajectory
 
 ## Output
 
-Ask the user where to save the analysis, or use your best judgment based on the project's conventions. Include a "Process Notes" section documenting which CLI commands were used so the analysis is reproducible.
+Ask the user where to save the analysis, or use your best judgment based on the project's conventions. Include a short "Process Notes" section listing the exact commands/tools used, so the analysis is reproducible.
 
 ## Important
 
-- Focus on what companies shipped. If a source has noisy data (blog posts mixed in, missing dates), work around it silently. Don't include source quality commentary in the report unless a company had to be substantially excluded.
-- Fill data gaps with web fetches. List sources to get release URLs, then WebFetch to spot-check pages for missing dates, versions, or feature details.
-- For velocity counting, get the latest releases with dates — CLI: `releases tail <slug> --json`, typed tool: `get_latest_releases`.
-- AI-powered summarize and compare are only available via CLI (`releases summary`, `releases compare`). When using typed tools, synthesize manually from raw release data.
+- Focus on what companies shipped. If a source has noisy data (blog posts mixed in, missing dates), work around it silently — don't pad the report with source-quality commentary unless a company had to be substantially excluded.
+- Fill data gaps with web fetches: list a source to get release URLs, then WebFetch to spot-check pages for a missing date, version, or detail.
+- For velocity counting, lean on the dated rows from `get_latest_releases` / `releases tail --json`.
+- Comparison and summarization are yours to synthesize from raw release data — there is no built-in tool that does it for you.

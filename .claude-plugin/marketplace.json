@@ -14,12 +14,7 @@
         "name": "Build Internet"
       },
       "strict": false,
-      "skills": [
-        "./skills/releases-mcp",
-        "./skills/releases-cli",
-        "./skills/analyzing-releases",
-        "./skills/finding-changelogs"
-      ],
+      "skills": ["./skills/releases-mcp", "./skills/releases-cli", "./skills/analyzing-releases"],
       "commands": "./plugins/claude/releases/commands",
       "mcpServers": "./plugins/claude/releases/.mcp.json"
     },
@@ -36,7 +31,8 @@
         "./skills/managing-sources",
         "./skills/parsing-changelogs",
         "./skills/classify-media-relevance",
-        "./skills/seeding-playbooks"
+        "./skills/seeding-playbooks",
+        "./skills/finding-changelogs"
       ],
       "agents": [
         "./plugins/claude/releases/agents/discovery.md",
