@@ -1,5 +1,23 @@
 # @buildinternet/releases
 
+## 0.45.0
+
+### Minor Changes
+
+- dc6ae62: Rework `search` / `tail`/`latest` human output and slim the default `--json`.
+
+  The human view for `search` and `tail`/`latest` is now a single column-aligned row per release (identity · description · relative age · dimmed `rel_…`); `search` adds a cleaned, markdown-stripped excerpt under each hit instead of dumping raw markdown. The piped (non-TTY) TSV path is fixed to one clean row per release.
+
+  `--json` now returns a lean release shape by default for `get` / `search` / `tail`/`latest` (`id`, `version`, `title`, `summary`, `excerpt`, `url`, `publishedAt`, nested `source`/`org`, `contentChars`, `contentTokens`); pass `--full` to recover the complete payload (`content`, `contentHash`, `versionSort`, `composition`, the `title*` variants, …). Scripts that read dropped fields should add `--full`.
+
+### Patch Changes
+
+- c5ece26: Refine the release reader output: clearer ownership, shorter labels, human dates.
+  - `search` release hits now lead with the owning org as `Org/Source` (e.g. `Axiom/Changelog`) so it's clear who ships each result. The org prefix is skipped when the source name already starts with the org name (`Railway Changelog` stays as-is rather than becoming `Railway/Railway Changelog`). Feed views (`get` entity cards, scoped `tail`) are unchanged — the org is already established there.
+  - The release detail cards (`get <rel_…>` and `release get`) now show an `Org:` line so the owning company is named even when the source is generic (e.g. an "API Release Notes" source under Google).
+  - `get` / `release get` print the publish date as `Jul 22, 2024` instead of the raw ISO timestamp. `--json` still emits ISO `publishedAt` for machine consumers.
+  - Trimmed the AI-attribution labels on the `get` card to `AI summary` / `AI headline`, and dropped the redundant `Release` heading above the title.
+
 ## 0.44.0
 
 ### Minor Changes
