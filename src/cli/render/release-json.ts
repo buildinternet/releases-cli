@@ -16,15 +16,11 @@ type RawReleaseDetail = ReleaseWithSource & {
 };
 
 function nullIfEmpty(s: string | null | undefined): string | null {
-  return s && s.trim().length > 0 ? s : null;
+  return s?.trim() || null;
 }
 
 function omitUndefined<T extends Record<string, unknown>>(obj: T): Partial<T> {
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(obj)) {
-    if (v !== undefined) out[k] = v;
-  }
-  return out as Partial<T>;
+  return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as Partial<T>;
 }
 
 export function slimReleaseDetail(
@@ -54,7 +50,7 @@ export function slimReleaseDetail(
 export function slimSearchHit(hit: SearchReleaseHit, full: boolean): unknown {
   if (full) return hit;
   const excerpt = cleanExcerpt(hit.content) || cleanExcerpt(hit.summary);
-  const chars = hit.content ? hit.content.length : 0;
+  const chars = hit.content?.length ?? 0;
   return omitUndefined({
     id: hit.id,
     version: nullIfEmpty(hit.version) ?? undefined,

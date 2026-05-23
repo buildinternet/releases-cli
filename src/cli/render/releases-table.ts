@@ -64,7 +64,7 @@ export function renderReleaseRows(rows: ReleaseRow[], opts: RenderReleaseRowsOpt
     mode === "search"
       ? rows.map((r) => {
           const ex = cleanExcerpt(r.summary) || cleanExcerpt(r.content);
-          if (ex.length === 0) return null;
+          if (!ex) return null;
           // Drop the continuation when it just repeats the title (common when
           // the summary IS the title) — pure noise in the scanning path.
           const title = cleanExcerpt(r.title) || r.title;
