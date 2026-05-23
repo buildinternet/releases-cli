@@ -8,6 +8,7 @@ import { VERSION } from "../version.js";
 import { isTelemetryEnabled, getOrCreateAnonId } from "../../lib/telemetry.js";
 import { apiFetch } from "../../api/client.js";
 import { stripAnsi } from "../../lib/sanitize.js";
+import { promptConfirm } from "../../lib/confirm.js";
 import { logger } from "@releases/lib/logger";
 
 const MIN_MESSAGE = 5;
@@ -205,6 +206,12 @@ export function registerFeedbackCommand(parent: Command): void {
     );
 }
 
+// Mirrors the API's FEEDBACK_STATUSES (packages/core schema). When
+// @buildinternet/releases-api-types ships the feedback shapes, these locals can
+// be replaced by its FeedbackItem / FeedbackStatus exports.
+const FEEDBACK_STATUSES = ["new", "triaged", "closed"] as const;
+const FEEDBACK_STATUSES_SET = new Set<string>(FEEDBACK_STATUSES);
+
 interface FeedbackRow {
   id: string;
   createdAt: number;
@@ -212,20 +219,39 @@ interface FeedbackRow {
   contact: string | null;
   type: string;
   status: string;
+  // Present once the API write-path (#1133) is deployed; optional so the
+  // command stays compatible with responses from an older API.
+  archived?: boolean;
 }
 interface FeedbackListResponse {
   items: FeedbackRow[];
   nextCursor: string | null;
 }
 
+/**
+ * Translate apiFetch's thrown error into a clean CLI failure. A 404 on a
+ * write becomes a short "not found"; anything else surfaces the API message
+ * rather than a stack trace. Always exits non-zero.
+ */
+function failFromApiError(err: unknown, id: string): never {
+  const msg = err instanceof Error ? err.message : String(err);
+  if (msg.includes("(404)")) {
+    logger.error(`No feedback found with id ${id}.`);
+  } else {
+    logger.error(msg);
+  }
+  process.exit(1);
+}
+
 export function registerFeedbackAdminCommand(parent: Command): void {
-  const cmd = parent.command("feedback").description("Inspect submitted CLI feedback");
+  const cmd = parent.command("feedback").description("Inspect and triage submitted CLI feedback");
 
   cmd
     .command("list")
     .description("List submitted feedback (newest first)")
     .option("--status <status>", "Filter by status: new | triaged | closed")
     .option("--type <type>", "Filter by type: bug | idea | other | general")
+    .option("--include-archived", "Include archived rows (hidden by default)")
     .option("--limit <n>", "Max rows (default 50)")
     .option("--cursor <cursor>", "Pagination cursor from a previous page")
     .option("--json", "Output as JSON")
@@ -233,6 +259,7 @@ export function registerFeedbackAdminCommand(parent: Command): void {
       async (opts: {
         status?: string;
         type?: string;
+        includeArchived?: boolean;
         limit?: string;
         cursor?: string;
         json?: boolean;
@@ -240,6 +267,7 @@ export function registerFeedbackAdminCommand(parent: Command): void {
         const qs = new URLSearchParams();
         if (opts.status) qs.set("status", opts.status);
         if (opts.type) qs.set("type", opts.type);
+        if (opts.includeArchived) qs.set("includeArchived", "true");
         if (opts.limit) qs.set("limit", opts.limit);
         if (opts.cursor) qs.set("cursor", opts.cursor);
         const data = await apiFetch<FeedbackListResponse>(
@@ -259,7 +287,8 @@ export function registerFeedbackAdminCommand(parent: Command): void {
           // stripAnsi here protects the operator's terminal from any
           // pre-existing or otherwise-ingested rows that carry escapes.
           const when = new Date(r.createdAt).toISOString().slice(0, 16).replace("T", " ");
-          const head = `${chalk.bold(r.id)}  ${chalk.dim(when)}  ${chalk.cyan(r.type)}/${r.status}`;
+          const archived = r.archived ? chalk.yellow(" [archived]") : "";
+          const head = `${chalk.bold(r.id)}  ${chalk.dim(when)}  ${chalk.cyan(r.type)}/${r.status}${archived}`;
           const contact = r.contact ? chalk.dim(` <${stripAnsi(r.contact)}>`) : "";
           logger.info(`${head}${contact}`);
           logger.info(`  ${stripAnsi(r.message).replace(/\s+/g, " ").slice(0, 200)}`);
@@ -269,4 +298,93 @@ export function registerFeedbackAdminCommand(parent: Command): void {
         }
       },
     );
+
+  cmd
+    .command("triage")
+    .description("Set the triage status of a feedback row")
+    .argument("<id>", "Feedback id (fb_…)")
+    .requiredOption("--status <status>", "new | triaged | closed")
+    .option("--json", "Output as JSON")
+    .action(async (id: string, opts: { status: string; json?: boolean }) => {
+      if (!FEEDBACK_STATUSES_SET.has(opts.status)) {
+        logger.error(`--status must be one of: ${FEEDBACK_STATUSES.join(", ")}`);
+        process.exit(1);
+      }
+      let updated: FeedbackRow;
+      try {
+        updated = await apiFetch<FeedbackRow>(`/v1/feedback/${encodeURIComponent(id)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ status: opts.status }),
+        });
+      } catch (err) {
+        failFromApiError(err, id);
+      }
+      if (opts.json) {
+        await writeJson(updated);
+        return;
+      }
+      logger.info(chalk.green(`Set ${chalk.bold(updated.id)} → status ${updated.status}`));
+    });
+
+  cmd
+    .command("archive")
+    .description("Archive a feedback row (hide it from the default list); --undo to restore")
+    .argument("<id>", "Feedback id (fb_…)")
+    .option("--undo", "Restore an archived row instead of archiving it")
+    .option("--json", "Output as JSON")
+    .action(async (id: string, opts: { undo?: boolean; json?: boolean }) => {
+      const archived = !opts.undo;
+      let updated: FeedbackRow;
+      try {
+        updated = await apiFetch<FeedbackRow>(`/v1/feedback/${encodeURIComponent(id)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ archived }),
+        });
+      } catch (err) {
+        failFromApiError(err, id);
+      }
+      if (opts.json) {
+        await writeJson(updated);
+        return;
+      }
+      logger.info(chalk.green(`${archived ? "Archived" : "Restored"} ${chalk.bold(updated.id)}`));
+    });
+
+  cmd
+    .command("delete")
+    .description("Permanently delete a feedback row (prefer `archive` for a reversible removal)")
+    .argument("<id>", "Feedback id (fb_…)")
+    .option("-y, --yes", "Skip the confirmation prompt (required in non-interactive contexts)")
+    .option("--json", "Output as JSON")
+    .action(async (id: string, opts: { yes?: boolean; json?: boolean }) => {
+      // Hard delete is irreversible — gate it behind a typeback of the id,
+      // bypassable with --yes. A non-TTY without --yes refuses rather than
+      // silently confirming (mirrors `org delete --hard`).
+      if (!opts.yes) {
+        const confirmed = await promptConfirm(
+          `Type the feedback id to permanently delete it (${id}): `,
+          id,
+        );
+        if (!confirmed) {
+          logger.error(
+            "Delete cancelled — id not confirmed. Pass --yes to skip the prompt in scripts.",
+          );
+          process.exit(1);
+        }
+      }
+      let result: { deleted: boolean; id: string };
+      try {
+        result = await apiFetch<{ deleted: boolean; id: string }>(
+          `/v1/feedback/${encodeURIComponent(id)}`,
+          { method: "DELETE" },
+        );
+      } catch (err) {
+        failFromApiError(err, id);
+      }
+      if (opts.json) {
+        await writeJson(result);
+        return;
+      }
+      logger.info(chalk.green(`Deleted ${chalk.bold(result.id)}`));
+    });
 }
