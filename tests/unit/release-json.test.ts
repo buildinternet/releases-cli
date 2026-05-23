@@ -58,6 +58,15 @@ describe("slimReleaseDetail", () => {
     expect(out).not.toHaveProperty("sourceId");
     expect(out).not.toHaveProperty("embeddedAt");
   });
+  it("preserves zero content metrics (empty body is a real measurement)", () => {
+    const out = slimReleaseDetail(rawDetail, {
+      contentChars: 0,
+      contentTokens: 0,
+      full: false,
+    }) as Record<string, unknown>;
+    expect(out.contentChars).toBe(0);
+    expect(out.contentTokens).toBe(0);
+  });
   it("--full passes everything through plus computed size", () => {
     const out = slimReleaseDetail(rawDetail, {
       contentChars: 51,
@@ -102,6 +111,15 @@ describe("slimSearchHit", () => {
   it("--full returns the hit verbatim", () => {
     const out = slimSearchHit(hit, true) as Record<string, unknown>;
     expect(out).toHaveProperty("score");
+  });
+  it("keeps contentChars:0 for an empty body but omits it when content is absent", () => {
+    const empty = slimSearchHit({ ...hit, content: "" } as never, false) as Record<string, unknown>;
+    expect(empty.contentChars).toBe(0);
+    const absent = slimSearchHit({ ...hit, content: undefined } as never, false) as Record<
+      string,
+      unknown
+    >;
+    expect(absent).not.toHaveProperty("contentChars");
   });
 });
 

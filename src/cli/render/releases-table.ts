@@ -17,6 +17,13 @@ export interface RenderReleaseRowsOptions {
   maxWidth?: number;
 }
 
+/** Collapse whitespace (incl. tabs/newlines) to single spaces so a search
+ *  title can't break the one-row-per-release TSV/TTY contract. The `feed`
+ *  description already runs through `cleanExcerpt`, which collapses too. */
+function singleLine(s: string): string {
+  return s.replace(/\s+/g, " ").trim();
+}
+
 /**
  * Shared renderer for the `latest` feed and the `search` releases section.
  * Both produce the same column-aligned grid (identity / description / age /
@@ -40,7 +47,7 @@ export function renderReleaseRows(rows: ReleaseRow[], opts: RenderReleaseRowsOpt
       .map((r) => {
         const identity = stripAnsi(releaseIdentity(r));
         const description =
-          mode === "search" ? stripAnsi(r.title) : stripAnsi(releaseDescription(r));
+          mode === "search" ? singleLine(stripAnsi(r.title)) : stripAnsi(releaseDescription(r));
         return [r.id, identity, description, r.version ?? "", r.publishedAt ?? ""].join("\t");
       })
       .join("\n");
@@ -55,7 +62,7 @@ export function renderReleaseRows(rows: ReleaseRow[], opts: RenderReleaseRowsOpt
 
   const tableRows = rows.map((r) => {
     const identity = stripAnsi(releaseIdentity(r));
-    const description = mode === "search" ? stripAnsi(r.title) : releaseDescription(r);
+    const description = mode === "search" ? singleLine(stripAnsi(r.title)) : releaseDescription(r);
     const age = relativeDate(r.publishedAt);
     return [identity, description, age, chalk.dim(r.id)];
   });

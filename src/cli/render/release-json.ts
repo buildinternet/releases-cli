@@ -42,15 +42,20 @@ export function slimReleaseDetail(
     publishedAt: r.publishedAt,
     source: { slug: r.sourceSlug ?? "", name: r.sourceName ?? "" },
     org: r.org ? { slug: r.org.slug, name: r.org.name } : undefined,
-    contentChars: opts.contentChars || undefined,
-    contentTokens: opts.contentTokens || undefined,
+    // `?? undefined` not `|| undefined` — a zero-length body is a real metric
+    // (empty release), and `get` always carries a content field. Keeping 0 also
+    // matches slimLatest below.
+    contentChars: opts.contentChars ?? undefined,
+    contentTokens: opts.contentTokens ?? undefined,
   });
 }
 
 export function slimSearchHit(hit: SearchReleaseHit, full: boolean): unknown {
   if (full) return hit;
   const excerpt = cleanExcerpt(hit.content) || cleanExcerpt(hit.summary);
-  const chars = hit.content?.length ?? 0;
+  // `number | undefined`: keep 0 (present-but-empty body) but omit entirely when
+  // the hit carries no content field (size unknown, not zero).
+  const chars = hit.content?.length;
   return omitUndefined({
     id: hit.id,
     version: nullIfEmpty(hit.version) ?? undefined,
@@ -60,7 +65,7 @@ export function slimSearchHit(hit: SearchReleaseHit, full: boolean): unknown {
     publishedAt: hit.publishedAt,
     source: { slug: hit.sourceSlug, name: hit.sourceName },
     org: hit.orgSlug ? { slug: hit.orgSlug, name: hit.orgName ?? undefined } : undefined,
-    contentChars: chars || undefined,
+    contentChars: chars,
   });
 }
 

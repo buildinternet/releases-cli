@@ -96,6 +96,27 @@ describe("renderReleaseRows (search)", () => {
     expect(out.split("\n")).toHaveLength(1); // no redundant continuation line
   });
 
+  it("collapses tabs/newlines in a search title so the row contract holds", () => {
+    const hit: ReleaseRow[] = [
+      {
+        id: "rel_t",
+        title: "Multi\nline\ttitle",
+        version: null,
+        summary: "body",
+        publishedAt: null,
+        sourceName: "Src",
+        sourceSlug: "src",
+      },
+    ];
+    // TSV: exactly one row, the title field free of raw tabs/newlines.
+    const tsv = renderReleaseRows(hit, { mode: "search", isTTY: false });
+    expect(tsv.split("\n")).toHaveLength(1);
+    expect(tsv.split("\t")[2]).toBe("Multi line title");
+    // TTY: the primary line carries the collapsed title (no embedded newline).
+    const tty = stripAnsi(renderReleaseRows(hit, { mode: "search", isTTY: true, maxWidth: 100 }));
+    expect(tty.split("\n")[0]).toContain("Multi line title");
+  });
+
   it("non-TTY: one plain line per hit, no continuation", () => {
     const hit: ReleaseRow[] = [
       {
