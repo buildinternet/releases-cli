@@ -104,10 +104,17 @@ interface OverviewFreshnessInput {
 
 // ── Action handlers ───────────────────────────────────────────────────────────
 
+/**
+ * Formats an overview timestamp for compact status output.
+ */
 function ageLabel(iso: string | null | undefined): string {
   return iso ? (timeAgo(iso) ?? "?") : "?";
 }
 
+/**
+ * Compares overview timestamps by instant, falling back to raw value comparison
+ * when either value is missing or cannot be parsed.
+ */
 function timestampsDifferMeaningfully(
   first: string | null | undefined,
   second: string | null | undefined,
@@ -121,6 +128,9 @@ function timestampsDifferMeaningfully(
   return firstMs !== secondMs;
 }
 
+/**
+ * Builds the human-readable freshness line shown above an org overview.
+ */
 export function formatOverviewFreshnessLine(overview: OverviewFreshnessInput): string {
   const generatedLabel = ageLabel(overview.generatedAt);
   const releaseLabel = `${overview.releaseCount} releases contributing`;
