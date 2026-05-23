@@ -46,7 +46,8 @@ Examples:
         });
 
         if (opts.json) {
-          await writeJson(result);
+          // Match the CLI's ListResponse JSON contract (see list.ts): { items, pagination }.
+          await writeJson({ items: result.items, pagination: result.pagination });
           return;
         }
 
