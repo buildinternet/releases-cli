@@ -45,8 +45,10 @@ async function releaseGetAction(rawId: string, opts: ReleaseGetOpts): Promise<vo
     return;
   }
 
+  const org = (rel as { org?: { slug: string; name: string } | null }).org;
   console.log(chalk.bold(stripAnsi(rel.title)));
   if (rel.version) console.log(`  Version:   ${stripAnsi(rel.version)}`);
+  if (org) console.log(`  Org:       ${stripAnsi(org.name)} (${org.slug})`);
   console.log(
     `  Source:    ${rel.sourceName ? stripAnsi(rel.sourceName) : chalk.dim("—")} (${rel.sourceSlug ?? chalk.dim("—")})`,
   );

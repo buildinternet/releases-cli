@@ -100,9 +100,13 @@ async function getRelease_(id: string, opts: GetEntityOpts) {
     );
     return;
   }
+  // Owning org is on the release-detail wire (and the slim JSON) but not the
+  // narrow type — read it defensively so the card can name who ships the release.
+  const org = (rel as { org?: { slug: string; name: string } | null }).org;
   console.log(chalk.bold(stripAnsi(rel.title)));
   console.log(`  ID:        ${rel.id}`);
   if (rel.version) console.log(`  Version:   ${stripAnsi(rel.version)}`);
+  if (org) console.log(`  Org:       ${stripAnsi(org.name)} (${org.slug})`);
   console.log(
     `  Source:    ${rel.sourceName ? stripAnsi(rel.sourceName) : chalk.dim("—")} (${rel.sourceSlug ?? chalk.dim("—")})`,
   );
