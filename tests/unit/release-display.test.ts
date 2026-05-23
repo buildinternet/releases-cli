@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   relativeDate,
+  humanDate,
   cleanExcerpt,
   releaseIdentity,
   releaseDescription,
@@ -21,6 +22,19 @@ describe("relativeDate", () => {
     expect(relativeDate(new Date(now - 21 * 86400 * 1000).toISOString(), now)).toBe("3w");
     expect(relativeDate(new Date(now - 90 * 86400 * 1000).toISOString(), now)).toBe("3mo");
     expect(relativeDate(new Date(now - 800 * 86400 * 1000).toISOString(), now)).toBe("2y");
+  });
+});
+
+describe("humanDate", () => {
+  it("returns empty string for null/undefined/unparseable", () => {
+    expect(humanDate(null)).toBe("");
+    expect(humanDate(undefined)).toBe("");
+    expect(humanDate("not-a-date")).toBe("");
+  });
+  it("formats as `Mon D, YYYY` in UTC", () => {
+    expect(humanDate("2024-07-22T00:00:00.000Z")).toBe("Jul 22, 2024");
+    // Midnight-UTC date renders the same calendar day regardless of runner TZ.
+    expect(humanDate("2026-01-01T00:00:00.000Z")).toBe("Jan 1, 2026");
   });
 });
 
@@ -57,6 +71,25 @@ describe("releaseIdentity", () => {
     );
     expect(releaseIdentity({ version: "v1.2.3", sourceName: "Render Blog" })).toBe("Render Blog");
     expect(releaseIdentity({ version: null, sourceName: "LangChain" })).toBe("LangChain");
+  });
+  it("prefixes the owning org as `Org/Source` when orgName is supplied", () => {
+    expect(releaseIdentity({ version: null, sourceName: "Changelog", orgName: "Axiom" })).toBe(
+      "Axiom/Changelog",
+    );
+  });
+  it("skips the org prefix when the source name already starts with the org name", () => {
+    expect(
+      releaseIdentity({ version: null, sourceName: "Resend Changelog", orgName: "Resend" }),
+    ).toBe("Resend Changelog");
+    // Case-insensitive match.
+    expect(releaseIdentity({ version: null, sourceName: "vercel blog", orgName: "Vercel" })).toBe(
+      "vercel blog",
+    );
+  });
+  it("keeps a package-qualified version even when orgName is present", () => {
+    expect(
+      releaseIdentity({ version: "next@15.0.0", sourceName: "Next.js", orgName: "Vercel" }),
+    ).toBe("next@15.0.0");
   });
 });
 

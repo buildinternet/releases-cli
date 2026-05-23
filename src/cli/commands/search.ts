@@ -9,7 +9,7 @@ import { writeJson } from "../../lib/output.js";
 import { parseTimeWindowFlag } from "../../lib/flags.js";
 import { renderReleaseRows } from "../render/releases-table.js";
 import { slimSearchHit } from "../render/release-json.js";
-import type { ReleaseRow } from "../../lib/release-display.js";
+import { humanDate, type ReleaseRow } from "../../lib/release-display.js";
 
 const SEARCH_MODES = ["lexical", "semantic", "hybrid"] as const;
 type SearchMode = (typeof SEARCH_MODES)[number];
@@ -35,17 +35,7 @@ function normalizeType(raw: string): SearchSection {
 const PREVIEW_LIMIT = 5;
 
 function formatShortDate(iso: string | null): string {
-  if (!iso) return "No date";
-  try {
-    return new Date(iso).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      timeZone: "UTC",
-    });
-  } catch {
-    return iso;
-  }
+  return humanDate(iso) || "No date";
 }
 
 function renderLookup(lookup: LookupResultPayload, query: string): void {
@@ -346,6 +336,11 @@ Examples:
             publishedAt: r.publishedAt,
             sourceName: r.sourceName,
             sourceSlug: r.sourceSlug,
+            // Cross-vendor surface: carry the owning org so the identity column
+            // renders `Org/Source` ("who ships this"). Feed-mode callers leave
+            // this unset because the org is already established in context.
+            orgName: r.orgName ?? null,
+            orgSlug: r.orgSlug ?? null,
           }));
           console.log(renderReleaseRows(rows, { mode: "search" }));
           console.log();
