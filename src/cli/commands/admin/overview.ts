@@ -28,6 +28,7 @@ import { orgNotFound } from "../../suggest.js";
 import { writeJson } from "../../../lib/output.js";
 import { trySaveBatchOverviewTrace } from "../../../lib/trace.js";
 import {
+  MAX_CONTENT_CHARS_DEFAULT,
   parseMaxContentCharsFlag,
   parseNonNegIntFlag,
   parsePositiveIntFlag,
@@ -747,7 +748,7 @@ old — orchestrator should poll-and-fetch first).`,
     )
     .option(
       "--max-content-chars [n]",
-      "With --json, clip each selected[].content to n chars before printing (bare: 1000)",
+      `With --json, clip each selected[].content to n chars before printing (bare: ${MAX_CONTENT_CHARS_DEFAULT})`,
     )
     .option("--json", "Output as JSON (recommended for agent consumption)")
     .addHelpText(
@@ -765,7 +766,7 @@ generator described in the \`regenerating-overviews\` skill, then upload the
 result with \`releases admin overview update\`.
 
 --max-content-chars clips each selected release body to n characters (bare flag
-defaults to 1000) before the JSON is printed, leaving every other field intact
+defaults to ${MAX_CONTENT_CHARS_DEFAULT}) before the JSON is printed, leaving every other field intact
 and never dropping a release. High-volume orgs (e.g. sentry, wordpress) emit
 500K+ chars of full release content here; when an agent runs this via Bash that
 exceeds the ~30K stdout cap and is silently truncated before the model sees it,
