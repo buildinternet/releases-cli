@@ -19,6 +19,24 @@ export function parsePositiveIntFlag(label: string, raw: string | undefined): nu
   return n;
 }
 
+/** Bare-flag default for `--max-content-chars` — matches the per-release clip
+ * the `regenerating-overviews` generation step applies anyway, so nothing
+ * useful is lost for the overview use case. */
+export const MAX_CONTENT_CHARS_DEFAULT = 1000;
+
+/**
+ * Resolve the `--max-content-chars [n]` option for `overview inputs --json`.
+ * Commander hands us `undefined` when the flag is omitted, the boolean `true`
+ * when it's passed bare (→ {@link MAX_CONTENT_CHARS_DEFAULT}), or the raw string
+ * when given a value (→ parsed as a positive integer, exiting 2 on bad input).
+ * `false` can't occur for an optional-value option but is handled as omitted.
+ */
+export function parseMaxContentCharsFlag(raw: string | boolean | undefined): number | undefined {
+  if (raw === undefined || raw === false) return undefined;
+  if (raw === true) return MAX_CONTENT_CHARS_DEFAULT;
+  return parsePositiveIntFlag("max-content-chars", raw);
+}
+
 /**
  * Parse a non-negative-integer CLI flag value (0 is allowed). Returns
  * `undefined` if the option was not provided. Exits with code 2 on invalid
