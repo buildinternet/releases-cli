@@ -24,10 +24,10 @@ afterAll(() => {
   else process.env.RELEASES_API_KEY = prevEnv.key;
 });
 
-function mockGet(response: unknown) {
+function mockGet(response: unknown, status = 200) {
   globalThis.fetch = (async () =>
     new Response(JSON.stringify(response), {
-      status: 200,
+      status,
       headers: { "Content-Type": "application/json" },
     })) as typeof fetch;
 }
@@ -110,11 +110,22 @@ describe("getOverview citations (#228)", () => {
     expect(payload).toHaveProperty("citationCount");
   });
 
-  it("returns null when no overview exists yet", async () => {
+  it("returns null when no overview exists yet (endpoint returns 200 + null)", async () => {
+    // The overview GET handler returns `c.json(null)` (HTTP 200, null body) when
+    // the org or page is missing — it does not 404 — so this is the real shape.
     mockGet(null);
 
     const { getOverview } = await import("../../src/api/client.js");
     const overview = await getOverview("org", "railway");
+
+    expect(overview).toBeNull();
+  });
+
+  it("returns null on a 404 too (generic apiFetch GET-404 → null path)", async () => {
+    mockGet({ message: "Not found" }, 404);
+
+    const { getOverview } = await import("../../src/api/client.js");
+    const overview = await getOverview("org", "nope");
 
     expect(overview).toBeNull();
   });
