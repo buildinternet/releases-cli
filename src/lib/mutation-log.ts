@@ -1,12 +1,13 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { expandHome } from "@releases/lib/config";
+import { resolveRunDir } from "./run-dir.js";
 
 /**
- * Admin-mutation log. When `RELEASES_RUN_DIR` is set (the maintenance skill
- * exports it once per batch), every operator write the CLI makes appends one
- * JSONL line to `$RELEASES_RUN_DIR/mutations.jsonl`. Unset → no-op. Fully
- * fail-open: a logging failure must never break the write it was recording.
+ * Admin-mutation log. When a run is active — `RELEASES_RUN_DIR` set, or a
+ * sticky `.current-run` pointer written by `work start` (#227) — every operator
+ * write the CLI makes appends one JSONL line to `<runDir>/mutations.jsonl`.
+ * No active run → no-op. Fully fail-open: a logging failure must never break
+ * the write it was recording.
  *
  * The chokepoint is the api-client's `apiFetch` (see `src/api/client.ts`), so
  * the gate keys on the HTTP verb rather than per-command wiring.
@@ -14,7 +15,6 @@ import { expandHome } from "@releases/lib/config";
  * See `docs/architecture/maintenance-workspace.md` in the monorepo.
  */
 
-const RUN_DIR_ENV = "RELEASES_RUN_DIR";
 const MUTATIONS_FILE = "mutations.jsonl";
 
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
@@ -45,11 +45,16 @@ function isPlumbing(path: string): boolean {
   return PLUMBING_PATTERNS.some((p) => path.includes(p));
 }
 
-/** Cheap gate so `apiFetch` skips all work on the common (env-unset) path. */
+/**
+ * Cheap gate so `apiFetch` skips all work on the common path. Verb/plumbing
+ * checks run first (pure, no I/O), so a GET short-circuits before we touch the
+ * filesystem to resolve the run dir — only an actual mutating call pays the
+ * pointer lookup.
+ */
 export function shouldRecordMutation(method: string | undefined, path: string): boolean {
-  if (!process.env[RUN_DIR_ENV]) return false;
   if (!method || !MUTATING_METHODS.has(method.toUpperCase())) return false;
   if (isPlumbing(path)) return false;
+  if (!resolveRunDir()) return false;
   return true;
 }
 
@@ -77,10 +82,10 @@ export function buildMutationRecord(
 
 export function recordMutation(outcome: MutationOutcome): void {
   try {
-    const runDir = process.env[RUN_DIR_ENV];
+    const runDir = resolveRunDir();
     if (!runDir) return;
     const record = buildMutationRecord(outcome, currentCommand(), new Date().toISOString());
-    const file = join(expandHome(runDir), MUTATIONS_FILE);
+    const file = join(runDir, MUTATIONS_FILE);
     mkdirSync(dirname(file), { recursive: true });
     appendFileSync(file, JSON.stringify(record) + "\n");
   } catch {

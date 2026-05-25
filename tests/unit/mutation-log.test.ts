@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "bun:test";
 import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -10,6 +10,22 @@ import {
 } from "../../src/lib/mutation-log.js";
 
 const ENV = "RELEASES_RUN_DIR";
+
+// resolveRunDir falls back to the sticky `.current-run` pointer under
+// <dataDir>/work when RELEASES_RUN_DIR is unset (#227). Pin RELEASES_DATA_DIR
+// at a fresh temp dir (no pointer) so the "unset" cases stay hermetic and
+// independent of the real ~/.releases or test file order.
+const dataDir = mkdtempSync(join(tmpdir(), "rel-mut-datadir-"));
+let prevDataDir: string | undefined;
+beforeAll(() => {
+  prevDataDir = process.env.RELEASES_DATA_DIR;
+  process.env.RELEASES_DATA_DIR = dataDir;
+});
+afterAll(() => {
+  if (prevDataDir === undefined) delete process.env.RELEASES_DATA_DIR;
+  else process.env.RELEASES_DATA_DIR = prevDataDir;
+  rmSync(dataDir, { recursive: true, force: true });
+});
 
 describe("shouldRecordMutation", () => {
   afterEach(() => {
