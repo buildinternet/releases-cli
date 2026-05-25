@@ -52,6 +52,13 @@ describe("admin overview subcommand group", () => {
     expect(stdout).toContain("Pre-flight only");
   });
 
+  it("`overview inputs --help` documents --max-content-chars and the Bash-stdout-cap motivation", () => {
+    const { stdout, exitCode } = runCli(["admin", "overview", "inputs", "--help"]);
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("--max-content-chars");
+    expect(stdout).toContain("stdout cap");
+  });
+
   it("`overview update --help` requires --content-file", () => {
     const { stdout, exitCode } = runCli(["admin", "overview", "update", "--help"]);
     expect(exitCode).toBe(0);

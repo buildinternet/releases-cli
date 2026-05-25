@@ -19,6 +19,7 @@ import {
   triggerBatchOverview,
   getBatchOverviewStatus,
   type OverviewCitation,
+  type OverviewInputs,
   type OverviewManifestRow,
   type BatchOverviewTriggerBody,
   type BatchOverviewStatusResponse,
@@ -26,7 +27,13 @@ import {
 import { orgNotFound } from "../../suggest.js";
 import { writeJson } from "../../../lib/output.js";
 import { trySaveBatchOverviewTrace } from "../../../lib/trace.js";
-import { parseNonNegIntFlag, parsePositiveIntFlag, parseTagList } from "../../../lib/flags.js";
+import {
+  MAX_CONTENT_CHARS_DEFAULT,
+  parseMaxContentCharsFlag,
+  parseNonNegIntFlag,
+  parsePositiveIntFlag,
+  parseTagList,
+} from "../../../lib/flags.js";
 import { logger } from "@releases/lib/logger";
 import { timeAgo } from "@buildinternet/releases-core/dates";
 import {
@@ -75,6 +82,8 @@ interface OverviewInputsOpts {
   window?: string;
   limit?: string;
   check?: boolean;
+  // `[n]` optional value: string when given, `true` when passed bare.
+  maxContentChars?: string | boolean;
 }
 
 interface OverviewPlanOpts {
@@ -208,6 +217,30 @@ async function overviewUpdateAction(
   }
 }
 
+/**
+ * Clip each `selected[].content` to at most `maxContentChars` characters,
+ * client-side, before the payload is printed. The CLI already received the full
+ * content over the wire — the wire isn't subject to the agent Bash-stdout cap;
+ * only stdout is — so this is purely about keeping the printed JSON under that
+ * cap for sub-agent callers. Never drops a release and leaves every other field
+ * (including `existingContent`, `media`, `totalAvailable`) untouched. Returns
+ * the input unchanged when `maxContentChars` is `undefined`.
+ */
+export function clipInputsContent(
+  inputs: OverviewInputs,
+  maxContentChars: number | undefined,
+): OverviewInputs {
+  if (maxContentChars === undefined) return inputs;
+  return {
+    ...inputs,
+    selected: inputs.selected.map((r) =>
+      r.content.length > maxContentChars
+        ? { ...r, content: r.content.slice(0, maxContentChars) }
+        : r,
+    ),
+  };
+}
+
 async function overviewInputsAction(
   orgIdentifier: string,
   opts: OverviewInputsOpts,
@@ -217,6 +250,7 @@ async function overviewInputsAction(
 
   const window = parsePositiveIntFlag("window", opts.window);
   const limit = parsePositiveIntFlag("limit", opts.limit);
+  const maxContentChars = parseMaxContentCharsFlag(opts.maxContentChars);
 
   if (opts.check) {
     const result = await getOverviewInputsCheck(org.slug, { window, limit });
@@ -241,7 +275,7 @@ async function overviewInputsAction(
   const inputs = await getOverviewInputs(org.slug, { window, limit });
 
   if (opts.json) {
-    await writeJson(inputs);
+    await writeJson(clipInputsContent(inputs, maxContentChars));
     return;
   }
 
@@ -712,6 +746,10 @@ old — orchestrator should poll-and-fetch first).`,
       "--check",
       "Pre-flight only — return {selected, totalAvailable, hasExistingContent, wouldRegenerate}",
     )
+    .option(
+      "--max-content-chars [n]",
+      `With --json, clip each selected[].content to n chars before printing (bare: ${MAX_CONTENT_CHARS_DEFAULT})`,
+    )
     .option("--json", "Output as JSON (recommended for agent consumption)")
     .addHelpText(
       "after",
@@ -720,11 +758,21 @@ Examples:
   releases admin overview inputs vercel --json
   releases admin overview inputs vercel --check --json
   releases admin overview inputs vercel --window 30 --json
+  releases admin overview inputs sentry --json --max-content-chars 1000
 
 Use --check to decide whether to dispatch a regen sub-agent without paying for
 the full release-content + media payload. Otherwise feed the JSON to the
 generator described in the \`regenerating-overviews\` skill, then upload the
-result with \`releases admin overview update\`.`,
+result with \`releases admin overview update\`.
+
+--max-content-chars clips each selected release body to n characters (bare flag
+defaults to ${MAX_CONTENT_CHARS_DEFAULT}) before the JSON is printed, leaving every other field intact
+and never dropping a release. High-volume orgs (e.g. sentry, wordpress) emit
+500K+ chars of full release content here; when an agent runs this via Bash that
+exceeds the ~30K stdout cap and is silently truncated before the model sees it,
+so the overview gets generated from only the first few releases. The clip
+happens client-side — the CLI still receives the full payload over the wire —
+so it removes that footgun without a multi-step jq workaround.`,
     )
     .action(overviewInputsAction);
 

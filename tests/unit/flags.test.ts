@@ -2,6 +2,8 @@ import { describe, it, expect, spyOn } from "bun:test";
 import {
   parsePositiveIntFlag,
   parseNonNegIntFlag,
+  parseMaxContentCharsFlag,
+  MAX_CONTENT_CHARS_DEFAULT,
   coerceMetadataValue,
   parseMetadataSetFlag,
   parseTimeWindowFlag,
@@ -88,6 +90,36 @@ describe("parseNonNegIntFlag", () => {
   it("rejects a negative integer", () => {
     withExitTrap(() => {
       expect(() => parseNonNegIntFlag("offset", "-1")).toThrow("process.exit called");
+    });
+  });
+});
+
+describe("parseMaxContentCharsFlag", () => {
+  it("returns undefined when the flag is omitted", () => {
+    expect(parseMaxContentCharsFlag(undefined)).toBeUndefined();
+  });
+
+  it("treats false (optional-value not present, no bare) as omitted", () => {
+    expect(parseMaxContentCharsFlag(false)).toBeUndefined();
+  });
+
+  it("uses the bare default when passed without a value (true)", () => {
+    expect(parseMaxContentCharsFlag(true)).toBe(MAX_CONTENT_CHARS_DEFAULT);
+  });
+
+  it("parses an explicit positive integer string", () => {
+    expect(parseMaxContentCharsFlag("500")).toBe(500);
+  });
+
+  it("rejects zero", () => {
+    withExitTrap(() => {
+      expect(() => parseMaxContentCharsFlag("0")).toThrow("process.exit called");
+    });
+  });
+
+  it("rejects a decimal string", () => {
+    withExitTrap(() => {
+      expect(() => parseMaxContentCharsFlag("1.5")).toThrow("process.exit called");
     });
   });
 });
