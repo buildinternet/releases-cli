@@ -139,8 +139,14 @@ async function overviewUpdateAction(
   const org = await findOrg(orgIdentifier);
   if (!org) return orgNotFound(orgIdentifier);
 
-  let content = await readContentArg(opts.contentFile);
-  if (opts.unescapeHtml) content = unescapeHtmlEntities(content);
+  // Always decode the five entities sub-agents reflexively over-escape when
+  // relaying markdown (Q&amp;A, streams.input&lt;T&gt;) — a transport artifact,
+  // not authored content (#229). The API stores `content` verbatim, so an
+  // un-decoded entity would render wrong. Single-pass + idempotent, so a body
+  // that's already clean (e.g. a caller that pre-decoded and computed citation
+  // offsets against the decoded text) is unchanged and its offsets stay valid.
+  // The `--unescapeHtml` flag is now the default; kept as an accepted no-op.
+  let content = unescapeHtmlEntities(await readContentArg(opts.contentFile));
   if (!content.trim()) {
     logger.error("Content is empty — refusing to write.");
     process.exit(2);
@@ -764,7 +770,10 @@ overview-age) so handpicked smoke tests run even on already-fresh orgs.`,
       "--last-contributing-at <iso>",
       "ISO timestamp of the most recent release reflected (defaults to first selected release)",
     )
-    .option("--unescape-html", "Decode &amp;, &lt;, &gt;, &quot;, &#39; before uploading")
+    .option(
+      "--unescape-html",
+      "(default; no-op) HTML-entity decode now always runs before uploading",
+    )
     .option("--json", "Output as JSON")
     .addHelpText(
       "after",
@@ -828,7 +837,7 @@ or include a non-empty array to swap them out.`,
     .option("--citations-file <path>", "Path to a JSON array of inline source citations")
     .option("--release-count <n>", "Number of releases the overview reflects")
     .option("--last-contributing-at <iso>", "ISO timestamp of the most recent release reflected")
-    .option("--unescape-html", "Decode HTML entities before uploading")
+    .option("--unescape-html", "(default; no-op) HTML-entity decode now always runs")
     .option("--json", "Output as JSON")
     .action(
       warnDeprecatedAlias<[string, OverviewUpdateOpts]>(

@@ -65,6 +65,14 @@ describe("admin overview subcommand group", () => {
     expect(stdout).toContain("startIndex");
   });
 
+  it("`overview update --help` documents --unescape-html as a default no-op (#229)", () => {
+    const { stdout, exitCode } = runCli(["admin", "overview", "update", "--help"]);
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("--unescape-html");
+    const flat = stdout.replace(/\s+/g, " ");
+    expect(flat).toContain("no-op");
+  });
+
   it("`overview batch --help` exposes the workflow trigger flag set", () => {
     const { stdout, exitCode } = runCli(["admin", "overview", "batch", "--help"]);
     expect(exitCode).toBe(0);
