@@ -1,6 +1,6 @@
 {
   "name": "@buildinternet/releases-windows-x64",
-  "version": "0.46.0",
+  "version": "0.47.0",
   "description": "releases binary for Windows x64",
   "os": [
     "win32"
