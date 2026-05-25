@@ -35,6 +35,7 @@ import { registerEmbedCommand } from "./commands/admin/embed.js";
 import { registerEvaluateCommand } from "./commands/admin/evaluate.js";
 import { registerPlaybookCommand } from "./commands/admin/playbook.js";
 import { registerOverviewCommands } from "./commands/admin/overview.js";
+import { registerWorkCommands } from "./commands/admin/work.js";
 import { registerTelemetryCommand } from "./commands/telemetry.js";
 import { registerFeedbackCommand, registerFeedbackAdminCommand } from "./commands/feedback.js";
 import { registerServeCommand } from "./commands/serve.js";
@@ -284,6 +285,7 @@ registerUsageCommand(statsAdmin);
 registerEmbedCommand(admin);
 registerPlaybookCommand(admin);
 registerOverviewCommands(admin);
+registerWorkCommands(admin);
 
 const mcpAdmin = admin.command("mcp").description("MCP server management");
 registerServeCommand(mcpAdmin);

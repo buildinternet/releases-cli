@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { getRunsDir, expandHome } from "@releases/lib/config";
+import { resolveRunDir } from "./run-dir.js";
 import type { Session } from "@buildinternet/releases-api-types";
 import type { BatchOverviewStatusResponse } from "../api/client.js";
 
@@ -16,13 +17,14 @@ import type { BatchOverviewStatusResponse } from "../api/client.js";
 /**
  * Where a trace is written, in precedence order:
  *   1. an explicit `--trace-dir` / `--save` value,
- *   2. `RELEASES_RUN_DIR` (so traces co-locate with a batch's mutations.jsonl),
+ *   2. the active run dir — `RELEASES_RUN_DIR`, then the sticky `.current-run`
+ *      pointer (#227) — so traces co-locate with a batch's mutations.jsonl,
  *   3. the default runs dir (`~/.releases/work/runs`).
  */
 export function resolveTraceDir(explicit?: string): string {
   if (explicit) return expandHome(explicit);
-  const env = process.env.RELEASES_RUN_DIR;
-  if (env) return expandHome(env);
+  const runDir = resolveRunDir();
+  if (runDir) return runDir;
   return getRunsDir();
 }
 
