@@ -111,6 +111,12 @@ async function overviewGetAction(orgIdentifier: string, opts: OverviewGetOpts): 
     return;
   }
 
+  // Citations are attached by the org overview GET, ordered by character
+  // position (#228). Surface a count so a post-write `overview get` can verify
+  // what `overview update` reported (it echoes `citations: N`); --json carries
+  // the full array for round-trip/audit without a re-write.
+  const citations = overview.citations ?? [];
+
   if (opts.json) {
     await writeJson({
       org: org.slug,
@@ -119,6 +125,8 @@ async function overviewGetAction(orgIdentifier: string, opts: OverviewGetOpts): 
       generatedAt: overview.generatedAt,
       updatedAt: overview.updatedAt,
       lastContributingReleaseAt: overview.lastContributingReleaseAt,
+      citationCount: citations.length,
+      citations,
     });
     return;
   }
@@ -126,7 +134,9 @@ async function overviewGetAction(orgIdentifier: string, opts: OverviewGetOpts): 
   const ageLabel = overview.generatedAt ? (timeAgo(overview.generatedAt) ?? "?") : "?";
   console.log(chalk.bold(`${org.name} — overview`));
   console.log(
-    chalk.dim(`  generated ${ageLabel} · ${overview.releaseCount} releases contributing`),
+    chalk.dim(
+      `  generated ${ageLabel} · ${overview.releaseCount} releases contributing · ${citations.length} citations`,
+    ),
   );
   console.log();
   console.log(overview.content);

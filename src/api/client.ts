@@ -1237,11 +1237,18 @@ export async function getMonthlySummary(
 
 const SCOPE_RESOURCE = { org: "orgs", product: "products" } as const;
 
+/**
+ * Knowledge page plus the inline citations the read endpoint returns. The org
+ * GET (`/v1/orgs/:slug/overview`) attaches `citations` ordered by character
+ * position; the product GET does not, so the field is optional.
+ */
+export type OverviewWithCitations = KnowledgePage & { citations?: OverviewCitation[] };
+
 export async function getOverview(
   scope: keyof typeof SCOPE_RESOURCE,
   identifier: string,
-): Promise<KnowledgePage | null> {
-  return apiFetch<KnowledgePage | null>(
+): Promise<OverviewWithCitations | null> {
+  return apiFetch<OverviewWithCitations | null>(
     `/v1/${SCOPE_RESOURCE[scope]}/${encodeURIComponent(identifier)}/overview`,
   );
 }
