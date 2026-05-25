@@ -1,5 +1,16 @@
 # @buildinternet/releases-linux-x64
 
+## 0.46.0
+
+### Minor Changes
+
+- f38f166: Add `releases admin work start <batch>` / `status` / `end` and a sticky run-dir pointer for the maintenance workspace. `RELEASES_RUN_DIR` auto-captures admin mutations into `mutations.jsonl` and defaults the managed-session trace dir, but a one-time `export` doesn't survive an agent harness (each shell is fresh), so logging silently stopped after the first command. `work start` creates `~/.releases/work/runs/<ts>-<batch>/` (honoring `RELEASES_DATA_DIR`) and writes a sticky `~/.releases/work/.current-run` pointer; the CLI now resolves the active run as `RELEASES_RUN_DIR` env → `.current-run` pointer → none, so mutation logging and the trace-dir default work across separate invocations with no env threading. Explicit `RELEASES_RUN_DIR` still wins. `work status` prints the run dir, where it came from, and a mutations/sessions tally; `work end` clears the pointer.
+
+### Patch Changes
+
+- 3f70b35: `releases admin overview update` now always HTML-entity-decodes the content body before uploading. The five entities sub-agents reflexively over-escape when relaying markdown (`&amp;`, `&lt;`, `&gt;`, `&quot;`, `&#39;` — e.g. `Q&amp;A`, `streams.input&lt;T&gt;`) are a transport artifact, not authored content, and the API stores the body verbatim — so an un-decoded entity rendered wrong. The decode is single-pass and idempotent, so an already-clean body (including one a caller pre-decoded to compute citation offsets) is unchanged. `--unescape-html` is now the default and kept as an accepted no-op flag for back-compat.
+- dc7c707: `releases admin overview get` now surfaces inline citations. The table line includes a citation count alongside the release count, and `--json` adds `citationCount` plus the full `citations` array. The org overview GET already returns citations ordered by character position — this exposes them so a post-write `overview get` can verify what `overview update` reported (which echoes `citations: N`) without a re-write.
+
 ## 0.45.0
 
 ## 0.44.0
