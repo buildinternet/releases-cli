@@ -1,8 +1,15 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import { logger } from "@releases/lib/logger";
-import { addIgnoredUrl, findOrg, createSource } from "../../api/client.js";
+import {
+  addIgnoredUrl,
+  findOrg,
+  createSource,
+  findProduct,
+  createProduct,
+} from "../../api/client.js";
 import { writeJson } from "../../lib/output.js";
+import type { Product } from "@buildinternet/releases-core/schema";
 
 interface AgentDiscoveredSource {
   slug: string;
@@ -12,6 +19,8 @@ interface AgentDiscoveredSource {
   approved?: boolean;
   validationError?: string;
   contentDepth?: string;
+  productName?: string;
+  productSlug?: string;
 }
 
 interface DiscoveryState {
@@ -26,7 +35,11 @@ interface ApplyResult {
   error?: string;
 }
 
-async function applySource(source: AgentDiscoveredSource, orgId?: string): Promise<ApplyResult> {
+async function applySource(
+  source: AgentDiscoveredSource,
+  orgId?: string,
+  productId?: string,
+): Promise<ApplyResult> {
   const { url, type, slug, label } = source;
 
   if (source.approved === false) {
@@ -53,6 +66,8 @@ async function applySource(source: AgentDiscoveredSource, orgId?: string): Promi
       slug,
       type,
       url,
+      orgId,
+      productId,
       metadata,
     });
 
@@ -68,6 +83,24 @@ async function applySource(source: AgentDiscoveredSource, orgId?: string): Promi
     }
     return { slug, url, action: "error", error: message };
   }
+}
+
+/**
+ * Lookup-or-create a product under the given org.
+ * Returns the product's ID, or undefined if the org is unknown.
+ */
+async function resolveProduct(
+  orgId: string,
+  orgSlug: string,
+  productSlug: string,
+  productName: string,
+): Promise<string | undefined> {
+  const identifier = `${orgSlug}/${productSlug}`;
+  let product: Product | null = await findProduct(identifier);
+  if (product) return product.id;
+  // Not found — create it.
+  product = await createProduct(orgId, productName, { slug: productSlug });
+  return product.id;
 }
 
 export function registerOnboardApplyCommand(onboardCmd: Command) {
@@ -94,14 +127,36 @@ export function registerOnboardApplyCommand(onboardCmd: Command) {
 
       const org = await findOrg(state.product);
       const orgId = org?.id;
+      const orgSlug = org?.slug;
+
+      // Build a productSlug → productId map by looking up or creating each
+      // distinct product tagged across the discovered sources. Sequential to
+      // avoid racing on shared org/product lookup-or-create across sources
+      // that belong to the same parent entity.
+      const productIdMap = new Map<string, string>();
+      if (orgId && orgSlug) {
+        const seen = new Set<string>();
+        for (const source of state.sources) {
+          if (source.productSlug && source.productName && !seen.has(source.productSlug)) {
+            seen.add(source.productSlug);
+            // eslint-disable-next-line no-await-in-loop
+            const pid = await resolveProduct(
+              orgId,
+              orgSlug,
+              source.productSlug,
+              source.productName,
+            );
+            if (pid) productIdMap.set(source.productSlug, pid);
+          }
+        }
+      }
 
       const results: ApplyResult[] = [];
 
-      // Sequential to avoid racing on shared org/product lookup-or-create
-      // across sources that belong to the same parent entity.
       for (const source of state.sources) {
+        const productId = source.productSlug ? productIdMap.get(source.productSlug) : undefined;
         // eslint-disable-next-line no-await-in-loop
-        const result = await applySource(source, orgId);
+        const result = await applySource(source, orgId, productId);
         results.push(result);
 
         if (!opts.json) {
