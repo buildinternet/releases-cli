@@ -157,7 +157,13 @@ server.registerTool(
             count: maxCount,
           })
         : null;
-      releases = res?.releases ?? [];
+      // A null target (unresolvable id/slug) or null feed (unknown org/product
+      // 404) is a bad identifier — distinct from a valid product with zero
+      // releases — so say so rather than returning a misleading empty result.
+      if (!target || !res) {
+        return textResult(`No product found matching "${product}".`);
+      }
+      releases = res.releases;
     } else {
       releases = await getLatestReleases({ org: organization, count: maxCount });
     }
