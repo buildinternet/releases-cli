@@ -53,6 +53,42 @@ function printFooterHint(lines: string[]): void {
   for (const line of lines) console.log(chalk.dim(`  ${line}`));
 }
 
+/**
+ * Like `printFooterHint` but takes `[command, description]` pairs and aligns
+ * the descriptions to a common column so the ` — ` markers line up regardless
+ * of command length.
+ */
+function printAlignedHints(hints: [command: string, description: string][]): void {
+  const width = Math.max(...hints.map(([cmd]) => cmd.length));
+  printFooterHint(hints.map(([cmd, desc]) => `${cmd.padEnd(width)}  — ${desc}`));
+}
+
+/**
+ * Trailing dim line carrying the entity's typed ID. Kept out of the metadata
+ * block (where it was visual noise) but still present for copy/paste and
+ * scripting off the human output.
+ */
+function printIdFooter(id: string): void {
+  console.log("");
+  console.log(chalk.dim(id));
+}
+
+/**
+ * One-line entity header: `Name by OrgName (coord)`. The "by Org" clause is
+ * dropped when the name already names the org — so App Store-style names like
+ * "Claude by Anthropic" don't render "… by Anthropic by Anthropic" — and when
+ * there's no parent org (orgs themselves). `coord` is the dim handle in parens:
+ * `orgSlug/slug` for products and sources, the bare slug for orgs.
+ */
+function entityHeader(name: string, coord: string, org: { name: string } | null): string {
+  const base = chalk.bold(name);
+  const handle = chalk.dim(` (${coord})`);
+  if (org && !name.toLowerCase().includes(org.name.toLowerCase())) {
+    return `${base}${chalk.dim(" by ")}${org.name}${handle}`;
+  }
+  return `${base}${handle}`;
+}
+
 async function notFound(identifier: string, kind: string, opts: GetEntityOpts): Promise<never> {
   if (opts.json) await writeJson(null);
   logger.info(`No ${kind} matching: ${identifier}`);
@@ -221,13 +257,13 @@ async function renderSource(rawSource: unknown, opts: GetEntityOpts) {
         ? chalk.yellow(`erroring (${source.consecutiveErrors} consecutive)`)
         : chalk.green("active");
 
-  console.log(chalk.dim("Source"));
-  console.log(chalk.bold(source.name));
-  console.log(`  ID:         ${source.id}`);
-  console.log(`  Slug:       ${source.slug}`);
+  // Header folds the org + slug into "Name by OrgName (orgSlug/sourceSlug)".
+  // Type label, ID, and the separate Slug/Org rows drop out; the ID moves to a
+  // dim trailing line (see printIdFooter).
+  const coord = org ? `${org.slug}/${source.slug}` : source.slug;
+  console.log(entityHeader(source.name, coord, org));
   console.log(`  Type:       ${source.type}`);
   console.log(`  URL:        ${source.url}`);
-  if (org) console.log(`  Org:        ${org.name} (${org.slug})`);
   if (product) console.log(`  Product:    ${product.name} (${product.slug})`);
   console.log(`  Status:     ${statusLabel}`);
   if (source.lastFetchedAt) console.log(`  Last fetch: ${source.lastFetchedAt}`);
@@ -244,11 +280,13 @@ async function renderSource(rawSource: unknown, opts: GetEntityOpts) {
     console.log(renderReleaseRows(latest, { mode: "feed" }));
   }
 
-  printFooterHint([
-    `releases list --source ${source.slug}             — full release feed`,
-    `releases fetch-log ${source.slug}                  — recent fetch attempts and errors`,
-    `releases release get <rel_id>                      — open one release with full content`,
+  printAlignedHints([
+    [`releases latest ${source.slug}`, "full release feed (add --since 90d to window it)"],
+    [`releases fetch-log ${source.slug}`, "recent fetch attempts and errors"],
+    [`releases release get <rel_id>`, "open one release with full content"],
   ]);
+
+  printIdFooter(source.id);
 }
 
 async function renderOrg(
@@ -293,10 +331,9 @@ async function renderOrg(
   ).length;
   const hiddenSources = sources.filter((s) => s.isHidden).length;
 
-  console.log(chalk.dim("Organization"));
-  console.log(chalk.bold(org.name));
-  console.log(`  ID:          ${org.id}`);
-  console.log(`  Slug:        ${org.slug}`);
+  // No parent, so the header is just "Name (slug)" — no "by" clause. The typed
+  // ID drops to a dim trailing line (see printIdFooter).
+  console.log(entityHeader(org.name, org.slug, null));
   if (org.domain) console.log(`  Domain:      ${org.domain}`);
   if (org.category) console.log(`  Category:    ${org.category}`);
   if (org.description) console.log(`  About:       ${stripAnsi(org.description)}`);
@@ -334,11 +371,13 @@ async function renderOrg(
     console.log(renderReleaseRows(releases, { mode: "feed" }));
   }
 
-  printFooterHint([
-    `releases org get ${org.slug}                  — accounts, aliases, overview, full source list`,
-    `releases org overview ${org.slug}             — AI-generated rollup`,
-    `releases list --org ${org.slug}               — full release feed`,
+  printAlignedHints([
+    [`releases org get ${org.slug}`, "accounts, aliases, overview, full source list"],
+    [`releases org overview ${org.slug}`, "AI-generated rollup"],
+    [`releases latest --org ${org.slug}`, "full release feed (add --since 90d to window it)"],
   ]);
+
+  printIdFooter(org.id);
 }
 
 async function renderProduct(
@@ -393,24 +432,24 @@ async function renderProduct(
     return;
   }
 
-  console.log(chalk.dim("Product"));
-  console.log(chalk.bold(product.name));
-  console.log(`  ID:        ${product.id}`);
-  console.log(`  Slug:      ${product.slug}`);
-  console.log(`  Org:       ${org ? `${org.name} (${org.slug})` : product.orgId}`);
-  console.log(`  URL:       ${product.url ?? chalk.dim("—")}`);
-  console.log(`  Category:  ${product.category ?? chalk.dim("—")}`);
-  if (product.description) console.log(`  About:     ${stripAnsi(product.description)}`);
-  if (tags.length > 0) console.log(`  Tags:      ${tags.join(", ")}`);
+  // Header folds the org + slug into one line: "Name by OrgName (orgSlug/slug)".
+  // The entity type is implied by the coordinate shape and `get`'s resolution,
+  // so there's no standalone "Product" label or separate Org/Slug rows. The
+  // coordinate (`orgSlug/productSlug`) doubles as the unambiguous handle for
+  // the footer commands — bare slugs are per-org-unique since #698.
+  const coord = org ? `${org.slug}/${product.slug}` : product.slug;
+  console.log(entityHeader(product.name, coord, org));
+  if (product.url) console.log(`  URL:      ${product.url}`);
+  if (product.category) console.log(`  Category: ${product.category}`);
+  if (product.description) console.log(`  About:    ${stripAnsi(product.description)}`);
+  if (tags.length > 0) console.log(`  Tags:     ${tags.join(", ")}`);
   if (sourceCount > 0) {
     const preview = productSources
       .slice(0, 5)
       .map((s) => chalk.dim(`(${s.slug})`))
       .join(" ");
     const more = productSources.length > 5 ? chalk.dim(` +${productSources.length - 5}`) : "";
-    console.log(`  Sources:   ${sourceCount} ${preview}${more}`);
-  } else {
-    console.log(`  Sources:   ${chalk.dim("none")}`);
+    console.log(`  Sources:  ${sourceCount} ${preview}${more}`);
   }
 
   console.log("");
@@ -425,24 +464,17 @@ async function renderProduct(
     console.log(renderReleaseRows(releases, { mode: "feed" }));
   }
 
-  // Point at the product's own cross-source feed first — products are the
-  // primary unit, so the full release feed should be the obvious next step,
-  // not an org-scoped feed that mixes sibling products. Prefer the `org/slug`
-  // coordinate (bare slugs are per-org-unique since #698) and fall back to the
-  // bare slug when the org didn't resolve.
-  const productRef = org ? `${org.slug}/${product.slug}` : product.slug;
-  printFooterHint(
-    [
-      `releases latest --product ${productRef}        — full release feed for this product`,
-      // Use the typed source ID rather than the bare slug — bare slugs are
-      // per-org-unique since #698, so the same slug under a different org
-      // could misroute this example. Typed `src_…` IDs stay globally unique
-      // and resolve via the bare path regardless of org.
-      productSources.length > 0
-        ? `releases get ${productSources[0]!.id}        — drill into one source's feed`
-        : "",
-    ].filter(Boolean),
-  );
+  // Lead with the product's own cross-source feed — products are the primary
+  // unit, so the full feed plus a time-windowed variant are the obvious next
+  // steps (both compose with --json, --kind, etc.). Dropped the old
+  // "drill into one source" hint: it pointed at an arbitrary first source via
+  // an opaque src_ id; the Sources line above already lists the slugs.
+  printAlignedHints([
+    [`releases latest --product ${coord}`, "full release feed for this product"],
+    [`releases latest --product ${coord} --since 90d`, "just the last 90 days"],
+  ]);
+
+  printIdFooter(product.id);
 }
 
 export function registerGetCommand(program: Command) {
