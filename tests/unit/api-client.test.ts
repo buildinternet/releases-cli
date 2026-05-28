@@ -335,3 +335,142 @@ describe("since/until query params", () => {
     expect(capturedUrl).toContain("until=2026-05-01");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Product cross-source feed
+// ---------------------------------------------------------------------------
+
+describe("getProductReleases", () => {
+  let originalFetch: typeof globalThis.fetch;
+  let capturedUrl = "";
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    capturedUrl = "";
+  });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  function captureWith(status: number, body: unknown) {
+    globalThis.fetch = (async (url: string) => {
+      capturedUrl = url;
+      return new Response(JSON.stringify(body), {
+        status,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as any;
+  }
+
+  it("hits the org feed with product + limit and maps the rows + cursor", async () => {
+    captureWith(200, {
+      releases: [
+        {
+          id: "rel_1",
+          version: "1.2.0",
+          title: "Shipped X",
+          summary: "Did the thing",
+          titleGenerated: "X is here",
+          titleShort: "X",
+          contentChars: 42,
+          contentTokens: 12,
+          publishedAt: "2026-05-20T00:00:00.000Z",
+          url: "https://example.com/x",
+          media: [],
+          // extra fields the org feed carries but the CLI ignores:
+          type: "feature",
+          prerelease: false,
+          coverageCount: 0,
+          source: { slug: "turborepo", name: "Turborepo", type: "github" },
+        },
+      ],
+      pagination: { nextCursor: "CURSOR_2", limit: 20 },
+    });
+
+    const res = await client.getProductReleases({
+      orgRef: "vercel",
+      product: "turborepo",
+      count: 20,
+    });
+
+    expect(capturedUrl).toContain("/v1/orgs/vercel/releases?");
+    expect(capturedUrl).toContain("product=turborepo");
+    expect(capturedUrl).toContain("limit=20");
+    expect(res).not.toBeNull();
+    expect(res!.nextCursor).toBe("CURSOR_2");
+    expect(res!.releases).toHaveLength(1);
+    const row = res!.releases[0];
+    expect(row.id).toBe("rel_1");
+    expect(row.sourceName).toBe("Turborepo");
+    expect(row.sourceSlug).toBe("turborepo");
+    expect(row.titleShort).toBe("X");
+    expect(row.contentTokens).toBe(12);
+  });
+
+  it("forwards cursor, since, and until when supplied", async () => {
+    captureWith(200, { releases: [], pagination: { nextCursor: null, limit: 20 } });
+    await client.getProductReleases({
+      orgRef: "vercel",
+      product: "turborepo",
+      count: 20,
+      cursor: "CURSOR_1",
+      since: "30d",
+      until: "2026-05-01",
+    });
+    expect(capturedUrl).toContain("cursor=CURSOR_1");
+    expect(capturedUrl).toContain("since=30d");
+    expect(capturedUrl).toContain("until=2026-05-01");
+  });
+
+  it("returns null when the org/product 404s", async () => {
+    captureWith(404, { error: "not_found" });
+    const res = await client.getProductReleases({
+      orgRef: "vercel",
+      product: "nope",
+      count: 20,
+    });
+    expect(res).toBeNull();
+  });
+});
+
+describe("resolveProductFeedTarget", () => {
+  let originalFetch: typeof globalThis.fetch;
+  let capturedUrl = "";
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    capturedUrl = "";
+  });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it("splits an org/slug coordinate locally without a round-trip", async () => {
+    globalThis.fetch = (async (url: string) => {
+      capturedUrl = url;
+      return new Response("{}", { status: 200 });
+    }) as any;
+    const target = await client.resolveProductFeedTarget("vercel/turborepo");
+    expect(target).toEqual({ orgRef: "vercel", product: "turborepo" });
+    expect(capturedUrl).toBe(""); // no network call for the coordinate form
+  });
+
+  it("bounces a bare slug through the product-by-slug lookup", async () => {
+    globalThis.fetch = (async (url: string) => {
+      capturedUrl = url;
+      return new Response(
+        JSON.stringify({ productId: "prod_x", productSlug: "turborepo", orgSlug: "vercel" }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }) as any;
+    const target = await client.resolveProductFeedTarget("turborepo");
+    expect(capturedUrl).toContain("/v1/lookups/product-by-slug?slug=turborepo");
+    expect(target).toEqual({ orgRef: "vercel", product: "turborepo" });
+  });
+
+  it("returns null when a bare slug doesn't resolve", async () => {
+    globalThis.fetch = (async () => new Response("null", { status: 404 })) as any;
+    const target = await client.resolveProductFeedTarget("ghost");
+    expect(target).toBeNull();
+  });
+});

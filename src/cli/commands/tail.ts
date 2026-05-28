@@ -1,8 +1,14 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import { findOrg, findSource, getLatestReleases } from "../../api/client.js";
+import {
+  findOrg,
+  findSource,
+  getLatestReleases,
+  getProductReleases,
+  resolveProductFeedTarget,
+} from "../../api/client.js";
 import type { LatestRelease } from "../../api/types.js";
-import { orgNotFound, sourceNotFound } from "../suggest.js";
+import { orgNotFound, productNotFound, sourceNotFound } from "../suggest.js";
 import { stripAnsi } from "../../lib/sanitize.js";
 import { sleep } from "../../lib/sleep.js";
 import { renderReleaseRows } from "../render/releases-table.js";
@@ -46,6 +52,10 @@ export function registerTailCommand(program: Command) {
       "Filter to an organization (org_…, slug, domain, name, or handle)",
     )
     .option(
+      "--product <identifier>",
+      "Show one product's cross-source feed (org/slug, prod_… id, or product slug). Not combinable with [source] or --org.",
+    )
+    .option(
       "--include-coverage",
       "Include releases that are coverage of another (hidden by default)",
     )
@@ -68,6 +78,7 @@ Examples:
   releases tail                         Latest releases across all sources
   releases tail my-source               Latest releases from one source
   releases tail --org acme --count 20   Latest 20 releases from an org
+  releases tail --product vercel/turborepo   One product's cross-source feed
   releases tail --since 30d             Releases from the last 30 days
   releases tail -f                      Follow new releases as they arrive (60s interval)
   releases tail -f --interval 30        Follow with a 30s poll interval
@@ -80,6 +91,7 @@ Examples:
         opts: {
           count: string;
           org?: string;
+          product?: string;
           includeCoverage?: boolean;
           since?: string;
           until?: string;
@@ -96,6 +108,14 @@ Examples:
         const since = parseTimeWindowFlag("since", opts.since);
         const until = parseTimeWindowFlag("until", opts.until);
 
+        // --product switches to the product's cross-source feed
+        // (GET /v1/orgs/:org/releases?product=…) — a different endpoint from the
+        // global latest feed, so it can't combine with a [source] or --org filter.
+        if (opts.product && (sourceArg || opts.org)) {
+          logger.error("--product can't be combined with a [source] argument or --org.");
+          process.exit(1);
+        }
+
         if (sourceArg) {
           const source = await findSource(sourceArg);
           if (!source) return sourceNotFound(sourceArg);
@@ -108,6 +128,14 @@ Examples:
           orgSlug = org.slug;
         }
 
+        let productTarget: { orgRef: string; product: string } | null = null;
+        if (opts.product) {
+          productTarget = await resolveProductFeedTarget(opts.product);
+          // org/slug coords aren't pre-validated here; a bad coord surfaces as a
+          // null feed in fetchPage. prod_/bare-slug forms validate in the resolver.
+          if (!productTarget) return productNotFound(opts.product);
+        }
+
         const fetchOpts = {
           source: sourceArg,
           org: orgSlug,
@@ -116,7 +144,24 @@ Examples:
           since,
           until,
         };
-        const rows = await getLatestReleases(fetchOpts);
+
+        // One page of the active feed (global latest, or the product feed when
+        // --product is set). Follow mode re-invokes this each tick.
+        const fetchPage = async (): Promise<LatestRelease[]> => {
+          if (!productTarget) return getLatestReleases(fetchOpts);
+          const res = await getProductReleases({
+            orgRef: productTarget.orgRef,
+            product: productTarget.product,
+            count,
+            includeCoverage: opts.includeCoverage,
+            since,
+            until,
+          });
+          if (!res) return productNotFound(opts.product!);
+          return res.releases;
+        };
+
+        const rows = await fetchPage();
 
         if (opts.json) {
           await writeJson(rows.map((row) => slimLatest(row, opts.full === true)));
@@ -154,7 +199,7 @@ Examples:
           // eslint-disable-next-line no-await-in-loop
           await sleep(intervalSeconds * 1000);
           // eslint-disable-next-line no-await-in-loop
-          const fresh = await getLatestReleases(fetchOpts);
+          const fresh = await fetchPage();
           const novel = fresh.filter((r) => !seen.has(r.id));
           if (novel.length === 0) continue;
 
