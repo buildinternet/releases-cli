@@ -1,5 +1,14 @@
 # @buildinternet/releases
 
+## 0.49.0
+
+### Minor Changes
+
+- f57a80e: Add a keyless `releases submit <url>` command to suggest a changelog or release-notes source for the registry — the terminal peer of the web submit form. Accepts an optional `--note` and `--contact`, normalizes a missing scheme to `https://`, and supports interactive/stdin input plus `--dry-run`. Maintainers review the queue via the new `releases admin recommendations list/triage/archive/delete` verbs, mirroring the existing `admin feedback` triage surface.
+- 7721a3f: Add `releases latest --product <org/slug>` (alias `releases tail --product`) to show one product's cross-source release feed, backed by `GET /v1/orgs/:slug/releases?product=`. Accepts an `org/slug` coordinate, a `prod_…` id, or a bare product slug; composes with `--count`, `--since`/`--until`, `--include-coverage`, `--json`/`--full`, and `--follow`. It can't combine with a `[source]` argument or `--org`.
+
+  The local MCP server's `get_latest_releases` tool now filters by product correctly too — previously its `product` argument was misrouted as a source filter, silently returning the wrong results.
+
 ## 0.48.0
 
 ### Minor Changes
