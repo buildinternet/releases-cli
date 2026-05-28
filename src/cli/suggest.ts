@@ -24,3 +24,9 @@ export async function sourceNotFound(identifier: string): Promise<never> {
   }
   process.exit(1);
 }
+
+export function productNotFound(identifier: string): never {
+  console.error(chalk.red(`Product not found: ${identifier}`));
+  console.error(chalk.dim('Use an "org/slug" coordinate, a prod_… id, or a product slug.'));
+  process.exit(1);
+}

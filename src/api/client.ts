@@ -676,23 +676,44 @@ function toMediaItems(
   }));
 }
 
-type LatestReleasesResponse = {
-  releases: Array<{
-    id: string;
-    version: string | null;
-    type: string;
-    title: string;
-    summary: string | null;
-    titleGenerated?: string | null;
-    titleShort?: string | null;
-    contentChars?: number | null;
-    contentTokens?: number | null;
-    publishedAt: string | null;
-    url: string | null;
-    media: Array<{ type: string; url: string; alt?: string; r2Url?: string }>;
-    source: { slug: string; name: string; type: string };
-  }>;
+// Common release-row wire shape shared by `/v1/releases/latest` and the
+// org feed (`/v1/orgs/:slug/releases`). The org feed carries a few extra
+// fields (prerelease, coverageCount, source.appStore) the CLI ignores, so
+// declaring the narrower shape here is fine — `toLatestRelease` only reads
+// what both endpoints return.
+type LatestReleaseWire = {
+  id: string;
+  version: string | null;
+  title: string;
+  summary: string | null;
+  titleGenerated?: string | null;
+  titleShort?: string | null;
+  contentChars?: number | null;
+  contentTokens?: number | null;
+  publishedAt: string | null;
+  media: Array<{ type: string; url: string; alt?: string; r2Url?: string }>;
+  source: { slug: string; name: string; type: string };
 };
+
+// `titleGenerated`/`titleShort`/`contentChars`/`contentTokens` are carried so
+// the shared renderer's description fallback chain and the slim JSON size hints
+// have data without an extra round-trip. #215.
+function toLatestRelease(r: LatestReleaseWire): LatestRelease {
+  return {
+    id: r.id,
+    title: r.title,
+    version: r.version,
+    publishedAt: r.publishedAt,
+    sourceName: r.source.name,
+    sourceSlug: r.source.slug,
+    summary: r.summary ?? null,
+    titleGenerated: r.titleGenerated ?? null,
+    titleShort: r.titleShort ?? null,
+    contentChars: r.contentChars ?? null,
+    contentTokens: r.contentTokens ?? null,
+    media: toMediaItems(r.media),
+  };
+}
 
 export async function getLatestReleases(opts: {
   /** Source identifier (src_… or slug). */
@@ -713,24 +734,80 @@ export async function getLatestReleases(opts: {
   if (opts.since) qs.set("since", opts.since);
   if (opts.until) qs.set("until", opts.until);
 
-  const data = await apiFetch<LatestReleasesResponse>(`/v1/releases/latest?${qs.toString()}`);
+  const data = await apiFetch<{ releases: LatestReleaseWire[] }>(
+    `/v1/releases/latest?${qs.toString()}`,
+  );
   if (!data) return [];
-  return data.releases.map((r) => ({
-    id: r.id,
-    title: r.title,
-    version: r.version,
-    publishedAt: r.publishedAt,
-    sourceName: r.source.name,
-    sourceSlug: r.source.slug,
-    summary: r.summary ?? null,
-    // Carried so the shared renderer's description fallback chain and the slim
-    // JSON size hints have data without an extra round-trip. #215.
-    titleGenerated: r.titleGenerated ?? null,
-    titleShort: r.titleShort ?? null,
-    contentChars: r.contentChars ?? null,
-    contentTokens: r.contentTokens ?? null,
-    media: toMediaItems(r.media),
-  }));
+  return data.releases.map(toLatestRelease);
+}
+
+/**
+ * Resolve a product identifier to the `{ orgRef, product }` pair the org
+ * release feed needs (`GET /v1/orgs/:orgRef/releases?product=…`). Mirrors the
+ * identifier shapes `resolveProductTarget` accepts:
+ *   - `prod_…` ids: fetch the product to recover its org (the feed is
+ *     org-scoped; the org path segment accepts `org_…` ids).
+ *   - `org/slug` coordinates: split locally, no round-trip. Existence is
+ *     validated by the feed call (a bad coord 404s → `getProductReleases`
+ *     returns `null`).
+ *   - bare slugs: bounce through `/v1/lookups/product-by-slug` for the
+ *     canonical org.
+ * Returns `null` when a `prod_…`/bare slug doesn't resolve to a product.
+ */
+export async function resolveProductFeedTarget(
+  identifier: string,
+): Promise<{ orgRef: string; product: string } | null> {
+  if (identifier.startsWith("prod_")) {
+    const product = await findProduct(identifier);
+    if (!product) return null;
+    return { orgRef: product.orgId, product: identifier };
+  }
+  const slash = identifier.indexOf("/");
+  if (slash > 0 && slash < identifier.length - 1) {
+    return { orgRef: identifier.slice(0, slash), product: identifier.slice(slash + 1) };
+  }
+  const resolved = await apiFetch<{
+    productId: string;
+    productSlug: string;
+    orgSlug: string;
+  } | null>(`/v1/lookups/product-by-slug?slug=${encodeURIComponent(identifier)}`);
+  if (!resolved) return null;
+  return { orgRef: resolved.orgSlug, product: resolved.productSlug };
+}
+
+/**
+ * One product's cross-source release feed via `GET /v1/orgs/:orgRef/releases?
+ * product=…`. Cursor-paginated; the server's cursor is opaque to the CLI.
+ * Returns `null` when the org or product is unknown (the endpoint 404s), which
+ * `apiFetch` maps to `null` for GETs — distinct from a valid-but-empty product
+ * (`{ releases: [], … }`).
+ */
+export async function getProductReleases(opts: {
+  orgRef: string;
+  product: string;
+  count: number;
+  cursor?: string | null;
+  includeCoverage?: boolean;
+  since?: string;
+  until?: string;
+}): Promise<{ releases: LatestRelease[]; nextCursor: string | null } | null> {
+  const qs = new URLSearchParams();
+  qs.set("product", opts.product);
+  qs.set("limit", String(opts.count));
+  if (opts.cursor) qs.set("cursor", opts.cursor);
+  if (opts.includeCoverage) qs.set("include_coverage", "true");
+  if (opts.since) qs.set("since", opts.since);
+  if (opts.until) qs.set("until", opts.until);
+
+  const data = await apiFetch<{
+    releases: LatestReleaseWire[];
+    pagination?: { nextCursor: string | null };
+  } | null>(`/v1/orgs/${encodeURIComponent(opts.orgRef)}/releases?${qs.toString()}`);
+  if (!data) return null;
+  return {
+    releases: data.releases.map(toLatestRelease),
+    nextCursor: data.pagination?.nextCursor ?? null,
+  };
 }
 
 // ── Known releases for incremental parsing ──

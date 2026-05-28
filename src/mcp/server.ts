@@ -7,6 +7,8 @@ import {
   findOrg,
   listOrgs,
   getLatestReleases,
+  getProductReleases,
+  resolveProductFeedTarget,
   unifiedSearch,
   sourceChangelog,
   getAliases,
@@ -16,6 +18,7 @@ import {
   findProduct,
   listSourcesWithOrg,
 } from "../api/client.js";
+import type { LatestRelease } from "../api/types.js";
 import { logger } from "@releases/lib/logger";
 import { recordEvent } from "../lib/telemetry.js";
 import { VERSION } from "../cli/version.js";
@@ -120,7 +123,12 @@ server.registerTool(
   {
     description: "Get the most recent releases, optionally filtered by product or organization",
     inputSchema: {
-      product: z.string().optional().describe("Filter to a specific product slug"),
+      product: z
+        .string()
+        .optional()
+        .describe(
+          "Show one product's cross-source feed. Accepts an org/slug coordinate, a prod_… id, or a product slug.",
+        ),
       organization: z
         .string()
         .optional()
@@ -137,11 +145,28 @@ server.registerTool(
   async ({ product, organization, count }) => {
     const maxCount = count ?? 10;
 
-    let releases = await getLatestReleases({
-      source: product,
-      org: organization,
-      count: maxCount,
-    });
+    // product takes precedence — it routes to the product's cross-source feed
+    // (GET /v1/orgs/:org/releases?product=…) rather than the global latest feed.
+    let releases: LatestRelease[];
+    if (product) {
+      const target = await resolveProductFeedTarget(product);
+      const res = target
+        ? await getProductReleases({
+            orgRef: target.orgRef,
+            product: target.product,
+            count: maxCount,
+          })
+        : null;
+      // A null target (unresolvable id/slug) or null feed (unknown org/product
+      // 404) is a bad identifier — distinct from a valid product with zero
+      // releases — so say so rather than returning a misleading empty result.
+      if (!target || !res) {
+        return textResult(`No product found matching "${product}".`);
+      }
+      releases = res.releases;
+    } else {
+      releases = await getLatestReleases({ org: organization, count: maxCount });
+    }
 
     // type filter: LatestRelease doesn't carry a type field — the remote MCP worker
     // handles this natively. Silently ignored when proxying.
