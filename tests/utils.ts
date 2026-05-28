@@ -6,7 +6,7 @@ const CLI_PATH = join(import.meta.dirname, "..", "src", "index.ts");
 
 export function runCli(
   args: string[],
-  options?: { env?: Record<string, string>; timeout?: number },
+  options?: { env?: Record<string, string>; timeout?: number; input?: string },
 ): { stdout: string; stderr: string; exitCode: number } {
   // OSS CLI is remote-only — a real-looking URL must be set so the CLI starts.
   // Commands that don't hit the API (e.g. `categories`) succeed without it.
@@ -21,6 +21,7 @@ export function runCli(
     stdio: ["pipe", "pipe", "pipe"],
     env: safeEnv,
     timeout: options?.timeout ?? 30_000,
+    input: options?.input,
   });
   return {
     stdout: stripAnsi(result.stdout ?? ""),

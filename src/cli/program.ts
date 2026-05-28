@@ -38,6 +38,7 @@ import { registerOverviewCommands } from "./commands/admin/overview.js";
 import { registerWorkCommands } from "./commands/admin/work.js";
 import { registerTelemetryCommand } from "./commands/telemetry.js";
 import { registerFeedbackCommand, registerFeedbackAdminCommand } from "./commands/feedback.js";
+import { registerSubmitCommand, registerRecommendationAdminCommand } from "./commands/recommend.js";
 import { registerServeCommand } from "./commands/serve.js";
 import { registerWhoamiCommand } from "./commands/whoami.js";
 import { registerWebhookCommand } from "./commands/webhook.js";
@@ -225,6 +226,7 @@ registerShowCommand(program);
 registerCollectionReadCommands(program);
 registerTelemetryCommand(program);
 registerFeedbackCommand(program);
+registerSubmitCommand(program);
 registerWhoamiCommand(program);
 registerAuthCommand(program);
 registerAgentContextCommand(program);
@@ -292,6 +294,7 @@ registerServeCommand(mcpAdmin);
 
 registerWebhookCommand(admin);
 registerFeedbackAdminCommand(admin);
+registerRecommendationAdminCommand(admin);
 
 gateAdminSubtree(admin);
 

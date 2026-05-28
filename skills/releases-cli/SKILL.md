@@ -50,6 +50,10 @@ Two commands built for agents specifically:
 
 `releases get <source> --json` reports `hasChangelogFile` and the `changelogUrl` keyless, so you can tell whether a source maintains a checked-in CHANGELOG.md. To read the **sliced content** keyless, use the MCP's `get_catalog_entry` (with `changelog_tokens` / `nextOffset`) or fetch the `changelogUrl` directly — the CLI's `releases admin source changelog` wrapper is key-gated and won't run without auth.
 
+### Submitting a source (keyless)
+
+`releases submit <url>` suggests a changelog or release-notes URL for the registry — the same review queue the [web submit form](https://releases.sh/submit) feeds, no key required. Scheme is optional (`https://` assumed); `--note` adds context and `--contact` an optional reply email. With no argument in a TTY it prompts; it also reads a piped URL from stdin. Its sibling `releases feedback "<message>"` sends product feedback the same keyless way. Maintainers triage submissions under the key-gated `releases admin recommendations …` (see the admin reference).
+
 ## Common Mistakes
 
 - `releases list` lists sources (alias `releases sources`). Do NOT write `releases sources list` — it reads `list` as a source slug and fails with "Source not found: list".

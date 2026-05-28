@@ -211,3 +211,19 @@ releases admin mcp serve
 ```
 
 Useful for clients that only support stdio transport. For native remote MCP support (Claude Code, Codex), connect directly to `https://mcp.releases.sh/mcp` instead.
+
+## Recommendations
+
+Review and triage the source URLs that users submit keyless via `releases submit` (and the [web submit form](https://releases.sh/submit)). The submit side needs no key; only the review verbs below do.
+
+```bash
+releases admin recommendations list                          # newest first
+releases admin recommendations list --status new --type source
+releases admin recommendations list --include-archived --cursor <cursor>
+releases admin recommendations triage <id> --status closed   # new | triaged | closed
+releases admin recommendations archive <id>                  # hide from default list
+releases admin recommendations archive <id> --undo           # restore
+releases admin recommendations delete <id>                   # permanent — type the id to confirm, or --yes
+```
+
+`list` is cursor-paginated (`--limit`, follow `--cursor` from the previous page) and hides archived rows unless `--include-archived` is passed. Prefer `archive` over `delete` for a reversible removal. Recommendation ids are `rec_…`. Mirrors the `releases admin feedback …` triage surface.
