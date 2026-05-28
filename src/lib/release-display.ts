@@ -75,6 +75,10 @@ export interface ReleaseRow {
    *  where the org is already established in the surrounding output. */
   orgName?: string | null;
   orgSlug?: string | null;
+  /** Owning product, when the release's source is grouped under one. Populated
+   *  on feed rows (#1217). Drives the product-identity column the org card uses
+   *  to name *which product* shipped each release rather than the raw source. */
+  product?: { slug: string; name: string } | null;
 }
 
 /**
@@ -97,6 +101,17 @@ export function releaseIdentity(
     return `${org}/${source}`;
   }
   return source;
+}
+
+/**
+ * Product-identity column: the owning product's name, falling back to the
+ * source name (then blank) when a release has no product. Used by the org card,
+ * where naming *which product* shipped each release is more useful than the
+ * individual source — multi-product orgs (Vercel → Next.js, Turborepo) get a
+ * meaningful grouping column instead of repeating source names.
+ */
+export function releaseProductIdentity(row: Pick<ReleaseRow, "product" | "sourceName">): string {
+  return row.product?.name?.trim() || row.sourceName || "";
 }
 
 /**

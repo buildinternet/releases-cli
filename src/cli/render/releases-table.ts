@@ -4,6 +4,7 @@ import {
   type ReleaseRow,
   relativeDate,
   releaseIdentity,
+  releaseProductIdentity,
   releaseDescription,
   cleanExcerpt,
 } from "../../lib/release-display.js";
@@ -25,6 +26,15 @@ export interface RenderReleaseRowsOptions {
    * always keeps identity so pipelines stay stable.
    */
   showIdentity?: boolean;
+  /**
+   * Which value fills the identity column: `"source"` (`releaseIdentity` —
+   * `Org/Source` or a package-qualified version) or `"product"`
+   * (`releaseProductIdentity` — the owning product's name, falling back to the
+   * source). Default `"source"`. The org card passes `"product"` so its left
+   * column names *which product* shipped each release. TTY-only; the machine
+   * TSV always uses source identity so pipelines stay stable.
+   */
+  identity?: "source" | "product";
 }
 
 /** Collapse whitespace (incl. tabs/newlines) to single spaces so a search
@@ -66,6 +76,9 @@ export function renderReleaseRows(rows: ReleaseRow[], opts: RenderReleaseRowsOpt
   }
 
   const showIdentity = opts.showIdentity ?? true;
+  const identityField = opts.identity ?? "source";
+  const identityFor = (r: ReleaseRow): string =>
+    stripAnsi(identityField === "product" ? releaseProductIdentity(r) : releaseIdentity(r));
 
   const head = [
     ...(showIdentity ? [{ label: "Item", noTruncate: true }] : []),
@@ -77,7 +90,7 @@ export function renderReleaseRows(rows: ReleaseRow[], opts: RenderReleaseRowsOpt
   const tableRows = rows.map((r) => {
     const description = mode === "search" ? singleLine(stripAnsi(r.title)) : releaseDescription(r);
     const age = relativeDate(r.publishedAt);
-    const identity = stripAnsi(releaseIdentity(r));
+    const identity = identityFor(r);
     return [...(showIdentity ? [identity] : []), description, age, chalk.dim(r.id)];
   });
 

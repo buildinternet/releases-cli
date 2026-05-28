@@ -369,7 +369,9 @@ async function renderOrg(
         `Latest ${releases.length} release${releases.length === 1 ? "" : "s"} (most recent first):`,
       ),
     );
-    console.log(renderReleaseRows(releases, { mode: "feed", showIdentity: false }));
+    // Left column names the owning product (falling back to the source) so a
+    // multi-product org's feed shows *which product* each release belongs to.
+    console.log(renderReleaseRows(releases, { mode: "feed", identity: "product" }));
   }
 
   printAlignedHints([

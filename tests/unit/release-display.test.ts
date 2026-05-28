@@ -4,6 +4,7 @@ import {
   humanDate,
   cleanExcerpt,
   releaseIdentity,
+  releaseProductIdentity,
   releaseDescription,
 } from "../../src/lib/release-display.js";
 
@@ -90,6 +91,33 @@ describe("releaseIdentity", () => {
     expect(
       releaseIdentity({ version: "next@15.0.0", sourceName: "Next.js", orgName: "Vercel" }),
     ).toBe("next@15.0.0");
+  });
+});
+
+describe("releaseProductIdentity", () => {
+  it("uses the owning product's name when present", () => {
+    expect(
+      releaseProductIdentity({
+        product: { slug: "next-js", name: "Next.js" },
+        sourceName: "Next.js Releases",
+      }),
+    ).toBe("Next.js");
+  });
+  it("trims the product name", () => {
+    expect(
+      releaseProductIdentity({ product: { slug: "p", name: "  Turborepo  " }, sourceName: "S" }),
+    ).toBe("Turborepo");
+  });
+  it("falls back to the source name when there is no product", () => {
+    expect(releaseProductIdentity({ product: null, sourceName: "Standalone Source" })).toBe(
+      "Standalone Source",
+    );
+    expect(releaseProductIdentity({ product: undefined, sourceName: "Standalone Source" })).toBe(
+      "Standalone Source",
+    );
+  });
+  it("returns empty string when neither product nor source name is set", () => {
+    expect(releaseProductIdentity({ product: null, sourceName: "" })).toBe("");
   });
 });
 
