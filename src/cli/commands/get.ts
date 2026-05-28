@@ -6,6 +6,7 @@ import {
   findProduct,
   getRelease,
   getLatestReleases,
+  getProductReleases,
   getOrgCollections,
   getSourcesByOrg,
   getProductsByOrg,
@@ -352,13 +353,24 @@ async function renderProduct(
   opts: GetEntityOpts,
 ) {
   // Pull related context concurrently. Each individually-degradable so a
-  // single endpoint failure can't blank the product card.
-  const [org, orgProducts, orgSources, tags] = await Promise.all([
+  // single endpoint failure can't blank the product card. The release preview
+  // uses the product's cross-source feed (GET /v1/orgs/:org/releases?product=…)
+  // so products — now the primary unit — show recent activity inline instead of
+  // forcing a round-trip into the org feed or a single source. The typed
+  // `prod_…` id is globally unique, so it routes unambiguously regardless of
+  // slug collisions across orgs.
+  const [org, orgProducts, orgSources, tags, productFeed] = await Promise.all([
     findOrg(product.orgId).catch(() => null),
     getProductsByOrg(product.orgId).catch(() => []),
     getSourcesByOrg(product.orgId).catch<Source[]>(() => []),
     getTagsForProduct(product.id).catch(() => []),
+    getProductReleases({
+      orgRef: product.orgId,
+      product: product.id,
+      count: PREVIEW_RELEASE_COUNT,
+    }).catch(() => null),
   ]);
+  const releases = productFeed?.releases ?? [];
 
   // /v1/sources?orgId=… returns the SourceWithOrg projection, which carries
   // productSlug/productName but not productId — match on slug to keep this
@@ -376,6 +388,7 @@ async function renderProduct(
       sources: productSources,
       sourceCount,
       tags,
+      releases,
     });
     return;
   }
@@ -400,21 +413,33 @@ async function renderProduct(
     console.log(`  Sources:   ${chalk.dim("none")}`);
   }
 
-  // No product-scoped "latest releases" endpoint today (releases/latest takes
-  // org or source, not product). Surface the workaround commands directly so
-  // the user doesn't have to discover them — releases-per-org gives the
-  // closest mixed feed, releases-per-source the per-source feed.
+  console.log("");
+  if (releases.length === 0) {
+    console.log(chalk.dim("No releases yet."));
+  } else {
+    console.log(
+      chalk.dim(
+        `Latest ${releases.length} release${releases.length === 1 ? "" : "s"} (most recent first):`,
+      ),
+    );
+    console.log(renderReleaseRows(releases, { mode: "feed" }));
+  }
+
+  // Point at the product's own cross-source feed first — products are the
+  // primary unit, so the full release feed should be the obvious next step,
+  // not an org-scoped feed that mixes sibling products. Prefer the `org/slug`
+  // coordinate (bare slugs are per-org-unique since #698) and fall back to the
+  // bare slug when the org didn't resolve.
+  const productRef = org ? `${org.slug}/${product.slug}` : product.slug;
   printFooterHint(
     [
-      org
-        ? `releases list --org ${org.slug}              — release feed (org-scoped; mixes other products)`
-        : "",
+      `releases latest --product ${productRef}        — full release feed for this product`,
       // Use the typed source ID rather than the bare slug — bare slugs are
       // per-org-unique since #698, so the same slug under a different org
       // could misroute this example. Typed `src_…` IDs stay globally unique
       // and resolve via the bare path regardless of org.
       productSources.length > 0
-        ? `releases get ${productSources[0]!.id}        — drill into a source for its release feed`
+        ? `releases get ${productSources[0]!.id}        — drill into one source's feed`
         : "",
     ].filter(Boolean),
   );
