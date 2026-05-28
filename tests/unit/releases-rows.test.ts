@@ -38,10 +38,10 @@ describe("renderReleaseRows (feed)", () => {
     const lines = out.split("\n");
     expect(lines).toHaveLength(2);
     expect(lines[0].startsWith("@posthog/nuxt@1.7.42")).toBe(true);
-    expect(lines[0]).toContain("Bump @posthog/cli to 0.7.13");
+    expect(lines[0]).toContain("Bump cli"); // title wins over summary (title-first)
     expect(lines[0]).toContain("rel_1");
     expect(lines[1].startsWith("PostHog ")).toBe(true); // plain version → source name
-    expect(lines[1]).toContain("Agent skills v0.107.0"); // summary null → title fallback
+    expect(lines[1]).toContain("Agent skills v0.107.0"); // title
   });
 
   it("non-TTY: clean TSV, one row per release, no injected newline", () => {
@@ -49,6 +49,49 @@ describe("renderReleaseRows (feed)", () => {
     const lines = out.split("\n");
     expect(lines).toHaveLength(2);
     expect(lines[0].split("\t")[0]).toBe("rel_1");
+  });
+
+  const productRows: ReleaseRow[] = [
+    {
+      id: "rel_p1",
+      title: "Turbopack is now stable",
+      version: null,
+      summary: null,
+      publishedAt: null,
+      sourceName: "Vercel CLI", // deliberately distinct from the product name
+      sourceSlug: "vercel-cli",
+      product: { slug: "next-js", name: "Next.js" },
+    },
+    {
+      id: "rel_p2",
+      title: "Standalone note",
+      version: null,
+      summary: null,
+      publishedAt: null,
+      sourceName: "Orphan Source",
+      sourceSlug: "orphan",
+      product: null,
+    },
+  ];
+
+  it("TTY: identity:'product' leads with the owning product name, falling back to the source", () => {
+    const out = stripAnsi(
+      renderReleaseRows(productRows, {
+        mode: "feed",
+        isTTY: true,
+        maxWidth: 100,
+        identity: "product",
+      }),
+    );
+    const lines = out.split("\n");
+    expect(lines[0].startsWith("Next.js")).toBe(true); // product name, not the source
+    expect(lines[1].startsWith("Orphan Source")).toBe(true); // no product → source name
+  });
+
+  it("non-TTY: identity:'product' keeps source identity in the TSV (pipeline stability)", () => {
+    const tsv = renderReleaseRows(productRows, { mode: "feed", isTTY: false, identity: "product" });
+    // The machine TSV always uses source identity so pipelines stay stable.
+    expect(tsv.split("\n")[0].split("\t")[1]).toBe("Vercel CLI");
   });
 });
 

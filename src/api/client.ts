@@ -395,6 +395,9 @@ export async function unifiedSearch(
   opts?: {
     org?: string;
     domain?: string;
+    /** Product identifier (org/slug coordinate, prod_… id, or product slug);
+     *  scopes hits to that product's sources. Resolved server-side (#1218). */
+    product?: string;
     mode?: "lexical" | "semantic" | "hybrid";
     kind?: Kind;
     /** ISO date or relative shorthand (90d/4w/6m/2y); resolved server-side. */
@@ -405,6 +408,7 @@ export async function unifiedSearch(
   const params = new URLSearchParams({ q: query, limit: String(limit) });
   if (opts?.org) params.set("org", opts.org);
   if (opts?.domain) params.set("domain", opts.domain);
+  if (opts?.product) params.set("product", opts.product);
   if (opts?.mode) params.set("mode", opts.mode);
   if (opts?.kind) params.set("kind", opts.kind);
   if (opts?.since) params.set("since", opts.since);
@@ -693,6 +697,7 @@ type LatestReleaseWire = {
   publishedAt: string | null;
   media: Array<{ type: string; url: string; alt?: string; r2Url?: string }>;
   source: { slug: string; name: string; type: string };
+  product?: { slug: string; name: string } | null;
 };
 
 // `titleGenerated`/`titleShort`/`contentChars`/`contentTokens` are carried so
@@ -712,6 +717,7 @@ function toLatestRelease(r: LatestReleaseWire): LatestRelease {
     contentChars: r.contentChars ?? null,
     contentTokens: r.contentTokens ?? null,
     media: toMediaItems(r.media),
+    product: r.product ?? null,
   };
 }
 

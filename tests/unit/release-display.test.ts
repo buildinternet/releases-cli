@@ -4,6 +4,7 @@ import {
   humanDate,
   cleanExcerpt,
   releaseIdentity,
+  releaseProductIdentity,
   releaseDescription,
 } from "../../src/lib/release-display.js";
 
@@ -93,6 +94,33 @@ describe("releaseIdentity", () => {
   });
 });
 
+describe("releaseProductIdentity", () => {
+  it("uses the owning product's name when present", () => {
+    expect(
+      releaseProductIdentity({
+        product: { slug: "next-js", name: "Next.js" },
+        sourceName: "Next.js Releases",
+      }),
+    ).toBe("Next.js");
+  });
+  it("trims the product name", () => {
+    expect(
+      releaseProductIdentity({ product: { slug: "p", name: "  Turborepo  " }, sourceName: "S" }),
+    ).toBe("Turborepo");
+  });
+  it("falls back to the source name when there is no product", () => {
+    expect(releaseProductIdentity({ product: null, sourceName: "Standalone Source" })).toBe(
+      "Standalone Source",
+    );
+    expect(releaseProductIdentity({ product: undefined, sourceName: "Standalone Source" })).toBe(
+      "Standalone Source",
+    );
+  });
+  it("returns empty string when neither product nor source name is set", () => {
+    expect(releaseProductIdentity({ product: null, sourceName: "" })).toBe("");
+  });
+});
+
 describe("releaseDescription", () => {
   const base = {
     id: "rel_x",
@@ -103,15 +131,21 @@ describe("releaseDescription", () => {
     sourceName: "S",
     sourceSlug: "s",
   };
-  it("prefers summary, cleaned", () => {
-    expect(releaseDescription({ ...base, summary: "**Bold** summary" })).toBe("Bold summary");
-  });
-  it("falls back through titleShort → titleGenerated → content excerpt → title", () => {
+  it("prefers an AI headline (titleShort → titleGenerated) over the raw title", () => {
     expect(releaseDescription({ ...base, titleShort: "Short" })).toBe("Short");
     expect(releaseDescription({ ...base, titleGenerated: "Generated" })).toBe("Generated");
-    expect(releaseDescription({ ...base, content: "## Heading\nbody text" })).toBe(
+  });
+  it("prefers the title over the summary and content (feed summaries are often raw excerpts)", () => {
+    expect(releaseDescription({ ...base, summary: "**Bold** summary" })).toBe("Raw Title");
+    expect(releaseDescription({ ...base, content: "## Heading\nbody text" })).toBe("Raw Title");
+    expect(releaseDescription({ ...base })).toBe("Raw Title");
+  });
+  it("falls back to summary then content for titleless rows, cleaned", () => {
+    expect(releaseDescription({ ...base, title: "", summary: "**Bold** summary" })).toBe(
+      "Bold summary",
+    );
+    expect(releaseDescription({ ...base, title: "", content: "## Heading\nbody text" })).toBe(
       "Heading body text",
     );
-    expect(releaseDescription({ ...base })).toBe("Raw Title");
   });
 });

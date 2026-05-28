@@ -75,6 +75,10 @@ export interface ReleaseRow {
    *  where the org is already established in the surrounding output. */
   orgName?: string | null;
   orgSlug?: string | null;
+  /** Owning product, when the release's source is grouped under one. Populated
+   *  on feed rows (#1217). Drives the product-identity column the org card uses
+   *  to name *which product* shipped each release rather than the raw source. */
+  product?: { slug: string; name: string } | null;
 }
 
 /**
@@ -99,14 +103,34 @@ export function releaseIdentity(
   return source;
 }
 
-/** Description column: summary → titleShort → titleGenerated → cleaned content excerpt → title. Always cleaned. */
+/**
+ * Product-identity column: the owning product's name, falling back to the
+ * source name (then blank) when a release has no product. Used by the org card,
+ * where naming *which product* shipped each release is more useful than the
+ * individual source — multi-product orgs (Vercel → Next.js, Turborepo) get a
+ * meaningful grouping column instead of repeating source names.
+ */
+export function releaseProductIdentity(row: Pick<ReleaseRow, "product" | "sourceName">): string {
+  return row.product?.name?.trim() || row.sourceName || "";
+}
+
+/**
+ * Description column: titleShort → titleGenerated → title → summary → cleaned
+ * content excerpt. Always cleaned.
+ *
+ * The title family ranks above the summary on purpose. Feed surfaces frequently
+ * serve a raw content excerpt in the `summary` field when a release has no
+ * curated AI summary yet (e.g. "New Anthropic Labs product that lets you
+ * collaborate…"), which buries the far more useful title ("Claude Design by
+ * Anthropic Labs"). An AI headline (titleShort/titleGenerated) is preferred
+ * over the raw title when present; summary/content remain fallbacks for
+ * titleless rows.
+ */
 export function releaseDescription(row: ReleaseRow): string {
-  const candidates = [row.summary, row.titleShort, row.titleGenerated];
+  const candidates = [row.titleShort, row.titleGenerated, row.title, row.summary, row.content];
   for (const c of candidates) {
     const cleaned = cleanExcerpt(c);
     if (cleaned) return cleaned;
   }
-  const fromContent = cleanExcerpt(row.content);
-  if (fromContent) return fromContent;
-  return cleanExcerpt(row.title) || row.title;
+  return row.title || "";
 }

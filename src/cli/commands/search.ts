@@ -122,6 +122,10 @@ export function registerSearchCommand(program: Command) {
       "Scope to the org owning this domain (URL-shaped input is normalized)",
     )
     .option(
+      "--product <identifier>",
+      "Scope hits to one product's sources (org/slug coordinate, prod_… id, or product slug)",
+    )
+    .option(
       "--kind <kind>",
       `Filter by taxonomy (${KIND_VALUES.join(", ")}). Release hits use COALESCE(source.kind, product.kind); catalog hits match the row's own kind only.`,
     )
@@ -142,6 +146,7 @@ Examples:
   releases search "breaking change"               Full-text + semantic search
   releases search "breaking change" --kind sdk    Narrow to SDK sources
   releases search "slack integration" --since 90d Only hits from the last 90 days
+  releases search webhooks --product vercel/next-js   Scope a term to one product
   releases search vercel --type orgs              Show only org matches
   releases search shopify/hydrogen                Coordinate lookup (GitHub)`,
     )
@@ -153,6 +158,7 @@ Examples:
           type?: string;
           mode?: string;
           domain?: string;
+          product?: string;
           kind?: string;
           since?: string;
           until?: string;
@@ -197,12 +203,14 @@ Examples:
         const searchOpts: {
           mode?: SearchMode;
           domain?: string;
+          product?: string;
           kind?: Kind;
           since?: string;
           until?: string;
         } = {};
         if (mode) searchOpts.mode = mode;
         if (opts.domain) searchOpts.domain = opts.domain;
+        if (opts.product) searchOpts.product = opts.product;
         if (kind) searchOpts.kind = kind;
         if (since) searchOpts.since = since;
         if (until) searchOpts.until = until;
@@ -219,6 +227,22 @@ Examples:
           } else if (response.domainStatus === "matched") {
             const scopedOrgName = response.orgs[0]?.name ?? scopedDomain;
             logger.info(`Scoped to ${scopedOrgName} (${scopedDomain}).`);
+          }
+        }
+
+        // `?product=` echo mirrors `?domain=`, but #1218 added no api-types
+        // shape for it — read the fields loosely (same pattern as the legacy
+        // `products`/`collections` reads below) until the wire type lands.
+        const productEcho = response as unknown as {
+          product?: string;
+          productStatus?: "matched" | "not_found";
+        };
+        if (!opts.json && productEcho.productStatus !== undefined) {
+          const scopedProduct = productEcho.product ?? opts.product;
+          if (productEcho.productStatus === "not_found") {
+            logger.warn(`No product matching "${scopedProduct}". Showing no results.`);
+          } else if (productEcho.productStatus === "matched") {
+            logger.info(`Scoped to product ${scopedProduct}.`);
           }
         }
 
@@ -262,6 +286,9 @@ Examples:
             filtered.degradedReason = response.degradedReason;
           if (response.domain !== undefined) filtered.domain = response.domain;
           if (response.domainStatus !== undefined) filtered.domainStatus = response.domainStatus;
+          if (productEcho.product !== undefined) filtered.product = productEcho.product;
+          if (productEcho.productStatus !== undefined)
+            filtered.productStatus = productEcho.productStatus;
           if (response.lookup != null) filtered.lookup = response.lookup;
           await writeJson(filtered);
           return;
