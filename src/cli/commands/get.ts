@@ -339,12 +339,13 @@ async function renderOrg(
   if (org.description) console.log(`  About:       ${stripAnsi(org.description)}`);
   if (tags.length > 0) console.log(`  Tags:        ${tags.join(", ")}`);
   if (sources.length > 0) {
+    // Status breakdown only — the bare total is redundant with the parts (and
+    // the active count is the part that actually carries signal).
     const breakdown: string[] = [];
     if (activeSources) breakdown.push(`${activeSources} active`);
     if (erroringSources) breakdown.push(chalk.yellow(`${erroringSources} erroring`));
     if (hiddenSources) breakdown.push(chalk.dim(`${hiddenSources} hidden`));
-    const suffix = breakdown.length > 0 ? ` — ${breakdown.join(", ")}` : "";
-    console.log(`  Sources:     ${sources.length}${suffix}`);
+    if (breakdown.length > 0) console.log(`  Sources:     ${breakdown.join(", ")}`);
   }
   if (products.length > 0) {
     const names = products
@@ -352,7 +353,7 @@ async function renderOrg(
       .map((p) => `${p.name} ${chalk.dim(`(${p.slug})`)}`)
       .join(", ");
     const more = products.length > 5 ? chalk.dim(` +${products.length - 5} more`) : "";
-    console.log(`  Products:    ${products.length} — ${names}${more}`);
+    console.log(`  Products:    ${names}${more}`);
   }
   if (collections.length > 0) {
     const labels = collections.map((c) => `${c.name} ${chalk.dim(`(${c.slug})`)}`).join(", ");
@@ -443,13 +444,14 @@ async function renderProduct(
   if (product.category) console.log(`  Category: ${product.category}`);
   if (product.description) console.log(`  About:    ${stripAnsi(product.description)}`);
   if (tags.length > 0) console.log(`  Tags:     ${tags.join(", ")}`);
-  if (sourceCount > 0) {
+  if (productSources.length > 0) {
+    // List the source slugs (the count is redundant — you can see them).
     const preview = productSources
       .slice(0, 5)
       .map((s) => chalk.dim(`(${s.slug})`))
       .join(" ");
     const more = productSources.length > 5 ? chalk.dim(` +${productSources.length - 5}`) : "";
-    console.log(`  Sources:  ${sourceCount} ${preview}${more}`);
+    console.log(`  Sources:  ${preview}${more}`);
   }
 
   console.log("");
