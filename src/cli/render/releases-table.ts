@@ -15,6 +15,16 @@ export interface RenderReleaseRowsOptions {
   mode?: ReleaseRowMode;
   isTTY?: boolean;
   maxWidth?: number;
+  /**
+   * Show the leading identity column (source / `Org/Source` / package version).
+   * Default true. Entity cards (`get <org|product|source>`) pass `false`: the
+   * owning entity is already in the card header, so the per-row source name is
+   * redundant — dropping it gives the title-bearing description column full
+   * width (and avoids "Claude by Anthropic │ Claude by Anthropic 1.2…" repeats
+   * for App Store-style rows). Only affects the TTY layout; the machine TSV
+   * always keeps identity so pipelines stay stable.
+   */
+  showIdentity?: boolean;
 }
 
 /** Collapse whitespace (incl. tabs/newlines) to single spaces so a search
@@ -29,8 +39,10 @@ function singleLine(s: string): string {
  * Both produce the same column-aligned grid (identity / description / age /
  * dimmed id); `search` puts the release title in the description column and
  * adds a cleaned, markdown-stripped excerpt as an aligned continuation line
- * (TTY only). `feed` uses the summary→…→title fallback as the description and
- * has no continuation. Non-TTY: feed → bare TSV; search → one plain line/hit.
+ * (TTY only). `feed` uses the title→…→summary fallback as the description and
+ * has no continuation. The leading identity column can be dropped via
+ * `showIdentity: false` (entity cards, where the source is already in the
+ * header). Non-TTY: feed → bare TSV; search → one plain line/hit.
  */
 export function renderReleaseRows(rows: ReleaseRow[], opts: RenderReleaseRowsOptions = {}): string {
   const mode = opts.mode ?? "feed";
@@ -53,18 +65,20 @@ export function renderReleaseRows(rows: ReleaseRow[], opts: RenderReleaseRowsOpt
       .join("\n");
   }
 
+  const showIdentity = opts.showIdentity ?? true;
+
   const head = [
-    { label: "Item", noTruncate: true },
+    ...(showIdentity ? [{ label: "Item", noTruncate: true }] : []),
     { label: "Description" },
     { label: "Age", noTruncate: true },
     { label: "ID", noTruncate: true },
   ];
 
   const tableRows = rows.map((r) => {
-    const identity = stripAnsi(releaseIdentity(r));
     const description = mode === "search" ? singleLine(stripAnsi(r.title)) : releaseDescription(r);
     const age = relativeDate(r.publishedAt);
-    return [identity, description, age, chalk.dim(r.id)];
+    const identity = stripAnsi(releaseIdentity(r));
+    return [...(showIdentity ? [identity] : []), description, age, chalk.dim(r.id)];
   });
 
   const subRows =

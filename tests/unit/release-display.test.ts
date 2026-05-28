@@ -103,15 +103,21 @@ describe("releaseDescription", () => {
     sourceName: "S",
     sourceSlug: "s",
   };
-  it("prefers summary, cleaned", () => {
-    expect(releaseDescription({ ...base, summary: "**Bold** summary" })).toBe("Bold summary");
-  });
-  it("falls back through titleShort → titleGenerated → content excerpt → title", () => {
+  it("prefers an AI headline (titleShort → titleGenerated) over the raw title", () => {
     expect(releaseDescription({ ...base, titleShort: "Short" })).toBe("Short");
     expect(releaseDescription({ ...base, titleGenerated: "Generated" })).toBe("Generated");
-    expect(releaseDescription({ ...base, content: "## Heading\nbody text" })).toBe(
+  });
+  it("prefers the title over the summary and content (feed summaries are often raw excerpts)", () => {
+    expect(releaseDescription({ ...base, summary: "**Bold** summary" })).toBe("Raw Title");
+    expect(releaseDescription({ ...base, content: "## Heading\nbody text" })).toBe("Raw Title");
+    expect(releaseDescription({ ...base })).toBe("Raw Title");
+  });
+  it("falls back to summary then content for titleless rows, cleaned", () => {
+    expect(releaseDescription({ ...base, title: "", summary: "**Bold** summary" })).toBe(
+      "Bold summary",
+    );
+    expect(releaseDescription({ ...base, title: "", content: "## Heading\nbody text" })).toBe(
       "Heading body text",
     );
-    expect(releaseDescription({ ...base })).toBe("Raw Title");
   });
 });

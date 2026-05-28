@@ -277,7 +277,7 @@ async function renderSource(rawSource: unknown, opts: GetEntityOpts) {
         `Latest ${latest.length} release${latest.length === 1 ? "" : "s"} (most recent first):`,
       ),
     );
-    console.log(renderReleaseRows(latest, { mode: "feed" }));
+    console.log(renderReleaseRows(latest, { mode: "feed", showIdentity: false }));
   }
 
   printAlignedHints([
@@ -368,7 +368,7 @@ async function renderOrg(
         `Latest ${releases.length} release${releases.length === 1 ? "" : "s"} (most recent first):`,
       ),
     );
-    console.log(renderReleaseRows(releases, { mode: "feed" }));
+    console.log(renderReleaseRows(releases, { mode: "feed", showIdentity: false }));
   }
 
   printAlignedHints([
@@ -461,7 +461,7 @@ async function renderProduct(
         `Latest ${releases.length} release${releases.length === 1 ? "" : "s"} (most recent first):`,
       ),
     );
-    console.log(renderReleaseRows(releases, { mode: "feed" }));
+    console.log(renderReleaseRows(releases, { mode: "feed", showIdentity: false }));
   }
 
   // Lead with the product's own cross-source feed — products are the primary

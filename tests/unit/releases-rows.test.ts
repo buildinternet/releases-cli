@@ -38,10 +38,10 @@ describe("renderReleaseRows (feed)", () => {
     const lines = out.split("\n");
     expect(lines).toHaveLength(2);
     expect(lines[0].startsWith("@posthog/nuxt@1.7.42")).toBe(true);
-    expect(lines[0]).toContain("Bump @posthog/cli to 0.7.13");
+    expect(lines[0]).toContain("Bump cli"); // title wins over summary (title-first)
     expect(lines[0]).toContain("rel_1");
     expect(lines[1].startsWith("PostHog ")).toBe(true); // plain version → source name
-    expect(lines[1]).toContain("Agent skills v0.107.0"); // summary null → title fallback
+    expect(lines[1]).toContain("Agent skills v0.107.0"); // title
   });
 
   it("non-TTY: clean TSV, one row per release, no injected newline", () => {
