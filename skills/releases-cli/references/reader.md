@@ -132,6 +132,21 @@ releases lookup domain vercel.com
 releases lookup domain https://tailwindcss.com/blog
 ```
 
+## Submit a source
+
+Suggest a changelog or release-notes URL for the registry (keyless — no account or key). This feeds the same review queue as the [web submit form](https://releases.sh/submit); maintainers triage it under the key-gated `releases admin recommendations …`.
+
+```bash
+releases submit https://acme.dev/changelog                  # one-shot
+releases submit acme.dev/changelog                          # scheme optional — https:// is assumed
+releases submit                                             # prompt for the URL (interactive)
+echo "https://acme.dev/releases" | releases submit          # pipe from stdin
+releases submit https://acme.dev/changelog --note "GitHub: acme/acme" --contact you@example.com
+releases submit https://acme.dev/changelog --dry-run --json # preview the payload, send nothing
+```
+
+`--note` carries extra context (product name, GitHub repo, feed quirks); `--contact` is an optional email to notify once it's reviewed. With no URL argument in an interactive terminal, `submit` prompts for the URL (and the optional note/contact); otherwise pass it inline or pipe via stdin. Index pages, changelogs, GitHub releases, and feed URLs are all ideal.
+
 ## Agent self-discovery
 
 ```bash

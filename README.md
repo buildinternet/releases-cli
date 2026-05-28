@@ -76,6 +76,7 @@ releases get vercel                      # org, product, or source
 releases get org_abc123                  # typed IDs are accepted
 releases org overview vercel             # full AI-generated overview for an org
 releases stats
+releases submit https://acme.dev/changelog        # suggest a source for the registry
 releases feedback "great tool, here's an idea…"   # send feedback to the maintainers
 ```
 
@@ -102,6 +103,21 @@ releases feedback "draft" --dry-run --json                    # preview the payl
 ```
 
 With no message argument in an interactive terminal, `feedback` prompts for the text (and an optional contact); otherwise pass it inline or pipe via stdin. `--type` accepts `bug`, `idea`, or `other`. Maintainers with admin access review submissions via `releases admin feedback list` (filter by `--type` / `--status`, `--include-archived`, paginate with `--cursor`) and triage them: `releases admin feedback triage <id> --status closed`, `releases admin feedback archive <id>` (`--undo` to restore), and `releases admin feedback delete <id>` (permanent — type the id to confirm, or pass `--yes`).
+
+### Submit a source
+
+Suggest a changelog or release-notes URL for the registry — the same review queue the [web submit form](https://releases.sh/submit) feeds. No API key or account required:
+
+```bash
+releases submit https://acme.dev/changelog                       # one-shot
+releases submit acme.dev/changelog                               # scheme optional — https:// is assumed
+releases submit                                                  # prompt for the URL (interactive)
+echo "https://acme.dev/releases" | releases submit               # pipe from stdin
+releases submit https://acme.dev/changelog --note "GitHub: acme/acme" --contact you@example.com
+releases submit https://acme.dev/changelog --dry-run --json      # preview the payload, send nothing
+```
+
+Index pages, changelogs, GitHub releases, and feed URLs are all ideal. `--note` carries extra context (product name, GitHub repo, feed quirks) and `--contact` is an optional email to notify once it's reviewed. With no URL argument in an interactive terminal, `submit` prompts for it (and the optional note/contact); otherwise pass it inline or pipe via stdin. Maintainers with admin access review the queue via `releases admin recommendations list` (filter by `--status` / `--type`, `--include-archived`, paginate with `--cursor`) and triage them: `releases admin recommendations triage <id> --status closed`, `releases admin recommendations archive <id>` (`--undo` to restore), and `releases admin recommendations delete <id>` (permanent — type the id to confirm, or pass `--yes`).
 
 ### MCP
 
