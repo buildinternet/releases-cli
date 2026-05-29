@@ -11,12 +11,11 @@ import {
 import { sourceNotFound } from "../suggest.js";
 import { toSlug } from "@buildinternet/releases-core/slug";
 import { isValidKind, KIND_VALUES, type Kind } from "@buildinternet/releases-core/kinds";
+import { SOURCE_TYPES } from "@buildinternet/releases-core/source-enums";
 import { logger } from "@releases/lib/logger";
 import { writeJson } from "../../lib/output.js";
 import { readContentArg } from "../../lib/input.js";
 import { parseMetadataSetFlag } from "../../lib/flags.js";
-
-const VALID_TYPES = ["github", "scrape", "feed", "agent"] as const;
 
 function inferFeedTypeFromUrl(url: string): "rss" | "atom" | "jsonfeed" {
   const lower = url.toLowerCase();
@@ -99,9 +98,9 @@ export async function updateSourceAction(
   const source = await findSource(identifier);
   if (!source) return sourceNotFound(identifier);
 
-  if (opts.type && !(VALID_TYPES as readonly string[]).includes(opts.type)) {
+  if (opts.type && !(SOURCE_TYPES as readonly string[]).includes(opts.type)) {
     console.error(
-      chalk.red(`Invalid type "${opts.type}". Must be one of: ${VALID_TYPES.join(", ")}`),
+      chalk.red(`Invalid type "${opts.type}". Must be one of: ${SOURCE_TYPES.join(", ")}`),
     );
     process.exit(1);
   }

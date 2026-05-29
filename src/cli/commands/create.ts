@@ -9,16 +9,20 @@ import {
   findProduct,
 } from "../../api/client.js";
 import { toSlug } from "@buildinternet/releases-core/slug";
+import { SOURCE_TYPES, type SourceType } from "@buildinternet/releases-core/source-enums";
 import { logger } from "@releases/lib/logger";
 import { writeJson } from "../../lib/output.js";
 import { readContentArg } from "../../lib/input.js";
-
-const VALID_TYPES = ["github", "scrape", "feed", "agent"] as const;
-type SourceType = (typeof VALID_TYPES)[number];
+import { isAppStoreUrl, isAppStoreCoordinate } from "./create-appstore.js";
 
 function isValidType(t: string): t is SourceType {
-  return (VALID_TYPES as readonly string[]).includes(t);
+  return (SOURCE_TYPES as readonly string[]).includes(t);
 }
+
+const APPSTORE_REDIRECT =
+  "App Store sources use a dedicated command: `releases admin source create-appstore <url-or-id>` " +
+  "(it resolves the listing, mints the first release, and backfills the app icon). " +
+  "`source create` cannot materialize them.";
 
 export function isGitHubUrl(url: string): boolean {
   return /^https?:\/\/(www\.)?github\.com\/[^/]+\/[^/]+/.test(url);
@@ -59,7 +63,7 @@ async function createSingleSource(input: CreateSourceInput): Promise<CreateSourc
       type: input.type,
       url,
       status: "error",
-      error: `Invalid type "${input.type}". Must be one of: ${VALID_TYPES.join(", ")}`,
+      error: `Invalid type "${input.type}". Must be one of: ${SOURCE_TYPES.join(", ")}`,
     };
   }
 
@@ -84,6 +88,23 @@ async function createSingleSource(input: CreateSourceInput): Promise<CreateSourc
     if (sourceType === "github") {
       logger.info("Detected GitHub URL — using github adapter");
     }
+  }
+
+  // App Store sources can't be materialized through the generic create path —
+  // they need the dedicated endpoint that resolves the iTunes listing, mints
+  // the first release, and backfills the app icon. Reject an explicit
+  // `--type appstore`, a pasted `apps.apple.com` URL (which would otherwise be
+  // mis-detected as `scrape`), or an `appstore:<id>` coordinate, pointing the
+  // caller at `create-appstore`.
+  if (sourceType === "appstore" || isAppStoreUrl(url) || isAppStoreCoordinate(url)) {
+    return {
+      name,
+      slug,
+      type: "appstore",
+      url,
+      status: "error",
+      error: APPSTORE_REDIRECT,
+    };
   }
 
   // Pre-check for duplicate URL BEFORE any side-effecting calls (createOrg,
@@ -428,7 +449,7 @@ function attachCreateOptions(cmd: Command): Command {
     .argument("[name]", "Display name for the source")
     .option(
       "--type <type>",
-      "Source type: github, scrape, feed, or agent (auto-detected from URL if omitted)",
+      "Source type: github, scrape, feed, or agent (auto-detected from URL if omitted). App Store apps use `source create-appstore`.",
     )
     .option("--url <url>", "URL of the source")
     .option("--slug <slug>", "Custom slug (auto-derived from name if omitted)")
