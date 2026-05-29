@@ -34,6 +34,7 @@ import type {
   EvaluationResult,
   MediaItem,
   OrgDependentsResponse,
+  AppStoreMaterializeResponse,
 } from "./types.js";
 import type { ListResponse } from "@buildinternet/releases-core/cli-contracts";
 import type {
@@ -936,28 +937,13 @@ export async function createSource(data: {
 }
 
 /**
- * Response from `POST /v1/sources/appstore`. The endpoint materializes an App
- * Store listing into a curated Org → Product → Source → first Release;
- * `source` is the bare sources row it returns verbatim. `status: "indexed"` is
- * a new source (HTTP 201), `"existing"` an idempotent hit on a prior
- * materialize of the same trackId (HTTP 200).
- *
- * Mirrors api-types `AppStoreMaterializeResponse` (added in
- * `@buildinternet/releases-api-types@0.24.0`); declared locally until this
- * CLI's pin is bumped to ^0.24.0 — the same bridge pattern as
- * `CollectionReleaseItemCli` and the `recommend`/`feedback` locals.
- */
-export interface AppStoreMaterializeResult {
-  status: "indexed" | "existing";
-  source: Source;
-  releaseCount: number;
-}
-
-/**
- * Materialize an App Store source. Pass exactly one of `url`
- * (`apps.apple.com/.../id<trackId>`) or `trackId` (bare numeric). The endpoint
- * resolves the listing via the iTunes Lookup API, so writes should stay serial:
- * concurrent POSTs for a brand-new org/product race on `UNIQUE(org_id, slug)`.
+ * Materialize an App Store source via `POST /v1/sources/appstore`. Pass exactly
+ * one of `url` (`apps.apple.com/.../id<trackId>`) or `trackId` (bare numeric).
+ * The endpoint resolves the listing via the iTunes Lookup API, mints the first
+ * release, and backfills the product avatar, returning the source row;
+ * `status: "indexed"` is a new source, `"existing"` an idempotent hit on a
+ * prior materialize of the same trackId. Writes should stay serial: concurrent
+ * POSTs for a brand-new org/product race on `UNIQUE(org_id, slug)`.
  */
 export async function createAppStoreSource(params: {
   url?: string;
@@ -966,12 +952,12 @@ export async function createAppStoreSource(params: {
   storefront?: string;
   orgSlug?: string;
   productSlug?: string;
-}): Promise<AppStoreMaterializeResult> {
+}): Promise<AppStoreMaterializeResponse> {
   // Strip undefined/null so optional fields don't reach the API as explicit nulls.
   const body = Object.fromEntries(
     Object.entries(params).filter(([, v]) => v !== null && v !== undefined),
   );
-  return apiFetch<AppStoreMaterializeResult>("/v1/sources/appstore", {
+  return apiFetch<AppStoreMaterializeResponse>("/v1/sources/appstore", {
     method: "POST",
     body: JSON.stringify(body),
   });
