@@ -40,7 +40,7 @@ releases admin source create "Linear" --url https://linear.app/changelog --dry-r
 
 `--dry-run` still runs the URL dedup and exclusion checks (so you'll see "already exists" or "blocked URL" outcomes), but skips the write — including the auto-create-org side effect when `--org <name>` doesn't resolve.
 
-By default, `create` runs automated pre-checks (provider detection, feed discovery, markdown probing). Override with `--type github|scrape|feed|agent`. Batch mode (`--batch`) skips evaluation by default for speed.
+By default, `create` runs automated pre-checks (provider detection, feed discovery, markdown probing). Override with `--type github|scrape|feed|agent`. Batch mode (`--batch`) skips evaluation by default for speed. App Store apps use the dedicated `source create-appstore` verb (below) — `create` rejects `--type appstore` and pasted `apps.apple.com` URLs with a pointer to it.
 
 Provide a feed URL explicitly when it isn't easily discoverable:
 
@@ -54,6 +54,27 @@ Evaluate without adding:
 ```bash
 releases admin discovery evaluate https://linear.app/changelog
 ```
+
+### Create App Store
+
+App Store apps have a dedicated verb because the create flow resolves the iTunes listing, mints the current version as the first release, and backfills the product's avatar with the app icon:
+
+```bash
+releases admin source create-appstore https://apps.apple.com/us/app/slack/id618783545 --org slack --product slack
+releases admin source create-appstore appstore:618783545 --platform ios --org slack
+releases admin source create-appstore 1496833156 --platform macos --dry-run
+```
+
+The identifier is an `apps.apple.com/.../id<trackId>` URL, a bare numeric track ID, or an `appstore:<trackId>` coordinate. `--platform` defaults to `ios` (`macos` = Mac App Store); `--storefront` defaults to `us`. The verb is idempotent on the track ID — re-running reports the existing source.
+
+With no `--product`, the endpoint names a _new_ product after the (often verbose) App Store title — e.g. "Shopify: Sell online/in person". To control the name, create the product first and reference it with `--product`:
+
+```bash
+releases admin product create "Shopify" --org shopify
+releases admin source create-appstore https://apps.apple.com/us/app/shopify/id719892358 --org shopify --product shopify
+```
+
+Add one app at a time — the listing is resolved on the fly, and concurrent creates for a brand-new org/product race on slug uniqueness.
 
 ### Update
 
