@@ -15,6 +15,7 @@ Operations can be performed via CLI commands or typed MCP/agent tools. Use which
 |-----------|-----|------------|
 | List sources | `releases list [slug] --json [--org <org>] [--query <text>] [--has-feed] [--category <c>] [--compact] [--limit <n>] [--page <n>]` | `list_catalog` (filter `kind: "source"` to exclude products); `list_sources` is a deprecated alias |
 | Add source | `releases admin source create <name> --url <url> [--type <type>] [--org <org>] [--feed-url <url>] [--primary]` | `manage_source` action "add" with name, url, type, organization, feed_url, **is_primary** (type auto-detected if omitted; only pass is_primary=true when the source is the org's primary changelog — see "Primary Sources") |
+| Add App Store source | `releases admin source create-appstore <url-or-id> [--platform ios\|macos] [--org <slug>] [--product <slug>] [--storefront <code>]` | _(no typed tool yet — CLI only)_ |
 | Edit source | `releases admin source update <identifier> [--primary] [--priority <p>]` | `manage_source` action "edit" with identifier, is_primary, fetch_priority, name, url, type (use only when changing an already-added source; prefer setting flags on "add") |
 | Remove source | `releases admin source delete <slug> [--ignore --reason <reason>]` | `manage_source` action "remove" with identifier |
 | Fetch releases | `releases admin source fetch <slug> [--dry-run] [--max <n>]` | `manage_source` action "fetch" with identifier |
@@ -47,9 +48,28 @@ Use `--json` (CLI) for structured output. Typed tools always return JSON.
 
 ## Adding Sources
 
-Required: **name** and **url**. Optional: **type** (github, scrape, feed, agent — auto-detected from URL if omitted), **organization** (org ID or slug to associate with), **feed_url** (direct feed URL if known).
+Required: **name** and **url**. Optional: **type** (github, scrape, feed, agent — auto-detected from URL if omitted), **organization** (org ID or slug to associate with), **feed_url** (direct feed URL if known). App Store apps (`appstore` type) are **not** created this way — use `create-appstore` (below); `source create` rejects `--type appstore` and pasted `apps.apple.com` URLs with a pointer to it.
 
 On slug collision the API auto-suffixes (`changelog` → `changelog-2`, `-3`, …) and the created row in the response tells you the resolved slug — no rename-and-retry needed.
+
+### App Store sources
+
+App Store apps need a dedicated command because the create flow resolves the iTunes listing, mints the current version as the first release, and backfills the product's avatar with the app icon:
+
+```
+releases admin source create-appstore <url-or-id> [--platform ios|macos] [--org <slug>] [--product <slug>] [--storefront <code>]
+```
+
+- `<url-or-id>` accepts an `apps.apple.com/.../id<trackId>` URL, a bare numeric track ID, or an `appstore:<trackId>` coordinate. `--platform` defaults to `ios` (`macos` = Mac App Store); `--storefront` defaults to `us`.
+- **Pre-create the product for a clean name.** With no `--product`, the endpoint names a *new* product after the (often verbose) App Store title — e.g. "Shopify: Sell online/in person". To control the name, create the product first and reference it:
+
+  ```
+  releases admin product create "Shopify" --org shopify
+  releases admin source create-appstore https://apps.apple.com/us/app/shopify/id719892358 --org shopify --product shopify
+  ```
+
+- **Keep writes serial.** The endpoint resolves the listing on the fly; concurrent creates for a brand-new org/product race on the org/product slug uniqueness constraint. Add one app at a time.
+- The command is idempotent on the app's track ID — re-running reports the existing source instead of creating a duplicate.
 
 ### Naming sources and products
 

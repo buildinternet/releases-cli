@@ -391,7 +391,7 @@ async function renderProduct(
     orgId: string;
     url: string | null;
     category: string | null;
-  } & { description?: string | null },
+  } & { description?: string | null; avatarUrl?: string | null },
   opts: GetEntityOpts,
 ) {
   // Pull related context concurrently. Each individually-degradable so a
@@ -444,6 +444,7 @@ async function renderProduct(
   console.log(entityHeader(product.name, coord, org));
   if (product.url) console.log(`  URL:      ${product.url}`);
   if (product.category) console.log(`  Category: ${product.category}`);
+  if (product.avatarUrl) console.log(`  Icon:     ${product.avatarUrl}`);
   if (product.description) console.log(`  About:    ${stripAnsi(product.description)}`);
   if (tags.length > 0) console.log(`  Tags:     ${tags.join(", ")}`);
   if (productSources.length > 0) {
