@@ -1579,6 +1579,50 @@ export async function getEmbedStatus(): Promise<EmbedStatusResponse> {
   return apiFetch<EmbedStatusResponse>("/v1/admin/embed/status");
 }
 
+// ── Source full-history backfill (admin-only) ──
+
+/**
+ * Report shape returned by POST /v1/workflows/backfill-source. Mirrors
+ * `SourceBackfillReport` on the API worker (monorepo
+ * workers/api/src/lib/source-backfill.ts) — kept as a local interface because
+ * it is worker-internal and not part of the published `releases-api-types`.
+ */
+export interface SourceBackfillReport {
+  source: { id: string; slug: string };
+  /** How the full-page body was acquired. */
+  via: "supplied" | "firecrawl" | "fetch";
+  windows: number;
+  cappedAtWindow: boolean;
+  droppedChars: number;
+  /** Pre-dedup count of extracted entries. */
+  extracted: number;
+  /** Unique-by-url count submitted to ingest. */
+  deduped: number;
+  dateRange: { from: string | null; to: string | null };
+  /** Rows seen by ingest (0 on dryRun). */
+  found: number;
+  /** Rows actually inserted (0 on dryRun). */
+  inserted: number;
+  dryRun: boolean;
+}
+
+/**
+ * Full-history backfill for a windowed scrape source. The endpoint rejects bare
+ * slugs (ambiguous across orgs, #690), so callers must pass the typed `src_…`
+ * ID — resolve via {@link findSource} first.
+ */
+export async function backfillSource(body: {
+  sourceId: string;
+  markdown?: string;
+  maxWindows?: number;
+  dryRun: boolean;
+}): Promise<SourceBackfillReport> {
+  return apiFetch<SourceBackfillReport>("/v1/workflows/backfill-source", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
 // ── Batch overview workflow (admin-only) ──
 
 /** Trigger body for POST /v1/workflows/batch-overview — mirrors `BatchOverviewBody` on the API worker. */

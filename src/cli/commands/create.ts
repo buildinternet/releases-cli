@@ -13,6 +13,7 @@ import { SOURCE_TYPES, type SourceType } from "@buildinternet/releases-core/sour
 import { logger } from "@releases/lib/logger";
 import { writeJson } from "../../lib/output.js";
 import { readContentArg } from "../../lib/input.js";
+import { parseMetadataSetFlag } from "../../lib/flags.js";
 import { isAppStoreUrl, isAppStoreCoordinate } from "./create-appstore.js";
 
 function isValidType(t: string): t is SourceType {
@@ -36,6 +37,10 @@ interface CreateSourceInput {
   org?: string;
   product?: string;
   feedUrl?: string;
+  /** Comma-separated feed keyword allowlist → `metadata.feedKeywordAllow`. */
+  keywordAllow?: string;
+  /** Raw `key=value` tokens → arbitrary `metadata` keys (mirrors `source update`). */
+  metadataSet?: string[];
   batch?: boolean;
   strict?: boolean;
   dryRun?: boolean;
@@ -88,6 +93,23 @@ async function createSingleSource(input: CreateSourceInput): Promise<CreateSourc
     if (sourceType === "github") {
       logger.info("Detected GitHub URL — using github adapter");
     }
+  }
+
+  // Atomic metadata at create time. Setting feed filters here — rather than via
+  // a follow-up `source update --metadata-set` — closes the race with the
+  // onboard workflow's auto-fetch, which reads the source's metadata before any
+  // post-create edit lands and would otherwise ingest the whole *unfiltered*
+  // feed on the first pass (#237).
+  if (input.keywordAllow) {
+    const allow = input.keywordAllow
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+    if (allow.length > 0) metadata.feedKeywordAllow = allow;
+  }
+  for (const token of input.metadataSet ?? []) {
+    const [key, value] = parseMetadataSetFlag(token);
+    metadata[key] = value;
   }
 
   // App Store sources can't be materialized through the generic create path —
@@ -296,6 +318,8 @@ export type CreateSourceOpts = {
   product?: string;
   name?: string;
   feedUrl?: string;
+  keywordAllow?: string;
+  metadataSet?: string[];
   batch?: string;
   json?: boolean;
   strict?: boolean;
@@ -404,6 +428,8 @@ export async function createSourceAction(
     org: opts.org,
     product: opts.product,
     feedUrl: opts.feedUrl,
+    keywordAllow: opts.keywordAllow,
+    metadataSet: opts.metadataSet,
     strict: opts.strict,
     dryRun: opts.dryRun,
   });
@@ -457,6 +483,23 @@ function attachCreateOptions(cmd: Command): Command {
     .option("--product <product>", "Product slug to assign this source to")
     .option("--name <name>", "Display name for the source (alternative to positional argument)")
     .option("--feed-url <feedUrl>", "Explicit feed URL")
+    .option(
+      "--keyword-allow <list>",
+      "Comma-separated feed keyword allowlist (→ metadata.feedKeywordAllow). Items whose " +
+        "title/link don't match a keyword are dropped at ingest. Set at create time so the " +
+        "onboard auto-fetch is filtered from the first pass — see --metadata-set for arbitrary keys.",
+    )
+    .option(
+      "--metadata-set <key=value>",
+      "Set a source metadata key at create time (repeatable). Same coercion as " +
+        "`source update --metadata-set`: true/false/null → JSON literal; number string → number; " +
+        "value starting with { or [ → parsed as JSON; otherwise → string. Keys with `.`/`[` are rejected.",
+      (val: string, acc: string[]) => {
+        acc.push(val);
+        return acc;
+      },
+      [] as string[],
+    )
     .option("--batch <file>", "JSON file with sources to add (use - for stdin)")
     .option("--json", "Output as JSON")
     .option("--strict", "Exit 1 if the source URL already exists (default: return existing)")
@@ -474,6 +517,10 @@ export function registerCreateCommand(program: Command) {
 Examples:
   releases admin source create "Next.js" --url https://github.com/vercel/next.js
   releases admin source create "Astro" --url https://astro.build/blog --type scrape
+  releases admin source create "Discord" --url https://discord.com/blog --type feed \\
+    --feed-url https://discord.com/blog/rss.xml --keyword-allow changelog,patch-notes
+  releases admin source create "Acme" --url https://acme.dev/changelog \\
+    --metadata-set marketingFilter=true --metadata-set feedContentDepth=summary-only
   releases admin source create --batch sources.json`,
       ),
   ).action(createSourceAction);
