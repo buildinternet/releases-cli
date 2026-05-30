@@ -13,7 +13,7 @@ import { SOURCE_TYPES, type SourceType } from "@buildinternet/releases-core/sour
 import { logger } from "@releases/lib/logger";
 import { writeJson } from "../../lib/output.js";
 import { readContentArg } from "../../lib/input.js";
-import { parseMetadataSetFlag } from "../../lib/flags.js";
+import { parseMetadataSetFlag, parseTagList } from "../../lib/flags.js";
 import { isAppStoreUrl, isAppStoreCoordinate } from "./create-appstore.js";
 
 function isValidType(t: string): t is SourceType {
@@ -100,13 +100,8 @@ async function createSingleSource(input: CreateSourceInput): Promise<CreateSourc
   // onboard workflow's auto-fetch, which reads the source's metadata before any
   // post-create edit lands and would otherwise ingest the whole *unfiltered*
   // feed on the first pass (#237).
-  if (input.keywordAllow) {
-    const allow = input.keywordAllow
-      .split(",")
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
-    if (allow.length > 0) metadata.feedKeywordAllow = allow;
-  }
+  const keywordAllow = parseTagList(input.keywordAllow);
+  if (keywordAllow.length > 0) metadata.feedKeywordAllow = keywordAllow;
   for (const token of input.metadataSet ?? []) {
     const [key, value] = parseMetadataSetFlag(token);
     metadata[key] = value;

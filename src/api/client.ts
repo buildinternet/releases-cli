@@ -988,6 +988,12 @@ export async function createOrg(
   });
 }
 
+/**
+ * Delete an org. Soft delete (default) accepts a slug or `org_…` ID; **hard
+ * delete requires the typed `org_…` ID** — the server rejects a slug on the
+ * destructive path as a guardrail (#690). Callers passing `{ hard: true }` must
+ * resolve the identifier to its ID first (see `orgDeleteAction`).
+ */
 export async function removeOrg(identifier: string, opts?: { hard?: boolean }): Promise<void> {
   const qs = opts?.hard ? "?hard=true" : "";
   await apiFetch(`/v1/orgs/${encodeURIComponent(identifier)}${qs}`, { method: "DELETE" });

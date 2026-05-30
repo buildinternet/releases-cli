@@ -21,8 +21,9 @@ function shortDate(iso: string | null): string {
 }
 
 export async function backfillAction(identifier: string, opts: BackfillOpts): Promise<void> {
-  // `--no-dry-run` (commander → dryRun:false) or `--commit` both opt into writing.
-  const dryRun = opts.dryRun !== false && !opts.commit;
+  // Either opt-in writes: `--no-dry-run` (commander sets dryRun:false) or `--commit`.
+  const write = opts.dryRun === false || !!opts.commit;
+  const dryRun = !write;
   const maxWindows = parsePositiveIntFlag("max-windows", opts.maxWindows);
   const markdown = opts.markdownFile ? await readContentArg(opts.markdownFile) : undefined;
 
@@ -65,10 +66,13 @@ export async function backfillAction(identifier: string, opts: BackfillOpts): Pr
   }
 
   if (report.cappedAtWindow || report.droppedChars > 0) {
+    const reason = report.cappedAtWindow
+      ? `hit the ${report.windows}-window cap`
+      : "dropped the oldest window(s)";
     logger.warn(
       chalk.yellow(
-        `Hit the window cap at ${report.windows} window(s); dropped ~${report.droppedChars.toLocaleString()} ` +
-          `chars of older history. Raise --max-windows (endpoint max 200) to reach further back.`,
+        `Backfill ${reason}: ~${report.droppedChars.toLocaleString()} chars of older history were not ` +
+          `extracted. Raise --max-windows (endpoint max 200) to reach further back.`,
       ),
     );
   }
