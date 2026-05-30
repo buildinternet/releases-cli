@@ -332,7 +332,7 @@ type OrgDeleteOpts = { json?: boolean; dryRun?: boolean; hard?: boolean; yes?: b
 // typeback prompt before any cascade runs; --yes / -y bypasses it for
 // scripted ops, and a piped (non-TTY) stdin without --yes errors out
 // rather than silently confirming.
-async function orgDeleteAction(identifier: string, opts: OrgDeleteOpts): Promise<void> {
+export async function orgDeleteAction(identifier: string, opts: OrgDeleteOpts): Promise<void> {
   // Fail fast on the obvious misconfiguration: --hard from a piped
   // stdin without --yes. Applies to --dry-run too — a scripted hard
   // delete that "works" in dry-run only to error in the real run is
@@ -388,7 +388,11 @@ async function orgDeleteAction(identifier: string, opts: OrgDeleteOpts): Promise
     }
   }
 
-  await removeOrg(found.slug, { hard: opts.hard });
+  // The server rejects a slug on the destructive hard-delete path (a guardrail
+  // against accidental slug-based purges, per #690) — it requires the typed
+  // org_ ID. Soft delete accepts either, so keep the slug for its friendlier
+  // audit-log target.
+  await removeOrg(opts.hard ? found.id : found.slug, { hard: opts.hard });
 
   if (opts.json) await writeJson({ removed: found.slug, hard: !!opts.hard });
   else

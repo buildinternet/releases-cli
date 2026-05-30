@@ -49,6 +49,17 @@ releases admin source create "Claude Code" --url https://docs.anthropic.com/en/c
   --feed-url https://docs.anthropic.com/en/changelog/rss.xml
 ```
 
+Set source metadata **at create time** with `--keyword-allow` (feed keyword filter → `metadata.feedKeywordAllow`) or the general `--metadata-set key=value` (repeatable; same coercion as `source update --metadata-set`):
+
+```bash
+releases admin source create "Discord" --url https://discord.com/blog --type feed \
+  --feed-url https://discord.com/blog/rss.xml --keyword-allow changelog,patch-notes
+releases admin source create "Acme" --url https://acme.dev/changelog \
+  --metadata-set marketingFilter=true --metadata-set feedContentDepth=summary-only
+```
+
+Do this rather than a follow-up `source update --metadata-set`: `create` triggers the onboard workflow's auto-fetch, which reads the source's metadata **before** any post-create edit lands. Setting a feed filter on create keeps that first ingest filtered; setting it afterward races the auto-fetch and ingests the whole unfiltered feed.
+
 Evaluate without adding:
 
 ```bash
@@ -117,6 +128,25 @@ Notes:
 - Remote concurrency defaults to 3, capped at 5. Duplicate source fetches are detected and blocked.
 - Smart fetch backoff: sources returning no changes back off exponentially (1h → 48h); error backoff caps at 72h.
 
+### Backfill (full history)
+
+Walk every scrape window of a windowed `scrape` source and upsert the whole history at once — the turnkey replacement for bespoke per-source backfill scripts. Idempotent (dedups by synthesized URL), and **dry-run by default**:
+
+```bash
+releases admin source backfill my-source                    # preview: counts + date range, nothing written
+releases admin source backfill my-source --no-dry-run        # write (or --commit)
+releases admin source backfill my-source --max-windows 100   # walk further back (endpoint clamps 1–200, default 50)
+releases admin source backfill my-source --markdown-file page.md --commit
+cat page.md | releases admin source backfill my-source --markdown-file - --commit
+```
+
+Notes:
+
+- Accepts a slug or `src_…` ID; the CLI resolves to the typed ID before calling (the endpoint rejects bare slugs as ambiguous across orgs).
+- `--markdown-file` supplies the full-page markdown for JS-heavy / bot-blocked sources the worker can't fetch itself. Without it the endpoint falls back to Firecrawl (if enabled on the source) then a plain fetch.
+- Scrape sources only. Non-scrape sources, an unfetchable body, or a missing `ANTHROPIC_API_KEY`/`FIRECRAWL_API_KEY` come back as a clear error.
+- A dry run reports `windows`, `extracted → unique`, and the date range; it warns if it hit the window cap (raise `--max-windows`).
+
 ### Poll (cheap change detection)
 
 ```bash
@@ -154,9 +184,13 @@ releases admin org link vercel --platform github --handle vercel
 releases admin org tag add vercel react serverless
 releases admin org alias add anthropic claude.ai claude.com
 releases admin org refresh vercel                         # fetch all sources + regenerate overview
+releases admin org delete vercel                          # reversible tombstone soft-delete
+releases admin org delete vercel --hard --yes             # permanent purge + FK cascade
 ```
 
 `org refresh` flags: `--max <n>` (per-source cap, default 20), `--concurrency <n>`, `--window <days>`, `--dry-run`, `--skip-overview`, `--json`.
+
+`org delete` soft-deletes by default (a reversible tombstone). `--hard` purges the row and cascade-deletes every dependent source, release, fetch-log, changelog file/chunk, summary, media asset, and webhook subscription; it prompts for a slug typeback unless `--yes` is passed (required in non-TTY/scripted contexts). You can pass a slug or an `org_…` ID either way — the CLI resolves to the typed ID the destructive path requires.
 
 ## Products
 
