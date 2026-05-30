@@ -267,6 +267,7 @@ type OrgUpdateOpts = {
   category?: string | boolean;
   avatar?: string | boolean;
   paused?: boolean;
+  featured?: boolean;
   json?: boolean;
   dryRun?: boolean;
 };
@@ -295,6 +296,11 @@ async function orgUpdateAction(identifier: string, opts: OrgUpdateOpts): Promise
   else if (typeof opts.avatar === "string") updates.avatarUrl = opts.avatar;
 
   if (opts.paused !== undefined) updates.fetchPaused = opts.paused;
+
+  // Editorial home-page rail flag (buildinternet/releases#1274). The API field
+  // is `featured`; commander surfaces --featured/--no-featured as a single
+  // boolean (undefined when neither is passed).
+  if (opts.featured !== undefined) updates.featured = opts.featured;
 
   if (Object.keys(updates).length === 0) {
     logger.warn("No fields to update.");
@@ -631,6 +637,8 @@ Examples:
     .option("--no-avatar", "Clear avatar URL")
     .option("--paused", "Pause ingest for all of this org's sources (catalog stays visible)")
     .option("--no-paused", "Resume ingest for this org's sources")
+    .option("--featured", "Promote this org on the home-page featured rail")
+    .option("--no-featured", "Remove this org from the home-page featured rail")
     .option("--json", "Output as JSON")
     .option("--dry-run", "Show what would change without writing")
     .action(orgUpdateAction);
@@ -649,6 +657,8 @@ Examples:
     .option("--no-avatar", "Clear avatar URL")
     .option("--paused", "Pause ingest for all of this org's sources (catalog stays visible)")
     .option("--no-paused", "Resume ingest for this org's sources")
+    .option("--featured", "Promote this org on the home-page featured rail")
+    .option("--no-featured", "Remove this org from the home-page featured rail")
     .option("--json", "Output as JSON")
     .option("--dry-run", "Show what would change without writing")
     .action(warnDeprecatedAlias<[string, OrgUpdateOpts]>("edit", "update", orgUpdateAction));
