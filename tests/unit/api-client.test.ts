@@ -650,8 +650,10 @@ describe("findSource bare-slug ambiguity (#264)", () => {
     expect(caught).toBeInstanceOf(client.AmbiguousSourceError);
     const err = caught as InstanceType<typeof client.AmbiguousSourceError>;
     expect(err.slug).toBe("blog");
-    expect(err.candidates.map((c) => c.orgSlug).toSorted()).toEqual(["hashnode", "vitest"]);
-    expect(err.candidates.map((c) => c.id).toSorted()).toEqual(["src_a", "src_b"]);
+    // Candidate order mirrors the server's row order (preserved through the
+    // filter + map in resolveSourceTarget).
+    expect(err.candidates.map((c) => c.orgSlug)).toEqual(["vitest", "hashnode"]);
+    expect(err.candidates.map((c) => c.id)).toEqual(["src_a", "src_b"]);
   });
 
   it("resolves a bare slug that matches exactly one source", async () => {

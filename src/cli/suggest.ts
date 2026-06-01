@@ -51,3 +51,17 @@ export function formatAmbiguousSourceError(err: AmbiguousSourceError): string {
     ...lines,
   ].join("\n");
 }
+
+/**
+ * Plain-text (no ANSI) sibling of {@link formatAmbiguousSourceError} for
+ * surfaces that aren't a color terminal — chiefly the local MCP server's
+ * `get_source` / `get_source_changelog` tools, where the string is returned as
+ * tool content for an agent to read and self-correct against (#264).
+ */
+export function describeAmbiguousSource(err: AmbiguousSourceError): string {
+  const lines = err.candidates.map((c) => `  ${c.orgSlug ?? "—"}/${c.slug}  (${c.id})`);
+  return (
+    `Source "${err.slug}" is ambiguous — it matches ${err.candidates.length} sources across orgs. ` +
+    `Retry with an org/slug coordinate or a src_… id:\n${lines.join("\n")}`
+  );
+}
