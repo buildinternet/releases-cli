@@ -26,6 +26,7 @@ import { logger } from "@releases/lib/logger";
 import { orgNotFound } from "../suggest.js";
 import { toSlug } from "@buildinternet/releases-core/slug";
 import { isValidCategory, CATEGORIES } from "@buildinternet/releases-core/categories";
+import { SOURCE_DISCOVERY } from "@buildinternet/releases-core/source-enums";
 import { timeAgo } from "@buildinternet/releases-core/dates";
 import { writeJson } from "../../lib/output.js";
 import {
@@ -268,11 +269,25 @@ type OrgUpdateOpts = {
   avatar?: string | boolean;
   paused?: boolean;
   featured?: boolean;
+  discovery?: string;
   json?: boolean;
   dryRun?: boolean;
 };
 
 async function orgUpdateAction(identifier: string, opts: OrgUpdateOpts): Promise<void> {
+  // Validate enumerated options before any network call so errors surface fast.
+  if (typeof opts.category === "string" && !isValidCategory(opts.category)) {
+    logger.error(`Invalid category: "${opts.category}". Valid: ${CATEGORIES.join(", ")}`);
+    process.exit(1);
+  }
+  if (
+    opts.discovery !== undefined &&
+    !(SOURCE_DISCOVERY as readonly string[]).includes(opts.discovery)
+  ) {
+    logger.error(`Invalid discovery "${opts.discovery}". Valid: ${SOURCE_DISCOVERY.join(", ")}`);
+    process.exit(1);
+  }
+
   const found = await findOrg(identifier);
   if (!found) return orgNotFound(identifier);
 
@@ -285,10 +300,6 @@ async function orgUpdateAction(identifier: string, opts: OrgUpdateOpts): Promise
   if (opts.category === false) {
     updates.category = null;
   } else if (typeof opts.category === "string") {
-    if (!isValidCategory(opts.category)) {
-      logger.error(`Invalid category: "${opts.category}". Valid: ${CATEGORIES.join(", ")}`);
-      process.exit(1);
-    }
     updates.category = opts.category;
   }
 
@@ -301,6 +312,8 @@ async function orgUpdateAction(identifier: string, opts: OrgUpdateOpts): Promise
   // is `featured`; commander surfaces --featured/--no-featured as a single
   // boolean (undefined when neither is passed).
   if (opts.featured !== undefined) updates.featured = opts.featured;
+
+  if (opts.discovery !== undefined) updates.discovery = opts.discovery;
 
   if (Object.keys(updates).length === 0) {
     logger.warn("No fields to update.");
@@ -639,6 +652,10 @@ Examples:
     .option("--no-paused", "Resume ingest for this org's sources")
     .option("--featured", "Promote this org on the home-page featured rail")
     .option("--no-featured", "Remove this org from the home-page featured rail")
+    .option(
+      "--discovery <status>",
+      `Promote/demote discovery status (${SOURCE_DISCOVERY.join(" | ")})`,
+    )
     .option("--json", "Output as JSON")
     .option("--dry-run", "Show what would change without writing")
     .action(orgUpdateAction);
@@ -659,6 +676,10 @@ Examples:
     .option("--no-paused", "Resume ingest for this org's sources")
     .option("--featured", "Promote this org on the home-page featured rail")
     .option("--no-featured", "Remove this org from the home-page featured rail")
+    .option(
+      "--discovery <status>",
+      `Promote/demote discovery status (${SOURCE_DISCOVERY.join(" | ")})`,
+    )
     .option("--json", "Output as JSON")
     .option("--dry-run", "Show what would change without writing")
     .action(warnDeprecatedAlias<[string, OrgUpdateOpts]>("edit", "update", orgUpdateAction));
