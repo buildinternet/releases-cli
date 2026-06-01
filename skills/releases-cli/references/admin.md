@@ -205,12 +205,12 @@ releases admin org update vercel --category developer-tools
 releases admin org link vercel --platform github --handle vercel
 releases admin org tag add vercel react serverless
 releases admin org alias add anthropic claude.ai claude.com
-releases admin org refresh vercel                         # fetch all sources + regenerate overview
+releases admin source fetch --org vercel                  # fetch all of an org's active sources
 releases admin org delete vercel                          # reversible tombstone soft-delete
 releases admin org delete vercel --hard --yes             # permanent purge + FK cascade
 ```
 
-`org refresh` flags: `--max <n>` (per-source cap, default 20), `--concurrency <n>`, `--window <days>`, `--dry-run`, `--skip-overview`, `--json`.
+There is no `org refresh` command. To refresh an org: fetch its sources with `releases admin source fetch --org <slug>` (see **Fetch** above), then regenerate the overview with the `overview` subcommands — `releases admin overview inputs <slug>` → generate the body → `releases admin overview update <slug>` (or `releases admin overview batch` for a server-side sweep). Overview generation is agent-driven; no single command does both.
 
 `org delete` soft-deletes by default (a reversible tombstone). `--hard` purges the row and cascade-deletes every dependent source, release, fetch-log, changelog file/chunk, summary, media asset, and webhook subscription; it prompts for a slug typeback unless `--yes` is passed (required in non-TTY/scripted contexts). You can pass a slug or an `org_…` ID either way — the CLI resolves to the typed ID the destructive path requires.
 
