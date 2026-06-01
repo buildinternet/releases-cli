@@ -11,7 +11,7 @@ import {
 import { sourceNotFound } from "../suggest.js";
 import { toSlug } from "@buildinternet/releases-core/slug";
 import { isValidKind, KIND_VALUES, type Kind } from "@buildinternet/releases-core/kinds";
-import { SOURCE_TYPES } from "@buildinternet/releases-core/source-enums";
+import { SOURCE_TYPES, SOURCE_DISCOVERY } from "@buildinternet/releases-core/source-enums";
 import { logger } from "@releases/lib/logger";
 import { writeJson } from "../../lib/output.js";
 import { readContentArg } from "../../lib/input.js";
@@ -47,6 +47,7 @@ export type UpdateSourceOpts = {
   enable?: boolean;
   changelogPaths?: string | boolean;
   kind?: string | boolean;
+  discovery?: string;
   dryRun?: boolean;
   metadataSet?: string[];
   metadataUnset?: string[];
@@ -86,6 +87,17 @@ export async function updateSourceAction(
   identifier: string,
   opts: UpdateSourceOpts,
 ): Promise<void> {
+  // Validate enumerated options before any network call so errors surface fast.
+  if (
+    opts.discovery !== undefined &&
+    !(SOURCE_DISCOVERY as readonly string[]).includes(opts.discovery)
+  ) {
+    logger.error(
+      `Invalid discovery "${opts.discovery}". Must be one of: ${SOURCE_DISCOVERY.join(", ")}`,
+    );
+    process.exit(1);
+  }
+
   // `--no-parse-instructions` produces `false` (boolean); `--parse-instructions-file`
   // provides the content string. An empty file clears (matches the empty-string case).
   const parseInstructions: string | false | undefined =
@@ -222,6 +234,11 @@ export async function updateSourceAction(
     }
     updates.kind = opts.kind satisfies Kind;
     changes.push(`kind → ${opts.kind}`);
+  }
+
+  if (opts.discovery !== undefined) {
+    updates.discovery = opts.discovery;
+    changes.push(`discovery → ${opts.discovery}`);
   }
 
   const metaUpdates: Record<string, unknown> = {};
@@ -424,6 +441,10 @@ export function attachUpdateOptions(cmd: Command): Command {
       `Set source taxonomy (${KIND_VALUES.join(", ")}). Resolves through the parent product on content-oriented surfaces (releases feed, search release hits) and matches directly on metadata surfaces (lists, catalog).`,
     )
     .option("--no-kind", "Clear the source's kind (falls back to inheriting from parent product)")
+    .option(
+      "--discovery <status>",
+      `Promote/demote discovery status (${SOURCE_DISCOVERY.join(" | ")})`,
+    )
     .option(
       "--changelog-paths <paths>",
       "Comma-separated list of CHANGELOG paths (relative to repo root) for monorepo sources, e.g. 'packages/core/CHANGELOG.md,packages/cli/CHANGELOG.md'",
