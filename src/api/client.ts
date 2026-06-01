@@ -1678,19 +1678,17 @@ export async function backfillSource(body: {
 }
 
 /**
- * Poll a durable backfill workflow's status. Throws when the instance ID is
- * unknown (404 `instance_not_found`, incl. the brief create→status race) so
- * callers reading `.status` can't crash on a null — mirrors
- * {@link getBatchOverviewStatus}.
+ * Poll a durable backfill workflow's status. Returns `null` on a 404
+ * (`instance_not_found`). For an instance we just dispatched, that's the brief
+ * create→status race, so callers keep polling rather than hard-failing; a
+ * persistent null means a wrong or expired instance ID.
  */
-export async function getBackfillStatus(instanceId: string): Promise<BackfillStatusResponse> {
-  const res = await apiFetch<BackfillStatusResponse | null>(
+export async function getBackfillStatus(
+  instanceId: string,
+): Promise<BackfillStatusResponse | null> {
+  return apiFetch<BackfillStatusResponse | null>(
     `/v1/workflows/backfill-source/status/${encodeURIComponent(instanceId)}`,
   );
-  if (res === null) {
-    throw new Error(`Workflow instance not found: ${instanceId}`);
-  }
-  return res;
 }
 
 /**

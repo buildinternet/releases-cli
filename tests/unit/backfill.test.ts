@@ -20,7 +20,7 @@ afterAll(() => {
 });
 
 const client = await import("../../src/api/client.js");
-const { backfillAction } = await import("../../src/cli/commands/backfill.js");
+const { backfillAction, backfillStatusAction } = await import("../../src/cli/commands/backfill.js");
 
 const SAMPLE_REPORT = {
   source: { id: "src_x", slug: "my-source" },
@@ -211,21 +211,30 @@ describe("backfillSource async dispatch + status", () => {
     }) as unknown as typeof globalThis.fetch;
     const status = await client.getBackfillStatus("i1");
     expect(capturedUrl).toBe("https://test.example.com/v1/workflows/backfill-source/status/i1");
-    expect(status.status).toBe("complete");
-    expect(status.output?.extracted).toBe(119);
+    expect(status?.status).toBe("complete");
+    expect(status?.output?.extracted).toBe(119);
+  });
+
+  it("getBackfillStatus returns null on a 404 (transient create→status race)", async () => {
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ error: "instance_not_found", message: "nope" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      })) as unknown as typeof globalThis.fetch;
+    expect(await client.getBackfillStatus("missing")).toBeNull();
   });
 });
 
-// ── Async command behavior (poll-by-default + --no-wait) ─────────────────────
+// ── Async command behavior (dispatch-by-default + --wait) ────────────────────
 
 describe("backfillAction async path", () => {
   let originalFetch: typeof globalThis.fetch;
   let dir: string;
   let statusCalls: number;
 
-  // Resolve src → 202 dispatch on POST → terminal status on the first GET so the
-  // poll loop breaks before the (5s) sleep ever fires.
-  function mockAsync(terminalStatus: "complete", withOutput = true) {
+  // Resolve src → 202 dispatch on POST → a completed status on the first GET so
+  // the poll loop breaks before the (5s) sleep ever fires.
+  function mockAsync() {
     statusCalls = 0;
     globalThis.fetch = (async (url: string, init?: RequestInit) => {
       const method = init?.method ?? "GET";
@@ -240,8 +249,8 @@ describe("backfillAction async path", () => {
         return new Response(
           JSON.stringify({
             instanceId: "backfill-src_x-123",
-            status: terminalStatus,
-            ...(withOutput ? { output: SAMPLE_REPORT } : {}),
+            status: "complete",
+            output: SAMPLE_REPORT,
           }),
           { status: 200, headers: { "Content-Type": "application/json" } },
         );
@@ -258,7 +267,7 @@ describe("backfillAction async path", () => {
     originalFetch = globalThis.fetch;
     dir = mkdtempSync(join(tmpdir(), "rel-backfill-async-cmd-"));
     process.env.RELEASES_RUN_DIR = dir;
-    mockAsync("complete");
+    mockAsync();
   });
   afterEach(() => {
     globalThis.fetch = originalFetch;
@@ -266,13 +275,82 @@ describe("backfillAction async path", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it("polls to completion by default and renders the report", async () => {
+  it("dispatches without polling by default (returns the handle)", async () => {
     await backfillAction("src_x", {});
-    expect(statusCalls).toBe(1);
+    expect(statusCalls).toBe(0);
   });
 
-  it("--no-wait dispatches without polling the status endpoint", async () => {
-    await backfillAction("src_x", { wait: false });
+  it("--json default dispatch emits the async handle on stdout", async () => {
+    let out = "";
+    const spy = ((s: string) => {
+      out += s;
+      return true;
+    }) as unknown as typeof process.stdout.write;
+    const orig = process.stdout.write;
+    process.stdout.write = spy;
+    try {
+      await backfillAction("src_x", { json: true });
+    } finally {
+      process.stdout.write = orig;
+    }
     expect(statusCalls).toBe(0);
+    expect(JSON.parse(out)).toMatchObject({ instanceId: "backfill-src_x-123", async: true });
+  });
+
+  it("--wait polls the status endpoint to completion and renders the report", async () => {
+    await backfillAction("src_x", { wait: true });
+    expect(statusCalls).toBe(1);
+  });
+});
+
+// ── backfill-status (resume a dispatched workflow) ───────────────────────────
+
+describe("backfillStatusAction", () => {
+  let originalFetch: typeof globalThis.fetch;
+  let dir: string;
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    dir = mkdtempSync(join(tmpdir(), "rel-backfill-status-"));
+    process.env.RELEASES_RUN_DIR = dir;
+  });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    delete process.env.RELEASES_RUN_DIR;
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("GETs the status endpoint for the instance ID and renders a completed report", async () => {
+    let capturedUrl = "";
+    globalThis.fetch = (async (url: string) => {
+      capturedUrl = url;
+      return new Response(
+        JSON.stringify({ instanceId: "i9", status: "complete", output: SAMPLE_REPORT }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }) as unknown as typeof globalThis.fetch;
+    await backfillStatusAction("i9", {});
+    expect(capturedUrl).toBe("https://test.example.com/v1/workflows/backfill-source/status/i9");
+  });
+
+  it("--json emits the raw status (incl. output) for an in-progress workflow", async () => {
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ instanceId: "i9", status: "running" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })) as unknown as typeof globalThis.fetch;
+    let out = "";
+    const spy = ((s: string) => {
+      out += s;
+      return true;
+    }) as unknown as typeof process.stdout.write;
+    const orig = process.stdout.write;
+    process.stdout.write = spy;
+    try {
+      await backfillStatusAction("i9", { json: true });
+    } finally {
+      process.stdout.write = orig;
+    }
+    expect(JSON.parse(out)).toMatchObject({ status: "running" });
   });
 });

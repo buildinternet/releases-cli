@@ -136,7 +136,7 @@ Walk every scrape window of a windowed `scrape` source and upsert the whole hist
 releases admin source backfill my-source                    # preview: counts + date range, nothing written
 releases admin source backfill my-source --no-dry-run        # write (or --commit)
 releases admin source backfill my-source --max-windows 100   # walk further back (endpoint clamps 1–200, default 50)
-releases admin source backfill my-source --no-wait           # deep Firecrawl backfill: dispatch async, don't poll
+releases admin source backfill my-source --wait              # deep Firecrawl backfill: block until the async workflow finishes
 releases admin source backfill my-source --markdown-file page.md --commit
 cat page.md | releases admin source backfill my-source --markdown-file - --commit
 ```
@@ -147,7 +147,10 @@ Notes:
 - `--markdown-file` supplies the full-page markdown for JS-heavy / bot-blocked sources the worker can't fetch itself. Without it the endpoint falls back to Firecrawl (if enabled on the source) then a plain fetch.
 - Scrape sources only. Non-scrape sources, an unfetchable body, or a missing `ANTHROPIC_API_KEY`/`FIRECRAWL_API_KEY` come back as a clear error.
 - A dry run reports `windows`, `extracted → unique`, and the date range; it warns if it hit the window cap (raise `--max-windows`).
-- Deep Firecrawl backfills run as a durable workflow (minutes): the CLI dispatches, then **polls to completion** and renders the report. Pass `--no-wait` to print the workflow instance ID and exit instead.
+- Deep Firecrawl backfills run as a durable workflow (minutes). Like `admin overview batch`, the CLI **dispatches and returns the workflow instance ID by default** (non-blocking — the agent-friendly default), then either:
+  - poll it yourself: `releases admin source backfill-status <instanceId> [--json]` (single-shot; loop on the `--json` `status` field), or
+  - pass `--wait` to block and render the report inline.
+- Non-Firecrawl / `--markdown-file` sources stay **synchronous** — the report comes back in one call regardless of `--wait`.
 
 ### Re-extract (from a stored snapshot)
 
