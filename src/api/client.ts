@@ -1595,8 +1595,9 @@ export async function getEmbedStatus(): Promise<EmbedStatusResponse> {
  */
 export interface SourceBackfillReport {
   source: { id: string; slug: string };
-  /** How the full-page body was acquired. */
-  via: "supplied" | "firecrawl" | "fetch";
+  /** How the full-page body was acquired. `snapshot` = re-extracted from a
+   *  stored raw snapshot (reextract-source, #1284) with no live scrape. */
+  via: "supplied" | "firecrawl" | "fetch" | "snapshot";
   windows: number;
   cappedAtWindow: boolean;
   droppedChars: number;
@@ -1610,20 +1611,102 @@ export interface SourceBackfillReport {
   /** Rows actually inserted (0 on dryRun). */
   inserted: number;
   dryRun: boolean;
+  /** Set only when the Firecrawl window ceiling reduced a deeper request and the
+   *  run stopped with untouched tail — tells the caller how to go deeper. */
+  guidance?: string;
+  /** Present on reextract-source: which stored snapshot the body came from. */
+  snapshot?: {
+    id: string;
+    contentHash: string;
+    capturedAt: string;
+    bytes: number;
+    format: string;
+  };
+}
+
+/**
+ * Async-dispatch shape returned (HTTP 202) by POST /v1/workflows/backfill-source
+ * when a deep Firecrawl backfill is routed to the durable BackfillSourceWorkflow
+ * (#1281/#1282). The caller polls {@link getBackfillStatus} until terminal.
+ */
+export interface BackfillAsyncResponse {
+  instanceId: string;
+  async: true;
+  statusUrl: string;
+}
+
+/** Discriminate the 202 async-dispatch shape from a synchronous report. */
+export function isBackfillAsync(
+  res: SourceBackfillReport | BackfillAsyncResponse,
+): res is BackfillAsyncResponse {
+  return (res as BackfillAsyncResponse).async === true;
+}
+
+/**
+ * Cloudflare Workflows status (`WorkflowInstance.status()`), passed through by
+ * GET /v1/workflows/backfill-source/status/:instanceId. Terminal states are
+ * `complete | errored | terminated`; on `complete`, `output` is the report.
+ * `status` is typed as string to stay forward-compatible with new CF values.
+ */
+export interface BackfillStatusResponse {
+  instanceId: string;
+  status: string;
+  output?: SourceBackfillReport;
+  error?: unknown;
+  [k: string]: unknown;
 }
 
 /**
  * Full-history backfill for a windowed scrape source. The endpoint rejects bare
  * slugs (ambiguous across orgs, #690), so callers must pass the typed `src_…`
  * ID — resolve via {@link findSource} first.
+ *
+ * Returns the report synchronously for supplied-markdown / plain-fetch sources;
+ * deep Firecrawl backfills return {@link BackfillAsyncResponse} (202) — poll
+ * {@link getBackfillStatus}. Use {@link isBackfillAsync} to discriminate.
  */
 export async function backfillSource(body: {
   sourceId: string;
   markdown?: string;
   maxWindows?: number;
   dryRun: boolean;
+}): Promise<SourceBackfillReport | BackfillAsyncResponse> {
+  return apiFetch<SourceBackfillReport | BackfillAsyncResponse>("/v1/workflows/backfill-source", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+/**
+ * Poll a durable backfill workflow's status. Throws when the instance ID is
+ * unknown (404 `instance_not_found`, incl. the brief create→status race) so
+ * callers reading `.status` can't crash on a null — mirrors
+ * {@link getBatchOverviewStatus}.
+ */
+export async function getBackfillStatus(instanceId: string): Promise<BackfillStatusResponse> {
+  const res = await apiFetch<BackfillStatusResponse | null>(
+    `/v1/workflows/backfill-source/status/${encodeURIComponent(instanceId)}`,
+  );
+  if (res === null) {
+    throw new Error(`Workflow instance not found: ${instanceId}`);
+  }
+  return res;
+}
+
+/**
+ * Re-extract releases from a stored raw snapshot (`released-raw`, #1284) — no
+ * live scrape, no Firecrawl credits, deterministic input. Always synchronous.
+ * Returns the standard {@link SourceBackfillReport} with `via: "snapshot"` and a
+ * `snapshot` block identifying which capture was used. Like {@link backfillSource}
+ * the endpoint rejects bare slugs — pass the typed `src_…` ID.
+ */
+export async function reextractSource(body: {
+  sourceId: string;
+  snapshotId?: string;
+  maxWindows?: number;
+  dryRun: boolean;
 }): Promise<SourceBackfillReport> {
-  return apiFetch<SourceBackfillReport>("/v1/workflows/backfill-source", {
+  return apiFetch<SourceBackfillReport>("/v1/workflows/reextract-source", {
     method: "POST",
     body: JSON.stringify(body),
   });
