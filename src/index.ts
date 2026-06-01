@@ -6,6 +6,8 @@ import { recordEvent, maybeShowFirstRunNotice } from "./lib/telemetry.js";
 import { checkForUpdate } from "./lib/update-check.js";
 import { checkForSkillsUpdate } from "./lib/skills-update-check.js";
 import { maybeShowCompletionHint } from "./cli/completion/hint.js";
+import { AmbiguousSourceError } from "./api/client.js";
+import { formatAmbiguousSourceError } from "./cli/suggest.js";
 
 const LEGACY_COMMAND_ALIASES: Record<string, string[]> = {
   add: ["admin", "source", "add"],
@@ -113,5 +115,13 @@ try {
   if (!isCompletionRelated && !skipUpdateCheck) maybeShowCompletionHint();
 } catch (err) {
   await flushTelemetry(1);
+  // A bare source slug that matches sources in more than one org (#264).
+  // Print the candidate list + disambiguators cleanly instead of dumping a
+  // stack trace. Centralized here so every command that resolves a source by
+  // slug gets the guard, not just fetch/fetch-log/update.
+  if (err instanceof AmbiguousSourceError) {
+    process.stderr.write(formatAmbiguousSourceError(err) + "\n");
+    process.exit(1);
+  }
   throw err;
 }

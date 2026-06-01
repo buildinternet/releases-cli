@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import { suggestOrgs, suggestSources } from "../api/client.js";
+import { suggestOrgs, suggestSources, type AmbiguousSourceError } from "../api/client.js";
 
 export async function orgNotFound(identifier: string): Promise<never> {
   console.error(chalk.red(`Organization not found: ${identifier}`));
@@ -29,4 +29,25 @@ export function productNotFound(identifier: string): never {
   console.error(chalk.red(`Product not found: ${identifier}`));
   console.error(chalk.dim('Use an "org/slug" coordinate, a prod_… id, or a product slug.'));
   process.exit(1);
+}
+
+/**
+ * Renders the candidate list for an ambiguous bare source slug (#264): a header
+ * naming the slug + match count, then one `org/slug  src_…` line per candidate,
+ * and a hint pointing at the two unambiguous escape hatches. Pure (no I/O) so
+ * it can be unit-tested; the top-level handler in `index.ts` prints it.
+ */
+export function formatAmbiguousSourceError(err: AmbiguousSourceError): string {
+  const coords = err.candidates.map((c) => `${c.orgSlug ?? "—"}/${c.slug}`);
+  const width = Math.max(0, ...coords.map((c) => c.length));
+  const lines = err.candidates.map(
+    (c, i) => `  ${chalk.cyan(coords[i]!.padEnd(width))}  ${chalk.dim(c.id)}`,
+  );
+  return [
+    chalk.red(
+      `Source slug "${err.slug}" is ambiguous — it matches ${err.candidates.length} sources across orgs.`,
+    ),
+    chalk.dim("Re-run with an org/slug coordinate or a src_… id:"),
+    ...lines,
+  ].join("\n");
 }

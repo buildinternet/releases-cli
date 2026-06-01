@@ -30,7 +30,7 @@ export function registerFetchCommand(program: Command) {
     .description(
       "Fetch releases from configured sources (delegated to a remote managed-agent session)",
     )
-    .argument("[identifier]", "Source ID (src_...) or slug to fetch")
+    .argument("[identifier]", "Source ID (src_…), org/slug coordinate, or slug to fetch")
     .option("--source <identifier>", "Source ID or slug")
     .option("--json", "Output as JSON")
     .option("--unfetched", "Only fetch sources that have never been fetched")

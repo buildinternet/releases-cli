@@ -404,7 +404,7 @@ export async function updateSourceAction(
 
 export function attachUpdateOptions(cmd: Command): Command {
   return cmd
-    .argument("<identifier>", "Source ID (src_...) or slug")
+    .argument("<identifier>", "Source ID (src_…), org/slug coordinate, or slug")
     .option("--name <name>", "Update display name")
     .option("--url <url>", "Update source URL")
     .option("--type <type>", "Update source type (github, scrape, feed, agent)")
