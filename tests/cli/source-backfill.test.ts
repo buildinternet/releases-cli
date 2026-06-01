@@ -13,6 +13,7 @@ describe("source backfill (--help surface)", () => {
     expect(stdout).toContain("--max-windows");
     expect(stdout).toContain("--no-dry-run");
     expect(stdout).toContain("--markdown-file");
+    expect(stdout).toContain("--wait");
     expect(stdout).toContain("--json");
   });
 
@@ -22,5 +23,12 @@ describe("source backfill (--help surface)", () => {
     });
     expect(exitCode).not.toBe(0);
     expect(stderr.toLowerCase()).toContain("identifier");
+  });
+
+  it("registers backfill-status with an instanceId argument", () => {
+    const { stdout, exitCode } = runCli(["admin", "source", "backfill-status", "--help"]);
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("instanceId");
+    expect(stdout).toContain("--json");
   });
 });

@@ -136,6 +136,7 @@ Walk every scrape window of a windowed `scrape` source and upsert the whole hist
 releases admin source backfill my-source                    # preview: counts + date range, nothing written
 releases admin source backfill my-source --no-dry-run        # write (or --commit)
 releases admin source backfill my-source --max-windows 100   # walk further back (endpoint clamps 1–200, default 50)
+releases admin source backfill my-source --wait              # deep Firecrawl backfill: block until the async workflow finishes
 releases admin source backfill my-source --markdown-file page.md --commit
 cat page.md | releases admin source backfill my-source --markdown-file - --commit
 ```
@@ -146,6 +147,27 @@ Notes:
 - `--markdown-file` supplies the full-page markdown for JS-heavy / bot-blocked sources the worker can't fetch itself. Without it the endpoint falls back to Firecrawl (if enabled on the source) then a plain fetch.
 - Scrape sources only. Non-scrape sources, an unfetchable body, or a missing `ANTHROPIC_API_KEY`/`FIRECRAWL_API_KEY` come back as a clear error.
 - A dry run reports `windows`, `extracted → unique`, and the date range; it warns if it hit the window cap (raise `--max-windows`).
+- Deep Firecrawl backfills run as a durable workflow (minutes). Like `admin overview batch`, the CLI **dispatches and returns the workflow instance ID by default** (non-blocking — the agent-friendly default), then either:
+  - poll it yourself: `releases admin source backfill-status <instanceId> [--json]` (single-shot; loop on the `--json` `status` field), or
+  - pass `--wait` to block and render the report inline.
+- Non-Firecrawl / `--markdown-file` sources stay **synchronous** — the report comes back in one call regardless of `--wait`.
+
+### Re-extract (from a stored snapshot)
+
+Re-run extraction over a source's captured raw body in R2 (`released-raw`) — **no live scrape, no Firecrawl credits, deterministic input**. Use it after extraction/parse logic improves to reprocess a source's history. Sibling of `backfill`, **dry-run by default**:
+
+```bash
+releases admin source reextract my-source                          # preview from the latest snapshot
+releases admin source reextract my-source --commit                 # write (or --no-dry-run)
+releases admin source reextract my-source --snapshot-id raw_abc123 --commit   # pin a specific capture
+releases admin source reextract my-source --max-windows 100 --json
+```
+
+Notes:
+
+- Slug or `src_…` ID, resolved to the typed ID before calling (bare slugs rejected). Scrape sources only.
+- Omitting `--snapshot-id` uses the most recent capture; the report's `snapshot` block names which one was used.
+- Actionable errors surface as-is: `no_snapshot`/`snapshot_not_found` (404, none stored / wrong id), `snapshot_expired` (410, body past the 90-day R2 lifecycle — re-scrape to capture fresh), missing `RAW_SNAPSHOTS`/`ANTHROPIC_API_KEY` (503).
 
 ### Poll (cheap change detection)
 
