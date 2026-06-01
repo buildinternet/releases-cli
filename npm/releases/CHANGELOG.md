@@ -1,5 +1,20 @@
 # @buildinternet/releases
 
+## 0.52.0
+
+### Minor Changes
+
+- c4d9046: Admin source/org ergonomics: three fixes surfaced during a Discord onboarding cleanup.
+  - `admin source backfill <id|slug>` — new verb wrapping the full-history backfill endpoint (`POST /v1/workflows/backfill-source`). Resolves a slug to the typed `src_…` ID, dry-runs by default (counts + date range), and writes with `--no-dry-run`/`--commit`. Supports `--max-windows` and `--markdown-file` (for JS-heavy / bot-blocked pages the worker can't fetch itself). (#252)
+  - `admin source create` now accepts `--keyword-allow <list>` (→ `metadata.feedKeywordAllow`) and the general repeatable `--metadata-set key=value`, so feed filters are set atomically at create time. This closes the race where a follow-up `source update` lost to the onboard auto-fetch and ingested the whole unfiltered feed. (#237)
+  - `admin org delete --hard` now succeeds: it sends the typed `org_` ID the destructive path requires instead of the slug the server rejects. Soft delete still uses the slug. (#236)
+
+- a744cad: Admin source backfill/re-extract: async-aware backfill + a new `reextract` verb.
+  - `admin source backfill` now handles the async dispatch shape. Deep Firecrawl backfills run as a durable workflow (buildinternet/releases#1281/#1282) and return `202 { instanceId, statusUrl }` instead of a report; the CLI now detects this rather than crashing on the non-report body. Matching `admin overview batch`, it **dispatches and returns the workflow instance ID by default** (non-blocking — the right primitive for the CLI's primary agent users), with `--wait` to poll inline and render the report. New sibling `admin source backfill-status <instanceId>` does a single-shot status read (renders the report when complete) so a dispatched workflow can be polled on the caller's own cadence. The Firecrawl-ceiling `guidance` hint is now surfaced. (buildinternet/releases#1285)
+  - `admin source reextract <id|slug>` — new verb wrapping `POST /v1/workflows/reextract-source` (buildinternet/releases#1284). Re-extracts releases from a stored raw snapshot (`released-raw`) with no live scrape, no Firecrawl credits, deterministic input — for reprocessing history after extraction/parse logic improves. Dry-run by default; `--snapshot-id` pins a specific capture, `--commit`/`--no-dry-run` writes. Surfaces the endpoint's actionable errors (`no_snapshot`/`snapshot_not_found` 404, `snapshot_expired` 410, non-scrape 400, missing bucket/key 503). (buildinternet/releases-cli#257)
+
+- a188184: `admin org update` now accepts `--featured` / `--no-featured`, so operators can curate the editorially-featured org list (the home-page rail, buildinternet/releases#1274/#1275) from the terminal instead of only via the web Admin menu or a raw API `PATCH`. The flag maps to `PATCH /v1/orgs/:slug { featured }`; aliased onto the deprecated `org edit` too. (#253)
+
 ## 0.51.0
 
 ### Minor Changes
