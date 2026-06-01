@@ -36,7 +36,7 @@ import type {
   OrgDependentsResponse,
   AppStoreMaterializeResponse,
 } from "./types.js";
-import type { ListResponse } from "@buildinternet/releases-core/cli-contracts";
+import { computePagination, type ListResponse } from "@buildinternet/releases-core/cli-contracts";
 import type {
   DomainLookupResponse,
   OverviewCitation,
@@ -1112,21 +1112,66 @@ export async function findProduct(identifier: string): Promise<Product | null> {
   return apiFetch<Product | null>(target.pathSegment);
 }
 
+export type ProductWithSourceCount = Product & { sourceCount: number };
+
+/**
+ * List products via `GET /v1/products`. Omit `orgId` to enumerate products
+ * across every org — the org-agnostic form backing `releases admin product
+ * list` with no org argument (releases-cli#259). Returns the paginated
+ * envelope so callers can surface `pagination.hasMore`; `getProductsByOrg`
+ * unwraps it for the single-org callers that only want the rows.
+ *
+ * `/v1/products` returns a paginated envelope; the legacy bare-array shape is
+ * tolerated too in case an old worker is ever in the path. Without the unwrap,
+ * downstream `for/find/filter/map` would silently iterate an object and yield
+ * nothing — which is what made `releases org get` skip the Products section.
+ */
+export async function listProducts(opts?: {
+  orgId?: string;
+  kind?: Kind;
+  limit?: number;
+  page?: number;
+}): Promise<ListResponse<ProductWithSourceCount>> {
+  const params = new URLSearchParams();
+  if (opts?.orgId) params.set("orgId", opts.orgId);
+  if (opts?.kind) params.set("kind", opts.kind);
+  if (opts?.limit != null) params.set("limit", String(opts.limit));
+  if (opts?.page != null) params.set("page", String(opts.page));
+  const qs = params.toString();
+  const raw = await apiFetch<ProductWithSourceCount[] | ListResponse<ProductWithSourceCount>>(
+    `/v1/products${qs ? `?${qs}` : ""}`,
+  );
+  if (!raw) {
+    return {
+      items: [],
+      pagination: computePagination({
+        page: opts?.page ?? 1,
+        pageSize: opts?.limit ?? 0,
+        returned: 0,
+        totalItems: 0,
+      }),
+    };
+  }
+  if (Array.isArray(raw)) {
+    return {
+      items: raw,
+      pagination: computePagination({
+        page: 1,
+        pageSize: raw.length,
+        returned: raw.length,
+        totalItems: raw.length,
+      }),
+    };
+  }
+  return raw;
+}
+
 export async function getProductsByOrg(
   orgId: string,
   opts?: { kind?: Kind },
-): Promise<Array<Product & { sourceCount: number }>> {
-  // /v1/products returns a paginated envelope; tolerate the legacy bare-array
-  // shape too in case an old worker is ever in the path. Without the unwrap,
-  // every downstream `for/find/filter/map` over the result was silently
-  // iterating an object and yielding nothing — which is what made
-  // `releases org get` skip the Products section even when the org had them.
-  type Row = Product & { sourceCount: number };
-  const params = new URLSearchParams({ orgId });
-  if (opts?.kind) params.set("kind", opts.kind);
-  const raw = await apiFetch<Row[] | ListResponse<Row>>(`/v1/products?${params}`);
-  if (!raw) return [];
-  return Array.isArray(raw) ? raw : raw.items;
+): Promise<ProductWithSourceCount[]> {
+  const { items } = await listProducts({ orgId, kind: opts?.kind });
+  return items;
 }
 
 export async function updateProduct(

@@ -1,10 +1,11 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import { renderTable } from "../render/table.js";
+import { renderTable, type ColumnSpec } from "../render/table.js";
 import {
   findOrg,
   findProduct,
-  getProductsByOrg,
+  listProducts,
+  listOrgs,
   createProduct,
   updateProduct,
   deleteProduct,
@@ -24,7 +25,12 @@ import { isValidCategory, CATEGORIES } from "@buildinternet/releases-core/catego
 import { isValidKind, KIND_VALUES, type Kind } from "@buildinternet/releases-core/kinds";
 import { logger } from "@releases/lib/logger";
 import { writeJson } from "../../lib/output.js";
-import { computePagination, type ListResponse } from "@buildinternet/releases-core/cli-contracts";
+import {
+  computePagination,
+  DEFAULT_PAGE_SIZE,
+  formatTruncationWarning,
+  type ListResponse,
+} from "@buildinternet/releases-core/cli-contracts";
 import { warnDeprecatedAlias } from "../../lib/deprecated-alias.js";
 import { parseTagList } from "../../lib/flags.js";
 
@@ -251,63 +257,134 @@ export function registerProductCommand(program: Command) {
 
   product
     .command("list")
-    .description("List products for an organization")
-    .argument("[org]", "Organization (org_…, slug, domain, name, or handle)")
+    .description("List products for an organization, or across all orgs when no org is given")
+    .argument(
+      "[org]",
+      "Organization (org_…, slug, domain, name, or handle). Omit to list products across every org.",
+    )
     .option("--json", "Output as JSON")
     .option(
       "--kind <kind>",
       `Filter by product taxonomy (${KIND_VALUES.join(", ")}). Matches the product's own kind only.`,
     )
-    .action(async (orgIdentifier: string | undefined, opts: { json?: boolean; kind?: string }) => {
-      if (!orgIdentifier) {
-        console.error(chalk.red("Please specify an organization"));
-        process.exit(1);
-      }
+    .option("--limit <n>", `Limit the number of results (default ${DEFAULT_PAGE_SIZE})`)
+    .option("--page <n>", "Page number for paginated results")
+    .addHelpText(
+      "after",
+      `
+Examples:
+  releases admin product list vercel          Products under one org
+  releases admin product list --kind sdk      Every SDK product across all orgs
+  releases admin product list --json          All products as JSON (for audits)`,
+    )
+    .action(
+      async (
+        orgIdentifier: string | undefined,
+        opts: { json?: boolean; kind?: string; limit?: string; page?: string },
+      ) => {
+        if (opts.kind !== undefined && !isValidKind(opts.kind)) {
+          logger.error(`Invalid kind "${opts.kind}". Must be one of: ${KIND_VALUES.join(", ")}`);
+          process.exit(1);
+        }
+        const kind = opts.kind as Kind | undefined;
 
-      if (opts.kind !== undefined && !isValidKind(opts.kind)) {
-        logger.error(`Invalid kind "${opts.kind}". Must be one of: ${KIND_VALUES.join(", ")}`);
-        process.exit(1);
-      }
-      const kind = opts.kind as Kind | undefined;
+        const parsedLimit = opts.limit === undefined ? undefined : Number(opts.limit);
+        if (parsedLimit !== undefined && (!Number.isInteger(parsedLimit) || parsedLimit <= 0)) {
+          logger.error("--limit must be a positive integer");
+          process.exit(1);
+        }
+        const explicitLimit = parsedLimit !== undefined;
+        const pageSize = explicitLimit ? parsedLimit : DEFAULT_PAGE_SIZE;
 
-      const org = await findOrg(orgIdentifier);
-      if (!org) {
-        console.error(chalk.red(`Organization not found: ${orgIdentifier}`));
-        process.exit(1);
-      }
+        const parsedPage = opts.page === undefined ? 1 : Number(opts.page);
+        if (!Number.isInteger(parsedPage) || parsedPage <= 0) {
+          logger.error("--page must be a positive integer");
+          process.exit(1);
+        }
+        const page = parsedPage;
 
-      const productList = await getProductsByOrg(org.id, { kind });
+        // org omitted → enumerate products across every org (releases-cli#259).
+        let org: Awaited<ReturnType<typeof findOrg>> | undefined;
+        if (orgIdentifier) {
+          org = await findOrg(orgIdentifier);
+          if (!org) {
+            console.error(chalk.red(`Organization not found: ${orgIdentifier}`));
+            process.exit(1);
+          }
+        }
 
-      if (productList.length === 0) {
-        if (opts.json) await writeJson([]);
-        else console.log(chalk.yellow(`No products found for organization: ${org.name}`));
-        return;
-      }
+        const { items: productList, pagination } = await listProducts({
+          orgId: org?.id,
+          kind,
+          limit: explicitLimit ? pageSize : undefined,
+          page: page > 1 ? page : undefined,
+        });
 
-      if (opts.json) {
-        await writeJson(productList);
-        return;
-      }
+        if (productList.length === 0) {
+          if (opts.json) await writeJson([]);
+          else if (org)
+            console.log(chalk.yellow(`No products found for organization: ${org.name}`));
+          else console.log(chalk.yellow("No products found."));
+          return;
+        }
 
-      console.log(
-        renderTable({
-          head: [
-            { label: "Name" },
-            { label: "Slug", noTruncate: true },
-            { label: "URL" },
-            { label: "Avatar" },
-            { label: "Sources", noTruncate: true, alignRight: true },
-          ],
-          rows: productList.map((p) => [
-            p.name,
-            p.slug,
-            p.url ?? chalk.dim("—"),
-            p.avatarUrl ?? chalk.dim("—"),
-            String(p.sourceCount),
-          ]),
-        }),
-      );
-    });
+        const warnIfTruncated = () => {
+          if (!explicitLimit && pagination.hasMore) {
+            logger.warn(
+              formatTruncationWarning({
+                returned: productList.length,
+                pageSize,
+                commandExample: "releases admin product list --limit <n> --page <p>",
+              }),
+            );
+          }
+        };
+
+        if (opts.json) {
+          await writeJson(productList);
+          warnIfTruncated();
+          return;
+        }
+
+        // Cross-org listing needs an Org column so a bare product slug is
+        // attributable; resolve ids → names once (orgs with products but no
+        // releases included). Org-scoped listing keeps the original columns.
+        const crossOrg = !org;
+        const orgNameById = new Map<string, string>();
+        if (crossOrg) {
+          const orgs = await listOrgs({ limit: 500, includeEmpty: true });
+          for (const o of orgs.items) orgNameById.set(o.id, o.name);
+        }
+
+        const head: ColumnSpec[] = [{ label: "Name" }];
+        if (crossOrg) head.push({ label: "Org" });
+        head.push(
+          { label: "Slug", noTruncate: true },
+          { label: "URL" },
+          { label: "Avatar" },
+          { label: "Sources", noTruncate: true, alignRight: true },
+        );
+
+        console.log(
+          renderTable({
+            head,
+            rows: productList.map((p) => {
+              const row = [p.name];
+              if (crossOrg) row.push(orgNameById.get(p.orgId) ?? p.orgId);
+              row.push(
+                p.slug,
+                p.url ?? chalk.dim("—"),
+                p.avatarUrl ?? chalk.dim("—"),
+                String(p.sourceCount),
+              );
+              return row;
+            }),
+          }),
+        );
+
+        warnIfTruncated();
+      },
+    );
 
   // ── product create (canonical) / product add (deprecated) ──
   product

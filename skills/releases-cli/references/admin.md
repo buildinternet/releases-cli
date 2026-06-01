@@ -223,6 +223,8 @@ releases admin product create "Next.js" --org vercel --url https://nextjs.org
 releases admin product create "Stripe Node" --org stripe --kind sdk
 releases admin product list vercel
 releases admin product list openai --kind sdk           # filter by taxonomy
+releases admin product list                             # every product, all orgs (adds an Org column)
+releases admin product list --kind sdk --json           # cross-org kind audit (CLI↔MCP list_catalog parity)
 releases admin product update nextjs --description "React framework for production"
 releases admin product update stripe-node --kind sdk    # classify
 releases admin product update stripe-node --no-kind     # clear
