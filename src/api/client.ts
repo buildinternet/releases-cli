@@ -1469,12 +1469,12 @@ export interface OverviewInputs {
 export async function getOverviewInputs(
   slug: string,
   opts: { window?: number; limit?: number } = {},
-): Promise<OverviewInputs> {
+): Promise<OverviewInputs | null> {
   const params = new URLSearchParams();
   if (opts.window !== undefined) params.set("window", String(opts.window));
   if (opts.limit !== undefined) params.set("limit", String(opts.limit));
   const qs = params.toString();
-  return apiFetch<OverviewInputs>(
+  return apiFetch<OverviewInputs | null>(
     `/v1/orgs/${encodeURIComponent(slug)}/overview/inputs${qs ? `?${qs}` : ""}`,
   );
 }
@@ -1482,12 +1482,12 @@ export async function getOverviewInputs(
 export async function getOverviewInputsCheck(
   slug: string,
   opts: { window?: number; limit?: number } = {},
-): Promise<OverviewInputsCheck> {
+): Promise<OverviewInputsCheck | null> {
   const params = new URLSearchParams();
   params.set("check", "true");
   if (opts.window !== undefined) params.set("window", String(opts.window));
   if (opts.limit !== undefined) params.set("limit", String(opts.limit));
-  return apiFetch<OverviewInputsCheck>(
+  return apiFetch<OverviewInputsCheck | null>(
     `/v1/orgs/${encodeURIComponent(slug)}/overview/inputs?${params.toString()}`,
   );
 }

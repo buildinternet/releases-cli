@@ -237,8 +237,8 @@ async function overviewUpdateAction(
 
   if (releaseCount === undefined || lastContributingAt === undefined) {
     const inputs = await getOverviewInputs(org.slug);
-    releaseCount ??= inputs.totalAvailable;
-    lastContributingAt ??= inputs.selected[0]?.publishedAt ?? undefined;
+    releaseCount ??= inputs?.totalAvailable ?? 0;
+    lastContributingAt ??= inputs?.selected[0]?.publishedAt ?? undefined;
   }
 
   await upsertOverview(org.slug, {
@@ -301,6 +301,16 @@ async function overviewInputsAction(
 
   if (opts.check) {
     const result = await getOverviewInputsCheck(org.slug, { window, limit });
+    if (!result) {
+      if (opts.json) {
+        await writeJson({ error: "not_found", orgSlug: org.slug });
+      } else {
+        logger.error(
+          `${org.name} exists in the registry but does not support overview generation (on_demand orgs are not eligible).`,
+        );
+      }
+      process.exit(1);
+    }
     if (opts.json) {
       await writeJson(result);
       return;
@@ -320,6 +330,16 @@ async function overviewInputsAction(
   }
 
   const inputs = await getOverviewInputs(org.slug, { window, limit });
+  if (!inputs) {
+    if (opts.json) {
+      await writeJson({ error: "not_found", orgSlug: org.slug });
+    } else {
+      logger.error(
+        `${org.name} exists in the registry but does not support overview generation (on_demand orgs are not eligible).`,
+      );
+    }
+    process.exit(1);
+  }
 
   if (opts.json) {
     await writeJson(clipInputsContent(inputs, maxContentChars));
