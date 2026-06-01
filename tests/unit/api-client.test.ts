@@ -578,3 +578,151 @@ describe("resolveProductFeedTarget", () => {
     expect(target).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// findSource bare-slug ambiguity (#264)
+//
+// Source slugs are unique per-org, not globally. A bare slug that exists under
+// more than one org must error and list candidates instead of silently
+// resolving to the oldest match. `src_…` ids and `org/slug` coordinates stay
+// the unambiguous escape hatches and must NOT trigger the enumeration.
+// ---------------------------------------------------------------------------
+
+const sourceRow = (id: string, slug: string, orgSlug: string): SourceWithOrg => ({
+  id,
+  name: slug,
+  slug,
+  type: "scrape",
+  url: `https://${orgSlug}.test/${slug}`,
+  orgName: orgSlug,
+  orgSlug,
+  productName: null,
+  productSlug: null,
+  isPrimary: false,
+  isHidden: false,
+  metadata: null,
+  releaseCount: 0,
+  latestVersion: null,
+  latestDate: null,
+  lastFetchedAt: null,
+  fetchPriority: "normal",
+  changeDetectedAt: null,
+  consecutiveNoChange: 0,
+  consecutiveErrors: 0,
+  nextFetchAfter: null,
+  lastPolledAt: null,
+  medianGapDays: null,
+  lastRetieredAt: null,
+});
+
+const jsonResponse = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+
+describe("findSource bare-slug ambiguity (#264)", () => {
+  let originalFetch: typeof globalThis.fetch;
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+  });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const json = jsonResponse;
+
+  it("throws AmbiguousSourceError with all candidates when a bare slug matches >1 org", async () => {
+    globalThis.fetch = (async (url: string) => {
+      if (url.includes("/v1/sources?")) {
+        return json([sourceRow("src_a", "blog", "vitest"), sourceRow("src_b", "blog", "hashnode")]);
+      }
+      return json(null, 404);
+    }) as any;
+
+    let caught: unknown;
+    try {
+      await client.findSource("blog");
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBeInstanceOf(client.AmbiguousSourceError);
+    const err = caught as InstanceType<typeof client.AmbiguousSourceError>;
+    expect(err.slug).toBe("blog");
+    // Candidate order mirrors the server's row order (preserved through the
+    // filter + map in resolveSourceTarget).
+    expect(err.candidates.map((c) => c.orgSlug)).toEqual(["vitest", "hashnode"]);
+    expect(err.candidates.map((c) => c.id)).toEqual(["src_a", "src_b"]);
+  });
+
+  it("resolves a bare slug that matches exactly one source", async () => {
+    let enumUrl = "";
+    globalThis.fetch = (async (url: string) => {
+      if (url.includes("/v1/sources?")) {
+        enumUrl = url;
+        return json([sourceRow("src_only", "blog", "vitest")]);
+      }
+      // Second hop: hydrate the resolved source by its typed id.
+      return json({ ...sourceRow("src_only", "blog", "vitest"), orgId: "org_vitest" });
+    }) as any;
+
+    const found = await client.findSource("blog");
+    expect(found).not.toBeNull();
+    expect(found!.id).toBe("src_only");
+    // Enumeration is an exact-slug match that includes hidden sources.
+    expect(enumUrl).toContain("slug=blog");
+    expect(enumUrl).toContain("include_hidden=true");
+  });
+
+  it("returns null when a bare slug matches no source", async () => {
+    globalThis.fetch = (async (url: string) => {
+      if (url.includes("/v1/sources?")) return json([]);
+      return json(null, 404);
+    }) as any;
+    expect(await client.findSource("ghost")).toBeNull();
+  });
+
+  it("passes a src_… id straight through without enumerating by slug", async () => {
+    const urls: string[] = [];
+    globalThis.fetch = (async (url: string) => {
+      urls.push(url);
+      return json(sourceRow("src_x", "blog", "vitest"));
+    }) as any;
+
+    await client.findSource("src_x");
+    expect(urls.some((u) => u.includes("/v1/sources/src_x"))).toBe(true);
+    expect(urls.some((u) => u.includes("/v1/sources?"))).toBe(false);
+  });
+
+  it("ignores non-matching rows from an API build that doesn't honor ?slug=", async () => {
+    // Older server returns an unfiltered page; the client re-applies the exact
+    // slug match so a single true match still resolves (no false ambiguity).
+    globalThis.fetch = (async (url: string) => {
+      if (url.includes("/v1/sources?")) {
+        return json([
+          sourceRow("src_a", "blog", "vitest"),
+          sourceRow("src_b", "changelog", "hashnode"),
+          sourceRow("src_c", "docs", "acme"),
+        ]);
+      }
+      return json({ ...sourceRow("src_a", "blog", "vitest"), orgId: "org_vitest" });
+    }) as any;
+
+    const found = await client.findSource("blog");
+    expect(found).not.toBeNull();
+    expect(found!.id).toBe("src_a");
+  });
+
+  it("splits an org/slug coordinate locally without enumerating by slug", async () => {
+    const urls: string[] = [];
+    globalThis.fetch = (async (url: string) => {
+      urls.push(url);
+      return json(sourceRow("src_y", "blog", "vitest"));
+    }) as any;
+
+    await client.findSource("vitest/blog");
+    expect(urls.some((u) => u.includes("/v1/orgs/vitest/sources/blog"))).toBe(true);
+    expect(urls.some((u) => u.includes("/v1/sources?"))).toBe(false);
+  });
+});

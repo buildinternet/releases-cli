@@ -142,21 +142,67 @@ export async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T> 
 
 // ── Source queries ──
 
+export interface AmbiguousSourceCandidate {
+  id: string;
+  slug: string;
+  orgSlug: string | null;
+}
+
 /**
- * Resolves an operator-supplied source identifier to a `{ orgSlug, sourceSlug }`
- * pair the API can match without ambiguity. Accepts:
+ * Raised when a bare source slug matches sources in more than one org. Source
+ * slugs are unique per-org but not globally (#690), so a bare `blog` can sit
+ * under several orgs. Rather than silently resolving to one (the old
+ * oldest-match behavior, which could read from — or mutate — the wrong org),
+ * resolution throws this and the CLI prints the `org/slug` + `src_…`
+ * disambiguators carried in `candidates` (#264).
+ */
+export class AmbiguousSourceError extends Error {
+  readonly slug: string;
+  readonly candidates: AmbiguousSourceCandidate[];
+  constructor(slug: string, candidates: AmbiguousSourceCandidate[]) {
+    super(
+      `Source slug "${slug}" is ambiguous — it matches ${candidates.length} sources across orgs.`,
+    );
+    this.name = "AmbiguousSourceError";
+    this.slug = slug;
+    this.candidates = candidates;
+  }
+}
+
+/**
+ * Lists every source whose slug **exactly** matches `slug`, across all orgs,
+ * including hidden sources (matching the visibility the legacy
+ * `source-by-slug` resolver had against `sources_active`). Distinct from the
+ * `?q=` substring search. Backs the cross-org ambiguity check in
+ * `resolveSourceTarget` (#264).
  *
- *   - `src_…` typed IDs: pass straight through; the bare API path still
- *     accepts globally-unique IDs.
+ * The exact-slug match is re-applied client-side so the result stays correct
+ * even against an older API build that doesn't yet honor `?slug=` (it would
+ * otherwise return an unfiltered page and make every bare slug look ambiguous).
+ */
+export async function listSourcesBySlug(slug: string): Promise<SourceWithOrg[]> {
+  const rows =
+    (await apiFetch<SourceWithOrg[] | null>(
+      `/v1/sources?slug=${encodeURIComponent(slug)}&include_hidden=true`,
+    )) ?? [];
+  return rows.filter((r) => r.slug === slug);
+}
+
+/**
+ * Resolves an operator-supplied source identifier to a path the API can match
+ * without ambiguity. Accepts:
+ *
+ *   - `src_…` typed IDs: pass straight through; globally unique.
  *   - `org/slug` coordinates: split locally; the API takes the org-scoped
  *     pair directly.
- *   - bare slugs: round-trip through `GET /v1/lookups/source-by-slug` to
- *     pick the canonical org for the slug. The lookup endpoint returns the
- *     oldest match so repeated calls land on the same row when a slug
- *     exists under multiple orgs (a side effect of #690 per-org slug
- *     uniqueness).
+ *   - bare slugs: enumerate every org's source with this exact slug via
+ *     `listSourcesBySlug`. Resolve only when exactly one matches; throw
+ *     `AmbiguousSourceError` when more than one org claims the slug so the
+ *     caller can surface `org/slug` + `src_…` disambiguators instead of
+ *     silently picking the oldest (#264).
  *
- * Returns `null` when no matching source exists. Throws on API errors.
+ * Returns `null` when no matching source exists. Throws `AmbiguousSourceError`
+ * on a cross-org bare-slug collision, or `Error` on API failures.
  */
 async function resolveSourceTarget(
   identifier: string,
@@ -173,17 +219,19 @@ async function resolveSourceTarget(
       sourceId: "", // unknown until we hydrate via findSource — callers that need the ID re-read source.id from the result
     };
   }
-  // Bare slug — bounce through the lookup resolver to get an unambiguous home.
-  const resolved = await apiFetch<{
-    sourceId: string;
-    sourceSlug: string;
-    orgSlug: string;
-  } | null>(`/v1/lookups/source-by-slug?slug=${encodeURIComponent(identifier)}`);
-  if (!resolved) return null;
-  return {
-    pathSegment: `/v1/orgs/${encodeURIComponent(resolved.orgSlug)}/sources/${encodeURIComponent(resolved.sourceSlug)}`,
-    sourceId: resolved.sourceId,
-  };
+  // Bare slug — slugs are unique per-org but not globally, so enumerate every
+  // org's source with this exact slug.
+  const matches = await listSourcesBySlug(identifier);
+  if (matches.length === 0) return null;
+  if (matches.length > 1) {
+    throw new AmbiguousSourceError(
+      identifier,
+      matches.map((m) => ({ id: m.id, slug: m.slug, orgSlug: m.orgSlug })),
+    );
+  }
+  // Exactly one match — hydrate through the globally-unambiguous typed id.
+  const only = matches[0]!;
+  return { pathSegment: `/v1/sources/${encodeURIComponent(only.id)}`, sourceId: only.id };
 }
 
 export async function findSource(identifier: string): Promise<Source | null> {

@@ -17,10 +17,12 @@ import {
   getProductsByOrg,
   findProduct,
   listSourcesWithOrg,
+  AmbiguousSourceError,
 } from "../api/client.js";
 import type { LatestRelease } from "../api/types.js";
 import { logger } from "@releases/lib/logger";
 import { recordEvent } from "../lib/telemetry.js";
+import { describeAmbiguousSource } from "../cli/suggest.js";
 import { VERSION } from "../cli/version.js";
 
 function textResult(text: string) {
@@ -247,7 +249,16 @@ server.registerTool(
     },
   },
   async ({ identifier }) => {
-    const source = await findSource(identifier);
+    let source;
+    try {
+      source = await findSource(identifier);
+    } catch (err) {
+      // A bare slug under more than one org: surface the candidates as tool
+      // text so the agent can re-call with an org/slug coordinate or src_ id,
+      // rather than silently reading the wrong org's source (#264).
+      if (err instanceof AmbiguousSourceError) return textResult(describeAmbiguousSource(err));
+      throw err;
+    }
     if (!source) {
       return textResult(`No source found matching "${identifier}"`);
     }
@@ -298,12 +309,18 @@ server.registerTool(
     },
   },
   async ({ source: identifier, path: requestedPath, offset, limit, tokens }) => {
-    const response = await sourceChangelog(identifier, {
-      path: requestedPath,
-      offset,
-      limit,
-      tokens,
-    });
+    let response;
+    try {
+      response = await sourceChangelog(identifier, {
+        path: requestedPath,
+        offset,
+        limit,
+        tokens,
+      });
+    } catch (err) {
+      if (err instanceof AmbiguousSourceError) return textResult(describeAmbiguousSource(err));
+      throw err;
+    }
 
     if (!response) {
       return textResult(

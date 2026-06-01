@@ -18,7 +18,7 @@ export function registerFetchLogCommand(program: Command) {
       `
 Examples:
   releases admin source fetch-log                 Show recent fetch history
-  releases admin source fetch-log my-source       Show history for one source (slug or src_…)
+  releases admin source fetch-log my-source       Show history for one source (slug, org/slug, or src_…)
   releases admin source fetch-log --limit 50
   releases admin source fetch-log --json`,
     )
@@ -87,7 +87,7 @@ Examples:
       );
       const hint = source
         ? `  More: "releases get ${source}" for source details · "releases admin source fetch ${source}" to re-fetch`
-        : `  More: "releases admin source fetch-log <source>" to filter by source (slug or src_…) · "releases get <source>" for source details`;
+        : `  More: "releases admin source fetch-log <source>" to filter by source (slug, org/slug, or src_…) · "releases get <source>" for source details`;
       console.log(chalk.dim(`\n${hint}`));
     });
 }

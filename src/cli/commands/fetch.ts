@@ -30,8 +30,8 @@ export function registerFetchCommand(program: Command) {
     .description(
       "Fetch releases from configured sources (delegated to a remote managed-agent session)",
     )
-    .argument("[identifier]", "Source ID (src_...) or slug to fetch")
-    .option("--source <identifier>", "Source ID or slug")
+    .argument("[identifier]", "Source ID (src_…), org/slug coordinate, or slug to fetch")
+    .option("--source <identifier>", "Source ID (src_…), org/slug coordinate, or slug")
     .option("--json", "Output as JSON")
     .option("--unfetched", "Only fetch sources that have never been fetched")
     .option("--stale <hours>", "Only fetch sources older than N hours")
@@ -138,7 +138,7 @@ Examples:
           label = `${entries.length} errored sources`;
         } else {
           logger.error(
-            "fetch requires a source identifier (src_… or slug) or filter (--stale, --unfetched, --changed, --retry-errors, --org)",
+            "fetch requires a source identifier (src_…, org/slug coordinate, or slug) or filter (--stale, --unfetched, --changed, --retry-errors, --org)",
           );
           process.exit(1);
         }
