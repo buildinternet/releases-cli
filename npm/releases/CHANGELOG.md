@@ -1,5 +1,19 @@
 # @buildinternet/releases
 
+## 0.53.0
+
+### Minor Changes
+
+- 1447aad: `admin org update` and `admin source update` now accept `--discovery <status>` to promote or demote discovery status (`curated | agent | on_demand`).
+- 54003b5: `admin product list` now lists products across all orgs when the org argument is omitted.
+
+  The org argument is optional: `releases admin product list` (no org) enumerates products across every org, honoring `--kind`, `--json`, and the new `--limit`/`--page` pagination flags. The cross-org table gains an **Org** column so a bare product slug stays attributable; org-scoped listing keeps its original columns. This closes the CLI↔MCP gap that blocked a cross-org `kind=sdk` audit — previously expressible only via the remote MCP `list_catalog` tool (buildinternet/releases-cli#259). Backed by the existing org-agnostic `GET /v1/products` endpoint; no API change required.
+
+### Patch Changes
+
+- 59ff421: Resolving a source by a **bare slug** (`admin source fetch`/`fetch-log`/`update`, the MCP `get_source` / `get_source_changelog` tools, and every other command that takes a source identifier) now errors and lists the matching `org/slug` + `src_…` candidates when that slug exists under more than one org, instead of silently resolving to the oldest match. Source slugs are unique per-org but not globally, so a bare `blog` could previously read from — or `update` could mutate — a source in the wrong org. Disambiguate with an `org/slug` coordinate or a `src_…` id (both already supported). Requires the API's `?slug=` source filter (releases#1323).
+- 6562369: Fix crash in `admin overview inputs` when the API returns 404 for on_demand orgs.
+
 ## 0.52.0
 
 ### Minor Changes
