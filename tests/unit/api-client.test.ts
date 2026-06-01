@@ -232,6 +232,110 @@ describe("listSourcesWithOrg", () => {
 });
 
 // ---------------------------------------------------------------------------
+// listProducts — org-agnostic product listing backing `releases admin product
+// list` with no org argument (releases-cli#259). Omitting orgId enumerates
+// products across every org; getProductsByOrg unwraps the envelope for the
+// single-org callers.
+// ---------------------------------------------------------------------------
+
+const productEnvelope = (items: unknown[], hasMore = false) => ({
+  items,
+  pagination: {
+    page: 1,
+    pageSize: items.length,
+    returned: items.length,
+    totalItems: items.length,
+    totalPages: 1,
+    hasMore,
+  },
+});
+
+describe("listProducts", () => {
+  let originalFetch: typeof globalThis.fetch;
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it("omits orgId from the query string when no org is given", async () => {
+    let capturedUrl = "";
+    globalThis.fetch = (async (url: string) => {
+      capturedUrl = url;
+      return new Response(JSON.stringify(productEnvelope([])), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as any;
+
+    await client.listProducts();
+    expect(capturedUrl).toContain("/v1/products");
+    expect(capturedUrl).not.toContain("orgId");
+  });
+
+  it("passes orgId, kind, limit, and page as query params", async () => {
+    let capturedUrl = "";
+    globalThis.fetch = (async (url: string) => {
+      capturedUrl = url;
+      return new Response(JSON.stringify(productEnvelope([])), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as any;
+
+    await client.listProducts({ orgId: "org_abc", kind: "sdk", limit: 25, page: 3 });
+    expect(capturedUrl).toContain("orgId=org_abc");
+    expect(capturedUrl).toContain("kind=sdk");
+    expect(capturedUrl).toContain("limit=25");
+    expect(capturedUrl).toContain("page=3");
+  });
+
+  it("returns the paginated envelope from the worker", async () => {
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify(productEnvelope([{ id: "prod_1", orgId: "org_x" }], true)), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })) as any;
+
+    const res = await client.listProducts({ kind: "sdk" });
+    expect(res.items).toHaveLength(1);
+    expect(res.pagination.hasMore).toBe(true);
+  });
+
+  it("wraps the legacy bare-array shape in an envelope", async () => {
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify([{ id: "prod_1", orgId: "org_x" }]), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })) as any;
+
+    const res = await client.listProducts();
+    expect(res.items).toHaveLength(1);
+    expect(res.pagination.returned).toBe(1);
+  });
+
+  it("getProductsByOrg unwraps the envelope to a bare array", async () => {
+    let capturedUrl = "";
+    globalThis.fetch = (async (url: string) => {
+      capturedUrl = url;
+      return new Response(JSON.stringify(productEnvelope([{ id: "prod_1", orgId: "org_x" }])), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as any;
+
+    const rows = await client.getProductsByOrg("org_x", { kind: "sdk" });
+    expect(Array.isArray(rows)).toBe(true);
+    expect(rows).toHaveLength(1);
+    expect(capturedUrl).toContain("orgId=org_x");
+    expect(capturedUrl).toContain("kind=sdk");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Embed backfill routes — paths moved from /v1/admin/embed/* to /v1/workflows/embed-*
 // (monorepo #494); status endpoint stayed on /v1/admin/embed/status.
 // ---------------------------------------------------------------------------
