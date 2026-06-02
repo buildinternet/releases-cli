@@ -911,8 +911,15 @@ export async function updateSource(
   });
 }
 
-export async function deleteSource(source: Pick<Source, "id">): Promise<void> {
-  await apiFetch(`/v1/sources/${encodeURIComponent(source.id)}`, { method: "DELETE" });
+export async function deleteSource(
+  source: Pick<Source, "id">,
+  opts?: { hard?: boolean },
+): Promise<void> {
+  // Soft delete (default) tombstones the row (sets deletedAt + mangles the
+  // slug); `?hard=true` removes it outright so the URL can be re-onboarded
+  // fresh. See #1184.
+  const query = opts?.hard ? "?hard=true" : "";
+  await apiFetch(`/v1/sources/${encodeURIComponent(source.id)}${query}`, { method: "DELETE" });
 }
 
 export async function insertReleasesBatch(
@@ -961,8 +968,16 @@ export async function insertReleasesBatch(
 
 export async function deleteReleasesForSource(
   source: Pick<Source, "id">,
-): Promise<{ deleted: number }> {
-  return apiFetch(`/v1/sources/${encodeURIComponent(source.id)}/releases`, { method: "DELETE" });
+  opts?: { hard?: boolean },
+): Promise<{ suppressed: number } | { deleted: number; hard: true }> {
+  // Default (soft) suppresses rows with reason "force_refetch" but leaves them
+  // occupying UNIQUE(source_id, url) — a re-fetch upserts on top but never
+  // un-suppresses, so the rows stay hidden. `?hard=true` removes them so the
+  // dedup slot frees up and a corrected re-fetch ingests clean. See #1184.
+  const query = opts?.hard ? "?hard=true" : "";
+  return apiFetch(`/v1/sources/${encodeURIComponent(source.id)}/releases${query}`, {
+    method: "DELETE",
+  });
 }
 
 export async function createSource(data: {
@@ -1950,8 +1965,11 @@ export async function findSourcesBySlugs(slugs: string[]): Promise<Source[]> {
   return results.filter((r): r is Source => r !== null);
 }
 
-export async function deleteSources(sources: Array<Pick<Source, "id">>): Promise<void> {
-  await Promise.all(sources.map((s) => deleteSource(s)));
+export async function deleteSources(
+  sources: Array<Pick<Source, "id">>,
+  opts?: { hard?: boolean },
+): Promise<void> {
+  await Promise.all(sources.map((s) => deleteSource(s, opts)));
 }
 
 // ── Exclusion check (compose blocked + ignored) ──
