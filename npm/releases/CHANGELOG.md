@@ -1,5 +1,12 @@
 # @buildinternet/releases
 
+## 0.54.0
+
+### Minor Changes
+
+- 9069be7: Add `--primary` to `admin source create` so an org's primary changelog can be marked in one step (`isPrimary` on the create POST), instead of creating the source and then running a follow-up `admin source update <slug> --primary`. The REST create endpoint and the `manage_source` "add" action already accepted this — the CLI was the only surface missing it, so it no longer rejects the `--primary` the `managing-sources` skill documents.
+- 1072996: Add `admin source create-video <channel-or-playlist-url> --org <slug>` to materialize a `video` source from a YouTube channel/playlist (`POST /v1/sources/video`), surfacing the resolved provider/channel and backfilled release count. The generic `source create` now rejects `--type video` and pasted `youtube.com`/`youtu.be` URLs with a pointer to the dedicated verb — mirroring the App Store guard — so a YouTube URL can no longer be silently mis-created as an empty-bodied feed source.
+
 ## 0.53.0
 
 ### Minor Changes
