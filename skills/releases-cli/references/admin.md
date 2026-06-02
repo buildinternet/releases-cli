@@ -40,7 +40,7 @@ releases admin source create "Linear" --url https://linear.app/changelog --dry-r
 
 `--dry-run` still runs the URL dedup and exclusion checks (so you'll see "already exists" or "blocked URL" outcomes), but skips the write — including the auto-create-org side effect when `--org <name>` doesn't resolve.
 
-By default, `create` runs automated pre-checks (provider detection, feed discovery, markdown probing). Override with `--type github|scrape|feed|agent`. Batch mode (`--batch`) skips evaluation by default for speed. App Store apps use the dedicated `source create-appstore` verb (below) — `create` rejects `--type appstore` and pasted `apps.apple.com` URLs with a pointer to it.
+By default, `create` runs automated pre-checks (provider detection, feed discovery, markdown probing). Override with `--type github|scrape|feed|agent`. Batch mode (`--batch`) skips evaluation by default for speed. App Store apps use the dedicated `source create-appstore` verb (below) — `create` rejects `--type appstore` and pasted `apps.apple.com` URLs with a pointer to it. YouTube channels/playlists use `source create-video` (below) — `create` likewise rejects `--type video` and pasted `youtube.com`/`youtu.be` URLs.
 
 Provide a feed URL explicitly when it isn't easily discoverable:
 
@@ -86,6 +86,20 @@ releases admin source create-appstore https://apps.apple.com/us/app/shopify/id71
 ```
 
 Add one app at a time — the listing is resolved on the fly, and concurrent creates for a brand-new org/product race on slug uniqueness.
+
+### Create Video
+
+YouTube channels and playlists have a dedicated verb because the create flow resolves the channel/playlist to its Atom feed, mints a `video` source, and backfills current videos as releases (description-only, summarizer-cleaned, marketing-filtered):
+
+```bash
+releases admin source create-video https://www.youtube.com/@AnthropicAI --org anthropic
+releases admin source create-video https://www.youtube.com/playlist?list=PLf2m23nhTg1P --org anthropic --product claude
+releases admin source create-video https://www.youtube.com/@AnthropicAI --org anthropic --dry-run
+```
+
+`--org` is **required** and must already exist — unlike `create-appstore`, no org is derived from the channel. Pass a slug or a typed `org_…` id. `--product <slug>` (optional) attaches the source to an existing product. The verb is idempotent on the resolved feed URL — re-running reports the existing source.
+
+Do not point generic `source create` at a YouTube URL. It builds a `feed` source whose parser drops `media:group/media:description`, producing a source with titles and dates but **empty release bodies** — a silent failure. `create` rejects `--type video` and pasted `youtube.com`/`youtu.be` URLs with a pointer to this verb.
 
 ### Update
 
