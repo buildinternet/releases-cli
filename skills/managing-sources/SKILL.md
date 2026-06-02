@@ -16,6 +16,7 @@ Operations can be performed via CLI commands or typed MCP/agent tools. Use which
 | List sources | `releases list [slug] --json [--org <org>] [--query <text>] [--has-feed] [--category <c>] [--compact] [--limit <n>] [--page <n>]` | `list_catalog` (filter `kind: "source"` to exclude products); `list_sources` is a deprecated alias |
 | Add source | `releases admin source create <name> --url <url> [--type <type>] [--org <org>] [--feed-url <url>] [--primary]` | `manage_source` action "add" with name, url, type, organization, feed_url, **is_primary** (type auto-detected if omitted; only pass is_primary=true when the source is the org's primary changelog — see "Primary Sources") |
 | Add App Store source | `releases admin source create-appstore <url-or-id> [--platform ios\|macos] [--org <slug>] [--product <slug>] [--storefront <code>]` | _(no typed tool yet — CLI only)_ |
+| Add video source | `releases admin source create-video <channel-or-playlist-url> --org <slug> [--product <slug>]` | _(no typed tool yet — CLI only)_ |
 | Edit source | `releases admin source update <identifier> [--primary] [--priority <p>]` | `manage_source` action "edit" with identifier, is_primary, fetch_priority, name, url, type (use only when changing an already-added source; prefer setting flags on "add") |
 | Remove source | `releases admin source delete <slug> [--ignore --reason <reason>]` | `manage_source` action "remove" with identifier |
 | Fetch releases | `releases admin source fetch <slug> [--dry-run] [--max <n>]` | `manage_source` action "fetch" with identifier |
@@ -48,7 +49,7 @@ Use `--json` (CLI) for structured output. Typed tools always return JSON.
 
 ## Adding Sources
 
-Required: **name** and **url**. Optional: **type** (github, scrape, feed, agent — auto-detected from URL if omitted), **organization** (org ID or slug to associate with), **feed_url** (direct feed URL if known). App Store apps (`appstore` type) are **not** created this way — use `create-appstore` (below); `source create` rejects `--type appstore` and pasted `apps.apple.com` URLs with a pointer to it.
+Required: **name** and **url**. Optional: **type** (github, scrape, feed, agent — auto-detected from URL if omitted), **organization** (org ID or slug to associate with), **feed_url** (direct feed URL if known). App Store apps (`appstore` type) are **not** created this way — use `create-appstore` (below); `source create` rejects `--type appstore` and pasted `apps.apple.com` URLs with a pointer to it. YouTube channels/playlists (`video` type) are likewise **not** created this way — use `create-video` (below); `source create` rejects `--type video` and pasted `youtube.com`/`youtu.be` URLs.
 
 On slug collision the API auto-suffixes (`changelog` → `changelog-2`, `-3`, …) and the created row in the response tells you the resolved slug — no rename-and-retry needed.
 
@@ -70,6 +71,19 @@ releases admin source create-appstore <url-or-id> [--platform ios|macos] [--org 
 
 - **Keep writes serial.** The endpoint resolves the listing on the fly; concurrent creates for a brand-new org/product race on the org/product slug uniqueness constraint. Add one app at a time.
 - The command is idempotent on the app's track ID — re-running reports the existing source instead of creating a duplicate.
+
+### Video sources
+
+YouTube channels and playlists need a dedicated command because the create flow resolves the channel/playlist to its Atom feed, mints a `video` source, and backfills current videos as releases (description-only, summarizer-cleaned, marketing-filtered):
+
+```
+releases admin source create-video <channel-or-playlist-url> --org <slug> [--product <slug>]
+```
+
+- `<channel-or-playlist-url>` is a YouTube channel (`youtube.com/@handle`, `/channel/<id>`) or playlist (`/playlist?list=<id>`) URL.
+- **`--org` is required and must already exist** — unlike `create-appstore`, no org is derived from the channel. Pass a slug or a typed `org_…` id. `--product <slug>` optionally attaches the source to an existing product.
+- The command is idempotent on the resolved feed URL — re-running reports the existing source.
+- **Never use generic `source create` for a YouTube URL.** It builds a `feed` source whose parser drops `media:group/media:description`, leaving a source with titles and dates but **empty release bodies** — a silent failure that needs deleting and re-creating to fix. `create` rejects YouTube URLs with a pointer to `create-video`.
 
 ### Naming sources and products
 

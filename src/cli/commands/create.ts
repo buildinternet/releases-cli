@@ -15,6 +15,7 @@ import { writeJson } from "../../lib/output.js";
 import { readContentArg } from "../../lib/input.js";
 import { parseMetadataSetFlag, parseTagList } from "../../lib/flags.js";
 import { isAppStoreUrl, isAppStoreCoordinate } from "./create-appstore.js";
+import { isVideoUrl } from "./create-video.js";
 
 function isValidType(t: string): t is SourceType {
   return (SOURCE_TYPES as readonly string[]).includes(t);
@@ -24,6 +25,12 @@ const APPSTORE_REDIRECT =
   "App Store sources use a dedicated command: `releases admin source create-appstore <url-or-id>` " +
   "(it resolves the listing, mints the first release, and backfills the app icon). " +
   "`source create` cannot materialize them.";
+
+const VIDEO_REDIRECT =
+  "Video sources use a dedicated command: `releases admin source create-video <channel-or-playlist-url> --org <slug>` " +
+  "(it resolves the channel/playlist feed, mints a `video` source, and backfills video descriptions through the " +
+  "marketing-filtered ingest). `source create` cannot materialize them — a generic feed/scrape source over a " +
+  "YouTube URL silently produces empty release bodies.";
 
 export function isGitHubUrl(url: string): boolean {
   return /^https?:\/\/(www\.)?github\.com\/[^/]+\/[^/]+/.test(url);
@@ -60,6 +67,27 @@ interface CreateSourceResult {
 
 async function createSingleSource(input: CreateSourceInput): Promise<CreateSourceResult> {
   const { name, url } = input;
+
+  // Video sources (YouTube channels/playlists) can't be materialized through
+  // the generic create path — the dedicated endpoint resolves the channel/
+  // playlist to its Atom feed, mints a `video` source, and backfills video
+  // descriptions through the marketing-filtered ingest. A generic feed/scrape
+  // source over a YouTube URL silently produces empty release bodies (the feed
+  // parser drops `media:group/media:description`) — issue #1260. Reject an
+  // explicit `--type video` or a pasted youtube.com/youtu.be URL, pointing the
+  // caller at `create-video`. Runs BEFORE the isValidType check because `video`
+  // is a dedicated endpoint-only type, not a generic-`create` source type (and
+  // may not be present in this CLI's pinned source-type enum).
+  if (input.type === "video" || isVideoUrl(url)) {
+    return {
+      name,
+      slug: input.slug ?? toSlug(name),
+      type: "video",
+      url,
+      status: "error",
+      error: VIDEO_REDIRECT,
+    };
+  }
 
   if (input.type && !isValidType(input.type)) {
     return {
@@ -470,7 +498,7 @@ function attachCreateOptions(cmd: Command): Command {
     .argument("[name]", "Display name for the source")
     .option(
       "--type <type>",
-      "Source type: github, scrape, feed, or agent (auto-detected from URL if omitted). App Store apps use `source create-appstore`.",
+      "Source type: github, scrape, feed, or agent (auto-detected from URL if omitted). App Store apps use `source create-appstore`; YouTube channels/playlists use `source create-video`.",
     )
     .option("--url <url>", "URL of the source")
     .option("--slug <slug>", "Custom slug (auto-derived from name if omitted)")

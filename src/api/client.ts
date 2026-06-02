@@ -35,6 +35,7 @@ import type {
   MediaItem,
   OrgDependentsResponse,
   AppStoreMaterializeResponse,
+  VideoMaterializeResponse,
 } from "./types.js";
 import { computePagination, type ListResponse } from "@buildinternet/releases-core/cli-contracts";
 import type {
@@ -1006,6 +1007,33 @@ export async function createAppStoreSource(params: {
     Object.entries(params).filter(([, v]) => v !== null && v !== undefined),
   );
   return apiFetch<AppStoreMaterializeResponse>("/v1/sources/appstore", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+/**
+ * Materialize a video source via `POST /v1/sources/video`. Resolves a YouTube
+ * channel/playlist URL into its Atom feed, mints a `video` source under the
+ * given org, and backfills current videos as releases (description-only,
+ * summarizer-cleaned, marketing-filtered). `orgSlug` or `orgId` is required —
+ * unlike the App Store path, no org is derived from the feed, so the org must
+ * already exist. Idempotent on the resolved feed URL: `status: "indexed"` is a
+ * new source (HTTP 201), `"existing"` an idempotent hit (HTTP 200). Writes
+ * should stay serial — concurrent POSTs for a brand-new org race on
+ * `UNIQUE(org_id, slug)`.
+ */
+export async function createVideoSource(params: {
+  url: string;
+  orgSlug?: string;
+  orgId?: string;
+  productId?: string;
+}): Promise<VideoMaterializeResponse> {
+  // Strip undefined/null so optional fields don't reach the API as explicit nulls.
+  const body = Object.fromEntries(
+    Object.entries(params).filter(([, v]) => v !== null && v !== undefined),
+  );
+  return apiFetch<VideoMaterializeResponse>("/v1/sources/video", {
     method: "POST",
     body: JSON.stringify(body),
   });

@@ -19,7 +19,7 @@ export function registerAddCommand(program: Command) {
     .argument("[name]", "Display name for the source")
     .option(
       "--type <type>",
-      "Source type: github, scrape, feed, or agent (auto-detected from URL if omitted)",
+      "Source type: github, scrape, feed, or agent (auto-detected from URL if omitted). App Store apps use `source create-appstore`; YouTube channels/playlists use `source create-video`.",
     )
     .option("--url <url>", "URL of the source")
     .option("--slug <slug>", "Custom slug (auto-derived from name if omitted)")

@@ -3,6 +3,7 @@ import chalk from "chalk";
 import { registerAddCommand } from "./commands/add.js";
 import { registerCreateCommand } from "./commands/create.js";
 import { registerCreateAppStoreCommand } from "./commands/create-appstore.js";
+import { registerCreateVideoCommand } from "./commands/create-video.js";
 import { registerEditCommand } from "./commands/edit.js";
 import { registerUpdateCommand } from "./commands/update.js";
 import { registerRemoveCommand } from "./commands/remove.js";
@@ -257,6 +258,7 @@ registerListCommand(sourceAdmin);
 // Canonical verbs: create, update, delete. Deprecated aliases: add, edit, remove (each emits a warning).
 registerCreateCommand(sourceAdmin);
 registerCreateAppStoreCommand(sourceAdmin);
+registerCreateVideoCommand(sourceAdmin);
 registerAddCommand(sourceAdmin);
 registerUpdateCommand(sourceAdmin);
 registerEditCommand(sourceAdmin);
