@@ -48,6 +48,8 @@ interface CreateSourceInput {
   keywordAllow?: string;
   /** Raw `key=value` tokens → arbitrary `metadata` keys (mirrors `source update`). */
   metadataSet?: string[];
+  /** Mark the source as the org's primary changelog (→ `isPrimary: true` on create). */
+  primary?: boolean;
   batch?: boolean;
   strict?: boolean;
   dryRun?: boolean;
@@ -308,6 +310,9 @@ async function createSingleSource(input: CreateSourceInput): Promise<CreateSourc
       orgId,
       productId,
       metadata: Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : undefined,
+      // Omit unless explicitly set so the create body stays minimal and the API
+      // applies its own default (matches the `metadata` omit-when-empty pattern).
+      isPrimary: input.primary ? true : undefined,
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
@@ -343,6 +348,7 @@ export type CreateSourceOpts = {
   feedUrl?: string;
   keywordAllow?: string;
   metadataSet?: string[];
+  primary?: boolean;
   batch?: string;
   json?: boolean;
   strict?: boolean;
@@ -453,6 +459,7 @@ export async function createSourceAction(
     feedUrl: opts.feedUrl,
     keywordAllow: opts.keywordAllow,
     metadataSet: opts.metadataSet,
+    primary: opts.primary,
     strict: opts.strict,
     dryRun: opts.dryRun,
   });
@@ -523,6 +530,10 @@ function attachCreateOptions(cmd: Command): Command {
       },
       [] as string[],
     )
+    .option(
+      "--primary",
+      "Mark as the org's primary changelog source (sets isPrimary on create — no follow-up `source update --primary` needed)",
+    )
     .option("--batch <file>", "JSON file with sources to add (use - for stdin)")
     .option("--json", "Output as JSON")
     .option("--strict", "Exit 1 if the source URL already exists (default: return existing)")
@@ -539,6 +550,7 @@ export function registerCreateCommand(program: Command) {
         `
 Examples:
   releases admin source create "Next.js" --url https://github.com/vercel/next.js
+  releases admin source create "Vitest" --url https://github.com/vitest-dev/vitest --org vitest --primary
   releases admin source create "Astro" --url https://astro.build/blog --type scrape
   releases admin source create "Discord" --url https://discord.com/blog --type feed \\
     --feed-url https://discord.com/blog/rss.xml --keyword-allow changelog,patch-notes

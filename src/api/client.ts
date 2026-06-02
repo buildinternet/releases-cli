@@ -973,6 +973,7 @@ export async function createSource(data: {
   orgId?: string | null;
   productId?: string | null;
   metadata?: string;
+  isPrimary?: boolean;
 }): Promise<Source> {
   // Strip null/undefined values so the API's z.string().optional() schema
   // doesn't reject an explicit `"productId": null` in the JSON body.

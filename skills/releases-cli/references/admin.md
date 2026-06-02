@@ -60,6 +60,12 @@ releases admin source create "Acme" --url https://acme.dev/changelog \
 
 Do this rather than a follow-up `source update --metadata-set`: `create` triggers the onboard workflow's auto-fetch, which reads the source's metadata **before** any post-create edit lands. Setting a feed filter on create keeps that first ingest filtered; setting it afterward races the auto-fetch and ingests the whole unfiltered feed.
 
+Mark the org's primary changelog in one step with `--primary` (sets `isPrimary` on create — no follow-up `source update --primary` needed). Only pass it when the source is the org's main, company-wide changelog:
+
+```bash
+releases admin source create "Vitest" --url https://github.com/vitest-dev/vitest --org vitest --primary
+```
+
 Evaluate without adding:
 
 ```bash
