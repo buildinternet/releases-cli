@@ -7,6 +7,7 @@ import { writeJson } from "../../lib/output.js";
 export type DeleteSourceOpts = {
   ignore?: boolean;
   reason?: string;
+  hard?: boolean;
   json?: boolean;
   dryRun?: boolean;
 };
@@ -21,6 +22,7 @@ export async function deleteSourceAction(slugs: string[], opts: DeleteSourceOpts
     name?: string;
     url?: string;
     status: "removed" | "not_found";
+    hard?: boolean;
     ignored?: boolean;
   }[] = [];
   let hasError = false;
@@ -38,7 +40,12 @@ export async function deleteSourceAction(slugs: string[], opts: DeleteSourceOpts
     } else {
       for (const r of dryResults) {
         if (r.status === "not_found") console.error(chalk.red(`Source not found: ${r.slug}`));
-        else console.log(chalk.yellow(`[dry-run] Would remove: ${r.name} (${r.slug})`));
+        else
+          console.log(
+            chalk.yellow(
+              `[dry-run] Would ${opts.hard ? "hard-delete" : "remove"}: ${r.name} (${r.slug})`,
+            ),
+          );
       }
     }
 
@@ -81,7 +88,7 @@ export async function deleteSourceAction(slugs: string[], opts: DeleteSourceOpts
   }
 
   if (existing.length > 0) {
-    await deleteSources(existing);
+    await deleteSources(existing, { hard: opts.hard });
 
     for (const source of existing) {
       results.push({
@@ -89,10 +96,15 @@ export async function deleteSourceAction(slugs: string[], opts: DeleteSourceOpts
         name: source.name,
         url: source.url,
         status: "removed",
+        ...(opts.hard ? { hard: true } : {}),
         ...(opts.ignore && ignoredUrlSet.has(source.url) ? { ignored: true } : {}),
       });
       if (!opts.json) {
-        logger.info(chalk.green(`Removed source: ${source.name} (${source.slug})`));
+        logger.info(
+          chalk.green(
+            `${opts.hard ? "Hard-deleted" : "Removed"} source: ${source.name} (${source.slug})`,
+          ),
+        );
       }
     }
   }
@@ -108,6 +120,10 @@ export function registerDeleteCommand(program: Command) {
     .argument("<sources...>", "Source IDs (src_…) or slugs to delete")
     .option("--ignore", "Add each source URL to the ignored list before deleting")
     .option("--reason <reason>", "Reason for ignoring (used with --ignore)")
+    .option(
+      "--hard",
+      "Permanently remove the source row (instead of tombstoning it) so its URL can be re-onboarded fresh.",
+    )
     .option("--dry-run", "Show what would be deleted without deleting")
     .option("--json", "Output as JSON")
     .action(deleteSourceAction);

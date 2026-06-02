@@ -184,12 +184,16 @@ export function registerReleaseCommand(program: Command) {
     .description("Delete a release by ID, or all releases for a source")
     .argument("[id]", "Release ID to delete")
     .option("--source <identifier>", "Delete all releases for a source (src_… or slug)")
+    .option(
+      "--hard",
+      "With --source: permanently remove rows (frees the UNIQUE(source_id, url) dedup slot) instead of soft-suppressing. Use before a corrected re-fetch.",
+    )
     .option("--dry-run", "Show what would be deleted without deleting")
     .option("--json", "Output as JSON")
     .action(
       async (
         rawId: string | undefined,
-        opts: { source?: string; json?: boolean; dryRun?: boolean },
+        opts: { source?: string; hard?: boolean; json?: boolean; dryRun?: boolean },
       ) => {
         const id = rawId ? normalizeReleaseId(rawId) : undefined;
         if (!id && !opts.source) {
@@ -239,22 +243,30 @@ export function registerReleaseCommand(program: Command) {
           if (opts.dryRun) {
             console.log(
               chalk.yellow(
-                `[dry-run] Would delete all releases for source: ${resolvedSource.slug}`,
+                `[dry-run] Would ${opts.hard ? "hard-delete" : "suppress"} all releases for source: ${resolvedSource.slug}`,
               ),
             );
             return;
           }
           let result: Awaited<ReturnType<typeof deleteReleasesForSource>>;
           try {
-            result = await deleteReleasesForSource(resolvedSource);
+            result = await deleteReleasesForSource(resolvedSource, { hard: opts.hard });
           } catch (err) {
             console.error(chalk.red(err instanceof Error ? err.message : String(err)));
             process.exit(1);
           }
           if (opts.json) await writeJson(result);
+          else if ("deleted" in result)
+            console.log(
+              chalk.green(
+                `Hard-deleted ${result.deleted} release${result.deleted === 1 ? "" : "s"}.`,
+              ),
+            );
           else
             console.log(
-              chalk.green(`Deleted ${result.deleted} release${result.deleted === 1 ? "" : "s"}.`),
+              chalk.green(
+                `Suppressed ${result.suppressed} release${result.suppressed === 1 ? "" : "s"} (soft — rows still occupy the URL dedup slot; pass --hard to free it for a clean re-fetch).`,
+              ),
             );
           return;
         }
