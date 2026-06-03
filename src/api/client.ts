@@ -26,6 +26,7 @@ import type {
   ReleaseWithSource,
   StatsSummary,
   FetchLogEntry,
+  ActiveFetchSession,
   LatestRelease,
   UsageStatsResponse,
   Session,
@@ -74,6 +75,7 @@ export type {
   ReleaseWithSource,
   StatsSummary,
   FetchLogEntry,
+  ActiveFetchSession,
   LatestRelease,
   UsageBreakdownRow,
   UsageStatsResponse,
@@ -622,30 +624,22 @@ export async function postFetchLog(entry: {
 
 // ── Fetch log read ──
 
-export async function getFetchLogs(opts: {
-  /** Source identifier (src_… or slug). */
-  source?: string;
-  limit: number;
-}): Promise<FetchLogEntry[]> {
-  const params = new URLSearchParams({ limit: String(opts.limit) });
-  if (opts.source) params.set("source", opts.source);
-  const logs = await apiFetch<
-    Array<{
-      id: string;
-      sourceId: string;
-      releasesFound: number;
-      releasesInserted: number;
-      durationMs: number | null;
-      status: string;
-      error: string | null;
-      rawContent: string | null;
-      createdAt: string;
-    }>
-  >(`/v1/admin/logs/fetch?${params}`);
+interface RawFetchLogRow {
+  id: string;
+  sourceId: string;
+  releasesFound: number;
+  releasesInserted: number;
+  durationMs: number | null;
+  status: string;
+  error: string | null;
+  rawContent: string | null;
+  createdAt: string;
+}
 
-  // The API fetch-log endpoint returns raw fetch_log rows without source name/slug.
-  // In remote mode we don't have the join data, so we provide what we can.
-  return logs.map((l) => ({
+// The API fetch-log endpoint returns raw fetch_log rows without source name/slug.
+// In remote mode we don't have the join data, so we provide what we can.
+function toFetchLogEntry(l: RawFetchLogRow): FetchLogEntry {
+  return {
     id: l.id,
     sourceName: "",
     sourceSlug: "",
@@ -655,7 +649,27 @@ export async function getFetchLogs(opts: {
     durationMs: l.durationMs,
     error: l.error,
     createdAt: l.createdAt,
-  }));
+  };
+}
+
+export async function getFetchLogs(opts: {
+  /** Source identifier (src_… or slug). */
+  source?: string;
+  limit: number;
+}): Promise<{ logs: FetchLogEntry[]; activeSession: ActiveFetchSession | null }> {
+  // Always request the envelope: for a source-filtered query it carries the live
+  // in-flight fetch (`activeSession`); for the global list it degrades to just
+  // `items` (no single active session). One response shape instead of branching.
+  const params = new URLSearchParams({ limit: String(opts.limit), envelope: "true" });
+  if (opts.source) params.set("source", opts.source);
+  const env = await apiFetch<{
+    items: RawFetchLogRow[];
+    activeSession?: ActiveFetchSession | null;
+  }>(`/v1/admin/logs/fetch?${params}`);
+  return {
+    logs: (env.items ?? []).map(toFetchLogEntry),
+    activeSession: env.activeSession ?? null,
+  };
 }
 
 // ── Stuck sources ──
