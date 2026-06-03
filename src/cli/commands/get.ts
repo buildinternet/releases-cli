@@ -23,6 +23,7 @@ import { humanDate } from "../../lib/release-display.js";
 import { getEntityType, normalizeReleaseId, isLikelyBareId } from "@buildinternet/releases-core/id";
 import { countTokensSafe } from "@buildinternet/releases-core/tokens";
 import { writeJson } from "../../lib/output.js";
+import { formatNotice, type EntityWithNotice } from "../../lib/notice.js";
 
 /** Format a payload-size annotation like `3.2K chars (~800 tokens)` so agents
  * can decide whether to pull the full content body before they spend the
@@ -210,14 +211,15 @@ async function getProduct(identifier: string, opts: GetEntityOpts) {
 
 /** Loose Source shape — `findSource` returns the full row but callers historically
  * narrowed it. Accept the full schema row so we can surface fetch state. */
-type SourceRow = Source & {
-  // Drizzle-derived fields that aren't in the published narrow Source export
-  // but ARE on the wire (see `packages/core/src/schema.ts`).
-  lastFetchedAt?: string | null;
-  consecutiveErrors?: number | null;
-  isHidden?: boolean | null;
-  description?: string | null;
-};
+type SourceRow = Source &
+  EntityWithNotice<{
+    // Drizzle-derived fields that aren't in the published narrow Source export
+    // but ARE on the wire (see `packages/core/src/schema.ts`).
+    lastFetchedAt?: string | null;
+    consecutiveErrors?: number | null;
+    isHidden?: boolean | null;
+    description?: string | null;
+  }>;
 
 async function renderSource(rawSource: unknown, opts: GetEntityOpts) {
   const source = rawSource as SourceRow;
@@ -267,6 +269,7 @@ async function renderSource(rawSource: unknown, opts: GetEntityOpts) {
   if (product) console.log(`  Product:    ${product.name} (${product.slug})`);
   console.log(`  Status:     ${statusLabel}`);
   if (source.lastFetchedAt) console.log(`  Last fetch: ${source.lastFetchedAt}`);
+  if (source.notice) console.log(`  ${chalk.yellow(formatNotice(source.notice))}`);
 
   console.log("");
   if (latest.length === 0) {
@@ -290,15 +293,14 @@ async function renderSource(rawSource: unknown, opts: GetEntityOpts) {
 }
 
 async function renderOrg(
-  org: {
+  org: EntityWithNotice<{
     id: string;
     name: string;
     slug: string;
     domain: string | null;
     category: string | null;
-  } & {
     description?: string | null;
-  },
+  }>,
   opts: GetEntityOpts,
 ) {
   // Collections degrade to empty on failure so an unrelated bug in the
@@ -359,6 +361,7 @@ async function renderOrg(
     const labels = collections.map((c) => `${c.name} ${chalk.dim(`(${c.slug})`)}`).join(", ");
     console.log(`  Collections: ${labels}`);
   }
+  if (org.notice) console.log(`  ${chalk.yellow(formatNotice(org.notice))}`);
 
   console.log("");
   if (releases.length === 0) {
@@ -384,14 +387,16 @@ async function renderOrg(
 }
 
 async function renderProduct(
-  product: {
+  product: EntityWithNotice<{
     id: string;
     name: string;
     slug: string;
     orgId: string;
     url: string | null;
     category: string | null;
-  } & { description?: string | null; avatarUrl?: string | null },
+    description?: string | null;
+    avatarUrl?: string | null;
+  }>,
   opts: GetEntityOpts,
 ) {
   // Pull related context concurrently. Each individually-degradable so a
@@ -456,6 +461,7 @@ async function renderProduct(
     const more = productSources.length > 5 ? chalk.dim(` +${productSources.length - 5}`) : "";
     console.log(`  Sources:  ${preview}${more}`);
   }
+  if (product.notice) console.log(`  ${chalk.yellow(formatNotice(product.notice))}`);
 
   console.log("");
   if (releases.length === 0) {

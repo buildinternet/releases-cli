@@ -43,6 +43,7 @@ import {
 } from "@buildinternet/releases-core/overview";
 import { warnDeprecatedAlias } from "../../lib/deprecated-alias.js";
 import { parseTagList } from "../../lib/flags.js";
+import { buildNoticePatch, formatNotice, type EntityWithNotice } from "../../lib/notice.js";
 
 // ── Shared action handlers ────────────────────────────────────────────────────
 
@@ -170,7 +171,9 @@ async function orgCreateAction(name: string, opts: OrgCreateOpts): Promise<void>
 type OrgGetOpts = { json?: boolean };
 
 async function orgGetAction(identifier: string, opts: OrgGetOpts): Promise<void> {
-  const found = await findOrg(identifier);
+  const found = (await findOrg(identifier)) as EntityWithNotice<
+    Awaited<ReturnType<typeof findOrg>>
+  >;
   if (!found) return orgNotFound(identifier);
 
   const [accounts, orgProducts, linkedSources, orgTags, aliases, overview] = await Promise.all([
@@ -204,6 +207,7 @@ async function orgGetAction(identifier: string, opts: OrgGetOpts): Promise<void>
   console.log(`  Updated: ${found.updatedAt}`);
   if (found.category) console.log(`  Category: ${found.category}`);
   if (orgTags.length > 0) console.log(`  Tags:    ${orgTags.join(", ")}`);
+  if (found.notice) console.log(`  ${chalk.yellow(formatNotice(found.notice))}`);
 
   if (accounts.length > 0) {
     console.log();
@@ -270,6 +274,10 @@ type OrgUpdateOpts = {
   paused?: boolean;
   featured?: boolean;
   discovery?: string;
+  notice?: string;
+  noticeLink?: string;
+  noticeLinkText?: string;
+  clearNotice?: boolean;
   json?: boolean;
   dryRun?: boolean;
 };
@@ -314,6 +322,9 @@ async function orgUpdateAction(identifier: string, opts: OrgUpdateOpts): Promise
   if (opts.featured !== undefined) updates.featured = opts.featured;
 
   if (opts.discovery !== undefined) updates.discovery = opts.discovery;
+
+  const noticePatch = buildNoticePatch(opts, logger);
+  if (noticePatch !== null) updates.notice = noticePatch.notice;
 
   if (Object.keys(updates).length === 0) {
     logger.warn("No fields to update.");
@@ -656,6 +667,16 @@ Examples:
       "--discovery <status>",
       `Promote/demote discovery status (${SOURCE_DISCOVERY.join(" | ")})`,
     )
+    .option("--notice <message>", "Set a curator notice on this organization (max 280 chars)")
+    .option(
+      "--notice-link <coordinate|url>",
+      "Optional pointer: registry coordinate (org/slug) or https:// URL",
+    )
+    .option(
+      "--notice-link-text <label>",
+      "Optional link label for the notice pointer (max 60 chars)",
+    )
+    .option("--clear-notice", "Remove the notice from this organization")
     .option("--json", "Output as JSON")
     .option("--dry-run", "Show what would change without writing")
     .action(orgUpdateAction);
@@ -680,6 +701,16 @@ Examples:
       "--discovery <status>",
       `Promote/demote discovery status (${SOURCE_DISCOVERY.join(" | ")})`,
     )
+    .option("--notice <message>", "Set a curator notice on this organization (max 280 chars)")
+    .option(
+      "--notice-link <coordinate|url>",
+      "Optional pointer: registry coordinate (org/slug) or https:// URL",
+    )
+    .option(
+      "--notice-link-text <label>",
+      "Optional link label for the notice pointer (max 60 chars)",
+    )
+    .option("--clear-notice", "Remove the notice from this organization")
     .option("--json", "Output as JSON")
     .option("--dry-run", "Show what would change without writing")
     .action(warnDeprecatedAlias<[string, OrgUpdateOpts]>("edit", "update", orgUpdateAction));
