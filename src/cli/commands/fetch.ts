@@ -22,6 +22,7 @@ import {
   NOT_FOUND_GRACE_MS,
   POLL_INTERVAL_MS,
 } from "./fetch-wait.js";
+import { runLocalHandoff } from "./fetch-local.js";
 import type { Session } from "@buildinternet/releases-api-types";
 
 export function registerFetchCommand(program: Command) {
@@ -33,6 +34,17 @@ export function registerFetchCommand(program: Command) {
     .argument("[identifier]", "Source ID (src_…), org/slug coordinate, or slug to fetch")
     .option("--source <identifier>", "Source ID (src_…), org/slug coordinate, or slug")
     .option("--json", "Output as JSON")
+    .option(
+      "--local",
+      "Stage local onboarding for the `local-ingest` skill instead of dispatching the remote managed agent: " +
+        "runs the robots.txt/Content-Signal preflight, resolves the source, discovers candidate page URLs, " +
+        "and prints a handoff brief. No model call, no extraction billing. Single source only.",
+    )
+    .option(
+      "--force",
+      "With --local, override a Content-Signal refusal (ai-input=no / ai-train=no). " +
+        "Use only with explicit publisher permission.",
+    )
     .option("--unfetched", "Only fetch sources that have never been fetched")
     .option("--stale <hours>", "Only fetch sources older than N hours")
     .option("--changed", "Only fetch sources where poll detected upstream changes")
@@ -62,7 +74,9 @@ Examples:
   releases admin source fetch --retry-errors        Retry sources that errored last time
   releases admin source fetch --org acme            Fetch all active sources for an org
   releases admin source fetch --org acme --wait     Wait for completion; exit non-zero on failure
-  releases admin source fetch --org acme --wait 60  Wait up to 60 seconds`,
+  releases admin source fetch --org acme --wait 60  Wait up to 60 seconds
+  releases admin source fetch my-source --local     Stage local-ingest handoff (no managed agent)
+  releases admin source fetch my-source --local --force   Override a Content-Signal refusal`,
     )
     .action(
       async (
@@ -70,6 +84,8 @@ Examples:
         opts: {
           source?: string;
           json?: boolean;
+          local?: boolean;
+          force?: boolean;
           unfetched?: boolean;
           stale?: string;
           changed?: boolean;
@@ -80,6 +96,42 @@ Examples:
         },
       ) => {
         const identifier = slugArg ?? opts.source;
+
+        // --local short-circuits the remote managed-agent path entirely: it stages
+        // the local-ingest handoff (preflight + URL discovery + brief) and never
+        // POSTs to /v1/workflows/update. Single-source only — the batch filters
+        // and --org fan-out don't apply to a one-source handoff brief.
+        if (opts.local) {
+          if (!identifier) {
+            logger.error(
+              "--local needs a single source identifier (src_…, org/slug coordinate, or slug).",
+            );
+            process.exit(1);
+          }
+          const conflicting = (
+            [
+              ["--org", opts.org],
+              ["--unfetched", opts.unfetched],
+              ["--stale", opts.stale],
+              ["--changed", opts.changed],
+              ["--retry-errors", opts.retryErrors],
+              ["--wait", opts.wait !== undefined],
+            ] as const
+          )
+            .filter(([, v]) => v)
+            .map(([name]) => name);
+          if (conflicting.length > 0) {
+            logger.error(
+              `--local stages a single-source handoff and can't combine with ${conflicting.join(", ")}.`,
+            );
+            process.exit(1);
+          }
+          return runLocalHandoff(identifier, { json: opts.json, force: opts.force });
+        }
+
+        if (opts.force) {
+          logger.warn("--force only applies with --local; ignoring it for the remote fetch path.");
+        }
 
         // Resolve --wait up front so a malformed value fails before we kick off a remote workflow.
         let waitSeconds: number | null = null;
