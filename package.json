@@ -55,22 +55,22 @@
   },
   "homepage": "https://releases.sh",
   "dependencies": {
-    "@buildinternet/releases-api-types": "^0.24.0",
+    "@buildinternet/releases-api-types": "^0.27.0",
     "@buildinternet/releases-core": "^0.22.1",
     "@buildinternet/releases-lib": "workspace:*",
     "@buildinternet/releases-skills": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "chalk": "^5.6.2",
-    "commander": "^14.0.3",
+    "commander": "^15.0.0",
     "string-width": "^7",
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@changesets/cli": "^2.27.10",
+    "@changesets/cli": "^2.31.0",
     "@types/bun": "latest",
     "husky": "^9.1.7",
-    "lint-staged": "^16.4.0",
-    "oxlint": "^1.63.0",
+    "lint-staged": "^17.0.7",
+    "oxlint": "^1.68.0",
     "prettier": "^3.8.3",
     "typescript": "^6.0.3"
   }
