@@ -726,3 +726,72 @@ describe("findSource bare-slug ambiguity (#264)", () => {
     expect(urls.some((u) => u.includes("/v1/sources?"))).toBe(false);
   });
 });
+
+const rawFetchLogRow = (id: string) => ({
+  id,
+  sourceId: "src_a1",
+  releasesFound: 0,
+  releasesInserted: 0,
+  durationMs: 1200,
+  status: "no_change",
+  error: null,
+  rawContent: null,
+  createdAt: "2026-06-01T00:00:00.000Z",
+});
+
+describe("getFetchLogs activeSession overlay (#1360)", () => {
+  let originalFetch: typeof globalThis.fetch;
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+  });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const rawRow = rawFetchLogRow;
+
+  it("requests envelope=true and returns the activeSession when a source is given", async () => {
+    let calledUrl = "";
+    const active = { sessionId: "ma-run", status: "running", startedAt: 1000, lastUpdatedAt: 2000 };
+    globalThis.fetch = (async (url: string) => {
+      calledUrl = url;
+      return jsonResponse({
+        items: [rawRow("fl_1")],
+        activeSession: active,
+        pagination: { page: 1, pageSize: 20, returned: 1, hasMore: false },
+      });
+    }) as any;
+
+    const result = await client.getFetchLogs({ source: "src_a1", limit: 20 });
+
+    expect(calledUrl).toContain("source=src_a1");
+    expect(calledUrl).toContain("envelope=true");
+    expect(result.logs).toHaveLength(1);
+    expect(result.logs[0].id).toBe("fl_1");
+    expect(result.activeSession).toEqual(active);
+  });
+
+  it("returns a null activeSession when the envelope reports none", async () => {
+    globalThis.fetch = (async () =>
+      jsonResponse({ items: [rawRow("fl_1")], activeSession: null, pagination: {} })) as any;
+
+    const result = await client.getFetchLogs({ source: "src_a1", limit: 20 });
+
+    expect(result.activeSession).toBeNull();
+    expect(result.logs).toHaveLength(1);
+  });
+
+  it("uses the bare-array form (no envelope) with a null activeSession when no source is given", async () => {
+    let calledUrl = "";
+    globalThis.fetch = (async (url: string) => {
+      calledUrl = url;
+      return jsonResponse([rawRow("fl_1"), rawRow("fl_2")]);
+    }) as any;
+
+    const result = await client.getFetchLogs({ limit: 20 });
+
+    expect(calledUrl).not.toContain("envelope=true");
+    expect(result.logs).toHaveLength(2);
+    expect(result.activeSession).toBeNull();
+  });
+});

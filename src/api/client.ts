@@ -622,30 +622,37 @@ export async function postFetchLog(entry: {
 
 // ── Fetch log read ──
 
-export async function getFetchLogs(opts: {
-  /** Source identifier (src_… or slug). */
-  source?: string;
-  limit: number;
-}): Promise<FetchLogEntry[]> {
-  const params = new URLSearchParams({ limit: String(opts.limit) });
-  if (opts.source) params.set("source", opts.source);
-  const logs = await apiFetch<
-    Array<{
-      id: string;
-      sourceId: string;
-      releasesFound: number;
-      releasesInserted: number;
-      durationMs: number | null;
-      status: string;
-      error: string | null;
-      rawContent: string | null;
-      createdAt: string;
-    }>
-  >(`/v1/admin/logs/fetch?${params}`);
+/**
+ * The managed-agent session currently fetching a source (#1360), surfaced on the
+ * enveloped fetch-log response so a poll can tell "a fetch is in flight" from a
+ * stale history. Only running sessions are reported. Defined locally because the
+ * published api-types may not yet export it.
+ */
+export interface ActiveFetchSession {
+  sessionId: string;
+  status: string;
+  /** Session start, epoch ms. */
+  startedAt: number;
+  /** Last session activity, epoch ms. */
+  lastUpdatedAt: number;
+}
 
-  // The API fetch-log endpoint returns raw fetch_log rows without source name/slug.
-  // In remote mode we don't have the join data, so we provide what we can.
-  return logs.map((l) => ({
+interface RawFetchLogRow {
+  id: string;
+  sourceId: string;
+  releasesFound: number;
+  releasesInserted: number;
+  durationMs: number | null;
+  status: string;
+  error: string | null;
+  rawContent: string | null;
+  createdAt: string;
+}
+
+// The API fetch-log endpoint returns raw fetch_log rows without source name/slug.
+// In remote mode we don't have the join data, so we provide what we can.
+function toFetchLogEntry(l: RawFetchLogRow): FetchLogEntry {
+  return {
     id: l.id,
     sourceName: "",
     sourceSlug: "",
@@ -655,7 +662,33 @@ export async function getFetchLogs(opts: {
     durationMs: l.durationMs,
     error: l.error,
     createdAt: l.createdAt,
-  }));
+  };
+}
+
+export async function getFetchLogs(opts: {
+  /** Source identifier (src_… or slug). */
+  source?: string;
+  limit: number;
+}): Promise<{ logs: FetchLogEntry[]; activeSession: ActiveFetchSession | null }> {
+  const params = new URLSearchParams({ limit: String(opts.limit) });
+  if (opts.source) {
+    params.set("source", opts.source);
+    // Ask for the envelope so the response carries the live in-flight fetch
+    // (`activeSession`) alongside the history. The global (no-source) list has
+    // no single active session, so it stays on the bare-array form.
+    params.set("envelope", "true");
+    const env = await apiFetch<{
+      items: RawFetchLogRow[];
+      activeSession: ActiveFetchSession | null;
+    }>(`/v1/admin/logs/fetch?${params}`);
+    return {
+      logs: (env.items ?? []).map(toFetchLogEntry),
+      activeSession: env.activeSession ?? null,
+    };
+  }
+
+  const rows = await apiFetch<RawFetchLogRow[]>(`/v1/admin/logs/fetch?${params}`);
+  return { logs: rows.map(toFetchLogEntry), activeSession: null };
 }
 
 // ── Stuck sources ──

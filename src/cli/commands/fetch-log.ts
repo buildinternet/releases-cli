@@ -1,11 +1,49 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import { renderTable } from "../render/table.js";
-import { findSource, getFetchLogs } from "../../api/client.js";
+import { findSource, getFetchLogs, type ActiveFetchSession } from "../../api/client.js";
 import { timeAgo } from "@buildinternet/releases-core/dates";
 import { stripAnsi } from "../../lib/sanitize.js";
 import { writeJson } from "../../lib/output.js";
 import { sourceNotFound } from "../suggest.js";
+
+/**
+ * Colour a fetch_log status for the table. crawl_timeout (#1361) and blocked
+ * (#1171) are distinct degraded states — surfacing them as their own labels
+ * (not the catch-all "no change") is the point of #1360; an unknown status is
+ * shown verbatim rather than mislabeled.
+ */
+export function formatStatusLabel(status: string): string {
+  switch (status) {
+    case "dry_run":
+      return chalk.magenta("dry run");
+    case "success":
+      return chalk.green("success");
+    case "error":
+      return chalk.red("error");
+    case "crawl_timeout":
+      return chalk.yellow("crawl timeout");
+    case "blocked":
+      return chalk.yellow("blocked");
+    case "no_change":
+      return chalk.dim("no change");
+    default:
+      return chalk.dim(status);
+  }
+}
+
+/**
+ * One-line banner for a source whose managed-agent fetch is still running
+ * (#1360), so an operator polling the fetch log can tell "in flight" from
+ * "stuck/dead" instead of seeing only terminal history.
+ */
+export function formatActiveFetchBanner(session: ActiveFetchSession): string {
+  const startedAgo = timeAgo(new Date(session.startedAt).toISOString()) ?? "just now";
+  return (
+    chalk.yellow("● fetch in progress") +
+    chalk.dim(` — session ${session.sessionId} · started ${startedAgo}`)
+  );
+}
 
 export function registerFetchLogCommand(program: Command) {
   program
@@ -34,19 +72,24 @@ Examples:
         if (!found) return sourceNotFound(source);
         resolvedSource = found.id;
       }
-      const logs = await getFetchLogs({ source: resolvedSource, limit });
+      const { logs, activeSession } = await getFetchLogs({ source: resolvedSource, limit });
 
-      if (logs.length === 0) {
-        if (opts.json) {
-          await writeJson([]);
-        } else {
-          console.log("No fetch logs found.");
-        }
+      // --json stays the bare logs array for back-compat with existing scripts;
+      // the in-progress banner is human-output only.
+      if (opts.json) {
+        await writeJson(logs);
         return;
       }
 
-      if (opts.json) {
-        await writeJson(logs);
+      // Show the live in-flight fetch first — it's meaningful even when there is
+      // no terminal history yet (a brand-new source mid-first-fetch).
+      if (activeSession) {
+        console.log(formatActiveFetchBanner(activeSession));
+        console.log("");
+      }
+
+      if (logs.length === 0) {
+        console.log("No fetch logs found.");
         return;
       }
 
@@ -62,14 +105,7 @@ Examples:
             { label: "When", noTruncate: true },
           ],
           rows: logs.map((log) => {
-            const statusLabel =
-              log.status === "dry_run"
-                ? chalk.magenta("dry run")
-                : log.status === "success"
-                  ? chalk.green("success")
-                  : log.status === "error"
-                    ? chalk.red("error")
-                    : chalk.dim("no change");
+            const statusLabel = formatStatusLabel(log.status);
             const sourceLabel = log.sourceName
               ? `${stripAnsi(log.sourceName)} ${chalk.dim(`(${log.sourceSlug})`)}`
               : log.sourceSlug || chalk.dim("—");
