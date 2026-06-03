@@ -5,8 +5,8 @@
     "": {
       "name": "releases-cli",
       "dependencies": {
-        "@buildinternet/releases-api-types": "^0.28.0",
-        "@buildinternet/releases-core": "^0.22.1",
+        "@buildinternet/releases-api-types": "^0.29.0",
+        "@buildinternet/releases-core": "^0.23.0",
         "@buildinternet/releases-lib": "workspace:*",
         "@buildinternet/releases-skills": "workspace:*",
         "@modelcontextprotocol/sdk": "^1.29.0",
@@ -73,9 +73,9 @@
 
     "@buildinternet/releases": ["@buildinternet/releases@workspace:npm/releases"],
 
-    "@buildinternet/releases-api-types": ["@buildinternet/releases-api-types@0.28.0", "", { "dependencies": { "@buildinternet/releases-core": "^0.22.0", "zod": "^4.4.3" } }, "sha512-2iJvrxf0dy1Hj7VIZHnR8KIBCk7V9UosXVH7BMtCUj9M26XXd2zpMOHHNECiX93m1zSHxYeuhseaTjuSujIaBw=="],
+    "@buildinternet/releases-api-types": ["@buildinternet/releases-api-types@0.29.0", "", { "dependencies": { "@buildinternet/releases-core": "^0.23.0", "zod": "^4.4.3" } }, "sha512-MwK5QXrbW7vQ7Qv94UqYfFEUpdNgYMYtMicBSx2nJVquaMoHxE4eOWmJoxO0y67bnlPqMda+mNQie8hX1gL8Bw=="],
 
-    "@buildinternet/releases-core": ["@buildinternet/releases-core@0.22.1", "", { "dependencies": { "drizzle-orm": "^0.45.2", "js-tiktoken": "^1.0.21", "nanoid": "^5.1.7" } }, "sha512-srKTkcKaEUeQsNcujf+Kbqh+LWBSpO4EUgZ0GNwNHip9A6AeEk8V907fRCEcOhhbljJOguL2tXmnmr4gUXWqlA=="],
+    "@buildinternet/releases-core": ["@buildinternet/releases-core@0.23.0", "", { "dependencies": { "drizzle-orm": "^0.45.2", "js-tiktoken": "^1.0.21", "nanoid": "^5.1.7" } }, "sha512-ieUK+KTlXmxX6nRHIft4alMuNNOJctk8AKCfbJmM0SbWqLHcHjLy9O+sj2R+4052IhwJI86gPFpTLM1QNfLFDA=="],
 
     "@buildinternet/releases-darwin-arm64": ["@buildinternet/releases-darwin-arm64@workspace:npm/releases-darwin-arm64"],
 

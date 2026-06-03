@@ -16,6 +16,7 @@ import { logger } from "@releases/lib/logger";
 import { writeJson } from "../../lib/output.js";
 import { readContentArg } from "../../lib/input.js";
 import { parseMetadataSetFlag } from "../../lib/flags.js";
+import { buildNoticePatch } from "../../lib/notice.js";
 
 function inferFeedTypeFromUrl(url: string): "rss" | "atom" | "jsonfeed" {
   const lower = url.toLowerCase();
@@ -48,6 +49,10 @@ export type UpdateSourceOpts = {
   changelogPaths?: string | boolean;
   kind?: string | boolean;
   discovery?: string;
+  notice?: string;
+  noticeLink?: string;
+  noticeLinkText?: string;
+  clearNotice?: boolean;
   dryRun?: boolean;
   metadataSet?: string[];
   metadataUnset?: string[];
@@ -356,6 +361,12 @@ export async function updateSourceAction(
     }
   }
 
+  const noticePatch = buildNoticePatch(opts, logger);
+  if (noticePatch !== null) {
+    updates.notice = noticePatch.notice;
+    changes.push(noticePatch.notice === null ? "notice cleared" : `notice → "${opts.notice}"`);
+  }
+
   if (changes.length === 0) {
     if (!opts.json) logger.warn("No changes specified. Use --help to see options.");
     return;
@@ -471,6 +482,16 @@ export function attachUpdateOptions(cmd: Command): Command {
       },
       [] as string[],
     )
+    .option("--notice <message>", "Set a curator notice on this source (max 280 chars)")
+    .option(
+      "--notice-link <coordinate|url>",
+      "Optional pointer: registry coordinate (org/slug) or https:// URL",
+    )
+    .option(
+      "--notice-link-text <label>",
+      "Optional link label for the notice pointer (max 60 chars)",
+    )
+    .option("--clear-notice", "Remove the notice from this source")
     .option("--json", "Output as JSON")
     .option("--dry-run", "Show what would change without writing");
 }

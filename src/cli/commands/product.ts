@@ -33,6 +33,7 @@ import {
 } from "@buildinternet/releases-core/cli-contracts";
 import { warnDeprecatedAlias } from "../../lib/deprecated-alias.js";
 import { parseTagList } from "../../lib/flags.js";
+import { buildNoticePatch, type EntityWithNotice } from "../../lib/notice.js";
 
 /**
  * Move every source in `sources` to `targetOrg.id` + `productId`, copy
@@ -170,12 +171,18 @@ type ProductUpdateOpts = {
   description?: string;
   category?: string | boolean;
   kind?: string | boolean;
+  notice?: string;
+  noticeLink?: string;
+  noticeLinkText?: string;
+  clearNotice?: boolean;
   json?: boolean;
   dryRun?: boolean;
 };
 
 async function productUpdateAction(slug: string, opts: ProductUpdateOpts): Promise<void> {
-  const found = await findProduct(slug);
+  const found = (await findProduct(slug)) as EntityWithNotice<
+    Awaited<ReturnType<typeof findProduct>>
+  >;
   if (!found) {
     console.error(chalk.red(`Product not found: ${slug}`));
     process.exit(1);
@@ -207,6 +214,9 @@ async function productUpdateAction(slug: string, opts: ProductUpdateOpts): Promi
     }
     updates.kind = opts.kind satisfies Kind;
   }
+
+  const noticePatch = buildNoticePatch(opts, logger);
+  if (noticePatch !== null) updates.notice = noticePatch.notice;
 
   if (Object.keys(updates).length === 0) {
     console.error(chalk.yellow("No fields to update."));
@@ -443,6 +453,16 @@ Examples:
     .option("--no-category", "Clear category")
     .option("--kind <kind>", `Set product taxonomy (${KIND_VALUES.join(", ")})`)
     .option("--no-kind", "Clear product kind")
+    .option("--notice <message>", "Set a curator notice on this product (max 280 chars)")
+    .option(
+      "--notice-link <coordinate|url>",
+      "Optional pointer: registry coordinate (org/slug) or https:// URL",
+    )
+    .option(
+      "--notice-link-text <label>",
+      "Optional link label for the notice pointer (max 60 chars)",
+    )
+    .option("--clear-notice", "Remove the notice from this product")
     .option("--json", "Output as JSON")
     .option("--dry-run", "Show what would change without writing")
     .addHelpText(
@@ -451,7 +471,9 @@ Examples:
 Examples:
   releases admin product update next-js --kind sdk
   releases admin product update prod_abc123 --name "Next.js" --category developer-tools
-  releases admin product update next-js --no-kind`,
+  releases admin product update next-js --no-kind
+  releases admin product update windsurf --notice "Windsurf is now Cognition's Devin" --notice-link cognition/devin
+  releases admin product update windsurf --clear-notice`,
     )
     .action(productUpdateAction);
 
@@ -466,6 +488,16 @@ Examples:
     .option("--no-category", "Clear category")
     .option("--kind <kind>", `Set product taxonomy (${KIND_VALUES.join(", ")})`)
     .option("--no-kind", "Clear product kind")
+    .option("--notice <message>", "Set a curator notice on this product (max 280 chars)")
+    .option(
+      "--notice-link <coordinate|url>",
+      "Optional pointer: registry coordinate (org/slug) or https:// URL",
+    )
+    .option(
+      "--notice-link-text <label>",
+      "Optional link label for the notice pointer (max 60 chars)",
+    )
+    .option("--clear-notice", "Remove the notice from this product")
     .option("--json", "Output as JSON")
     .option("--dry-run", "Show what would change without writing")
     .action(
