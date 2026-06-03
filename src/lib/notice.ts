@@ -4,31 +4,14 @@
  * A "notice" is a small curator-set note attached to an org, product, or source
  * with an optional pointer — either a registry coordinate ("org/slug") or an
  * external URL.
- *
- * INTERIM TYPE NOTE:
- * The monorepo added `notice` to `@buildinternet/releases-api-types` in PR #1385
- * but the version was NOT bumped before 0.28.0 was published (the currently
- * pinned version). Once `@buildinternet/releases-api-types` is republished at
- * ≥0.29.0 with `notice` exported, bump the pin in package.json and replace the
- * `Notice` type below with the canonical import:
- *   import type { Notice } from "@buildinternet/releases-api-types";
- * Also remove the local `EntityWithNotice` extension type and read `.notice`
- * directly off the API response types.
  */
 
-export interface Notice {
-  message: string;
-  linkText?: string | null;
-  /** Internal registry coordinate, e.g. "cognition" or "cognition/devin". */
-  coordinate?: string | null;
-  /** External URL, e.g. "https://example.com/post". */
-  href?: string | null;
-}
+import type { Notice } from "@buildinternet/releases-core/notice";
+export type { Notice };
 
 /**
- * Extend any entity type at runtime to carry the optional `notice` field the
- * live API already returns (even though the published api-types version doesn't
- * yet declare it).
+ * Extend any entity type at runtime to carry the optional `notice` field.
+ * Used by command files that cast narrowed API response shapes to include notice.
  */
 export type EntityWithNotice<T> = T & { notice?: Notice | null };
 

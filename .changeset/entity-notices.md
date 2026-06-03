@@ -14,4 +14,4 @@ Add entity-notice rendering (Part A) and set/clear verbs (Part B) for org, produ
 
 `--notice-link` is routed automatically: an `https?://` value is sent as `href`; anything else is validated as a 1–2-segment registry coordinate (`org` or `org/slug`) and sent as `coordinate`. `--clear-notice` sends `{ notice: null }` to remove an existing notice. The flags are mutually exclusive (`--clear-notice` + `--notice` exits with an error).
 
-All flag parsing lives in `src/lib/notice.ts` with a local `Notice` type — an interim measure while `@buildinternet/releases-api-types` ≥0.29.0 is pending. Once it is republished with `notice` exported, bump the pin in `package.json` and replace the local type with the canonical import.
+All flag parsing lives in `src/lib/notice.ts`. The `Notice` type is imported from `@buildinternet/releases-core@0.23.0` (canonical source); this PR also bumps `@buildinternet/releases-api-types` to `^0.29.0`.
