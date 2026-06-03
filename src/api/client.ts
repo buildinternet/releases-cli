@@ -26,6 +26,7 @@ import type {
   ReleaseWithSource,
   StatsSummary,
   FetchLogEntry,
+  ActiveFetchSession,
   LatestRelease,
   UsageStatsResponse,
   Session,
@@ -74,6 +75,7 @@ export type {
   ReleaseWithSource,
   StatsSummary,
   FetchLogEntry,
+  ActiveFetchSession,
   LatestRelease,
   UsageBreakdownRow,
   UsageStatsResponse,
@@ -621,21 +623,6 @@ export async function postFetchLog(entry: {
 }
 
 // ── Fetch log read ──
-
-/**
- * The managed-agent session currently fetching a source (#1360), surfaced on the
- * enveloped fetch-log response so a poll can tell "a fetch is in flight" from a
- * stale history. Only running sessions are reported. Defined locally because the
- * published api-types may not yet export it.
- */
-export interface ActiveFetchSession {
-  sessionId: string;
-  status: string;
-  /** Session start, epoch ms. */
-  startedAt: number;
-  /** Last session activity, epoch ms. */
-  lastUpdatedAt: number;
-}
 
 interface RawFetchLogRow {
   id: string;
