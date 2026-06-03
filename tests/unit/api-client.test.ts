@@ -781,16 +781,18 @@ describe("getFetchLogs activeSession overlay (#1360)", () => {
     expect(result.logs).toHaveLength(1);
   });
 
-  it("uses the bare-array form (no envelope) with a null activeSession when no source is given", async () => {
+  it("requests the envelope for the global list too, with a null activeSession", async () => {
     let calledUrl = "";
     globalThis.fetch = (async (url: string) => {
       calledUrl = url;
-      return jsonResponse([rawRow("fl_1"), rawRow("fl_2")]);
+      // The global (no-source) list degrades to just items — no activeSession.
+      return jsonResponse({ items: [rawRow("fl_1"), rawRow("fl_2")], pagination: {} });
     }) as any;
 
     const result = await client.getFetchLogs({ limit: 20 });
 
-    expect(calledUrl).not.toContain("envelope=true");
+    expect(calledUrl).toContain("envelope=true");
+    expect(calledUrl).not.toContain("source=");
     expect(result.logs).toHaveLength(2);
     expect(result.activeSession).toBeNull();
   });

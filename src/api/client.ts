@@ -670,25 +670,19 @@ export async function getFetchLogs(opts: {
   source?: string;
   limit: number;
 }): Promise<{ logs: FetchLogEntry[]; activeSession: ActiveFetchSession | null }> {
-  const params = new URLSearchParams({ limit: String(opts.limit) });
-  if (opts.source) {
-    params.set("source", opts.source);
-    // Ask for the envelope so the response carries the live in-flight fetch
-    // (`activeSession`) alongside the history. The global (no-source) list has
-    // no single active session, so it stays on the bare-array form.
-    params.set("envelope", "true");
-    const env = await apiFetch<{
-      items: RawFetchLogRow[];
-      activeSession: ActiveFetchSession | null;
-    }>(`/v1/admin/logs/fetch?${params}`);
-    return {
-      logs: (env.items ?? []).map(toFetchLogEntry),
-      activeSession: env.activeSession ?? null,
-    };
-  }
-
-  const rows = await apiFetch<RawFetchLogRow[]>(`/v1/admin/logs/fetch?${params}`);
-  return { logs: rows.map(toFetchLogEntry), activeSession: null };
+  // Always request the envelope: for a source-filtered query it carries the live
+  // in-flight fetch (`activeSession`); for the global list it degrades to just
+  // `items` (no single active session). One response shape instead of branching.
+  const params = new URLSearchParams({ limit: String(opts.limit), envelope: "true" });
+  if (opts.source) params.set("source", opts.source);
+  const env = await apiFetch<{
+    items: RawFetchLogRow[];
+    activeSession?: ActiveFetchSession | null;
+  }>(`/v1/admin/logs/fetch?${params}`);
+  return {
+    logs: (env.items ?? []).map(toFetchLogEntry),
+    activeSession: env.activeSession ?? null,
+  };
 }
 
 // ── Stuck sources ──
