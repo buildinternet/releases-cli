@@ -450,7 +450,12 @@ async function resolveAvatarSource(
   from: string,
   org: { id: string; slug: string; domain?: string | null },
 ): Promise<string> {
-  if (/^https?:\/\//i.test(from)) return from;
+  if (/^https:\/\//i.test(from)) return from;
+  if (/^http:\/\//i.test(from)) {
+    throw new Error(
+      `Refusing to fetch an avatar over plaintext http. Pass an https:// URL instead.`,
+    );
+  }
   switch (from) {
     case "github": {
       const accounts = await getOrgAccountsBySlug(org.slug);
