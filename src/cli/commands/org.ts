@@ -19,7 +19,14 @@ import {
   setAliases,
   getOverview,
   getOrgDependents,
+  setOrgAvatar,
 } from "../../api/client.js";
+import {
+  githubAvatarUrl,
+  faviconAvatarUrl,
+  appStoreTrackId,
+  appStoreArtworkUrl,
+} from "../../lib/avatar-source.js";
 import { promptConfirm } from "../../lib/confirm.js";
 import { stripAnsi } from "../../lib/sanitize.js";
 import { logger } from "@releases/lib/logger";
@@ -433,6 +440,54 @@ export async function orgDeleteAction(identifier: string, opts: OrgDeleteOpts): 
     );
 }
 
+/**
+ * Resolve a `--from` value to a concrete image URL. An https URL is used as-is;
+ * the shortcuts derive a URL from the org's own data (no fuzzy matching): `github`
+ * → the org's linked GitHub handle, `favicon` → the org domain's apple-touch-icon,
+ * `appstore` → the org's App Store source's iTunes artwork (#1406).
+ */
+async function resolveAvatarSource(
+  from: string,
+  org: { id: string; slug: string; domain?: string | null },
+): Promise<string> {
+  if (/^https:\/\//i.test(from)) return from;
+  if (/^http:\/\//i.test(from)) {
+    throw new Error(
+      `Refusing to fetch an avatar over plaintext http. Pass an https:// URL instead.`,
+    );
+  }
+  switch (from) {
+    case "github": {
+      const accounts = await getOrgAccountsBySlug(org.slug);
+      const gh = accounts.find((a) => a.platform === "github");
+      if (!gh)
+        throw new Error(`No GitHub account linked to ${org.slug}; pass --from <url> instead.`);
+      return githubAvatarUrl(gh.handle);
+    }
+    case "favicon": {
+      if (!org.domain) throw new Error(`${org.slug} has no domain; pass --from <url> instead.`);
+      return faviconAvatarUrl(org.domain);
+    }
+    case "appstore": {
+      const sources = await getSourcesByOrg(org.id);
+      const app = sources.find((s) => s.type === "appstore" && s.url);
+      if (!app?.url)
+        throw new Error(
+          `${org.slug} has no App Store source; pass the apps.apple.com artwork URL via --from <url>.`,
+        );
+      const trackId = appStoreTrackId(app.url);
+      if (!trackId) throw new Error(`Could not parse an App Store track id from ${app.url}.`);
+      const art = await appStoreArtworkUrl(trackId);
+      if (!art) throw new Error(`iTunes lookup returned no artwork for track ${trackId}.`);
+      return art;
+    }
+    default:
+      throw new Error(
+        `Unknown --from "${from}". Use an https:// URL, or appstore | github | favicon.`,
+      );
+  }
+}
+
 // ── Command registration ──────────────────────────────────────────────────────
 
 export function registerOrgCommand(program: Command) {
@@ -680,6 +735,47 @@ Examples:
     .option("--json", "Output as JSON")
     .option("--dry-run", "Show what would change without writing")
     .action(orgUpdateAction);
+
+  org
+    .command("avatar")
+    .description("Resolve an image, mirror it to R2, and set it as the org avatar")
+    .argument("<identifier>", "Organization ID (org_…), slug, domain, or name")
+    .requiredOption(
+      "--from <source>",
+      "Image source: an https:// URL, or a shortcut — appstore | github | favicon",
+    )
+    .option("--json", "Output as JSON")
+    .action(async (identifier: string, opts: { from: string; json?: boolean }) => {
+      const target = await findOrg(identifier);
+      if (!target) {
+        orgNotFound(identifier);
+        process.exitCode = 1;
+        return;
+      }
+
+      let sourceUrl: string;
+      try {
+        sourceUrl = await resolveAvatarSource(opts.from.trim(), target);
+      } catch (err) {
+        logger.error(err instanceof Error ? err.message : String(err));
+        process.exitCode = 1;
+        return;
+      }
+
+      try {
+        const result = await setOrgAvatar(target.slug, sourceUrl);
+        if (opts.json) {
+          console.log(JSON.stringify(result, null, 2));
+          return;
+        }
+        logger.info(
+          `${chalk.green("✓")} Set ${chalk.bold(target.slug)} avatar → ${result.avatarUrl} (${result.width}×${result.height})`,
+        );
+      } catch (err) {
+        logger.error(`Failed to set avatar: ${err instanceof Error ? err.message : String(err)}`);
+        process.exitCode = 1;
+      }
+    });
 
   org
     .command("edit")

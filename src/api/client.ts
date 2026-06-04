@@ -55,6 +55,7 @@ import type {
   UpdateCollectionRequest,
   ReplaceCollectionMembersRequest,
   AddCollectionMemberRequest,
+  SetOrgAvatarResponse,
 } from "@buildinternet/releases-api-types";
 export type {
   DomainLookupResponse,
@@ -1124,6 +1125,21 @@ export async function updateOrg(
   return apiFetch<Organization>(`/v1/orgs/${encodeURIComponent(identifier)}`, {
     method: "PATCH",
     body: JSON.stringify(data),
+  });
+}
+
+/**
+ * Mirror a remote image to R2 and set it as the org avatar (#1406). The server
+ * fetches + validates (square raster) + stores at `orgs/{slug}.{ext}`, keeping CF
+ * credentials server-side; the CLI only resolves a concrete image URL.
+ */
+export async function setOrgAvatar(
+  identifier: string,
+  sourceUrl: string,
+): Promise<SetOrgAvatarResponse> {
+  return apiFetch<SetOrgAvatarResponse>(`/v1/orgs/${encodeURIComponent(identifier)}/avatar`, {
+    method: "POST",
+    body: JSON.stringify({ sourceUrl }),
   });
 }
 
