@@ -3,6 +3,7 @@ import {
   scopeToApiPermissions,
   requestDeviceCode,
   pollForToken,
+  runDeviceLogin,
 } from "../../src/lib/device-auth.js";
 
 const BASE = "https://test.example.com";
@@ -81,5 +82,76 @@ describe("pollForToken", () => {
         sleep: async () => {},
       }),
     ).rejects.toThrow(/denied/i);
+  });
+});
+
+describe("runDeviceLogin", () => {
+  it("returns a stored-credential payload on success", async () => {
+    const apiUrl = BASE;
+    let opened: string | null = null;
+    const printed: string[] = [];
+
+    const fakeFetch = (async (url: string) => {
+      const u = String(url);
+      if (u.endsWith("/api/auth/device/code")) {
+        return new Response(
+          JSON.stringify({
+            device_code: "dev123",
+            user_code: "ABCD1234",
+            verification_uri: `${apiUrl}/device`,
+            verification_uri_complete: `${apiUrl}/device?user_code=ABCD1234`,
+            expires_in: 900,
+            interval: 0,
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      if (u.endsWith("/api/auth/device/token")) {
+        return new Response(JSON.stringify({ access_token: "tok_abc" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      if (u.endsWith("/api/auth/get-session")) {
+        return new Response(JSON.stringify({ user: { email: "z@example.com", name: "Zach" } }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      if (u.endsWith("/api/auth/api-key/create")) {
+        return new Response(
+          JSON.stringify({
+            key: "relu_secretkey",
+            name: "releases-cli",
+            scopes: ["read", "write"],
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      throw new Error(`unexpected url ${u}`);
+    }) as unknown as typeof fetch;
+
+    const result = await runDeviceLogin({
+      apiUrl,
+      scope: "write",
+      openInBrowser: true,
+      deps: {
+        fetchImpl: fakeFetch,
+        sleep: async () => {},
+        openBrowser: (url) => {
+          opened = url;
+          return true;
+        },
+        print: (line) => printed.push(line),
+        keyName: "releases-cli (testhost)",
+      },
+    });
+
+    expect(result.token).toBe("relu_secretkey");
+    expect(result.apiUrl).toBe(apiUrl);
+    expect(result.scopes).toEqual(["read", "write"]);
+    expect(opened).toBe(`${apiUrl}/device?user_code=ABCD1234`);
+    // The user code is shown to the human at least once.
+    expect(printed.join("\n")).toContain("ABCD1234");
   });
 });

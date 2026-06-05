@@ -161,3 +161,72 @@ export async function createUserApiKey(
   }
   return (await res.json()) as CreatedKey;
 }
+
+export interface DeviceLoginDeps {
+  fetchImpl?: typeof fetch;
+  sleep?: (ms: number) => Promise<void>;
+  openBrowser?: (url: string) => boolean;
+  print?: (line: string) => void;
+  /** Name recorded on the minted key (defaults to `releases-cli (<hostname>)`). */
+  keyName?: string;
+}
+
+export interface DeviceLoginArgs {
+  apiUrl: string;
+  scope: UserScope;
+  openInBrowser: boolean;
+  deps?: DeviceLoginDeps;
+}
+
+export interface DeviceLoginResult {
+  token: string;
+  name?: string;
+  scopes?: string[];
+  apiUrl: string;
+}
+
+/**
+ * Orchestrate the full device-login flow and return a credential payload for the
+ * caller to persist. Pure of I/O specifics via injectable deps (fetch, sleep,
+ * browser, print) so it's unit-testable. Does NOT write to disk — the command
+ * layer owns persistence so storage stays in one place.
+ */
+export async function runDeviceLogin(args: DeviceLoginArgs): Promise<DeviceLoginResult> {
+  const fetchImpl = args.deps?.fetchImpl ?? fetch;
+  const print = args.deps?.print ?? ((l: string) => console.log(l));
+  const keyName = args.deps?.keyName ?? "releases-cli";
+
+  const code = await requestDeviceCode(args.apiUrl, args.scope, fetchImpl);
+
+  print(`\nTo connect the CLI, visit:\n  ${code.verification_uri}`);
+  print(`and enter the code:\n  ${code.user_code}\n`);
+
+  const target = code.verification_uri_complete ?? code.verification_uri;
+  if (args.openInBrowser && args.deps?.openBrowser) {
+    const ok = args.deps.openBrowser(target);
+    print(ok ? "Opening your browser..." : `Open this URL manually:\n  ${target}`);
+  } else if (args.openInBrowser) {
+    // No injected opener in this context; the command layer wires the real one.
+    print(`Open this URL to continue:\n  ${target}`);
+  }
+
+  print("Waiting for authorization...");
+  const accessToken = await pollForToken(args.apiUrl, code.device_code, {
+    intervalSeconds: code.interval ?? 5,
+    expiresInSeconds: code.expires_in,
+    fetchImpl,
+    sleep: args.deps?.sleep,
+  });
+
+  const sessionUser = await getSessionUser(args.apiUrl, accessToken, fetchImpl);
+  if (sessionUser) print(`Authorized as ${sessionUser.name ?? sessionUser.email}.`);
+
+  const created = await createUserApiKey(args.apiUrl, accessToken, keyName, args.scope, fetchImpl);
+
+  return {
+    token: created.key,
+    name: created.name ?? keyName,
+    scopes: created.scopes ?? scopeToApiPermissions(args.scope).api,
+    apiUrl: args.apiUrl,
+  };
+}
