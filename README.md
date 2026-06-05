@@ -10,7 +10,7 @@ The changelog & release-notes registry for developers and AI agents. A lean HTTP
 
 The CLI talks to the hosted registry at `api.releases.sh`. Reader commands work out of the box with no configuration.
 
-> **Admin access is currently closed beta.** `releases admin …` commands require an API key, and API keys are not self-serve yet — the hosted registry doesn't expose a public signup flow for them. If you'd like early access, open an issue and we'll get in touch. Everything below the install section assumes reader-only use unless stated otherwise.
+> **Reader access is open; admin access is closed beta.** Search and browse need no account. You can mint a personal **read-only** API key with `releases login` (browser sign-in — see [Authentication](#authentication)). `releases admin …` commands need a **write/admin** key, which isn't self-serve yet — open an issue for early access. Everything below the install section assumes reader-only use unless stated otherwise.
 
 ## Install
 
@@ -195,7 +195,18 @@ Use this path when you only want the skill behavior (auto-triggering on release/
 
 ## Authentication
 
-Admin commands require an API token. You can store one persistently using the `auth` command namespace so you don't need to set `RELEASES_API_KEY` in your shell every time.
+Most commands are reader-only and need no auth. The easiest way to get a personal API key is to sign in through your browser — no token to copy or paste:
+
+```bash
+releases login              # opens your browser to approve, then saves the key
+releases login --no-browser # print the URL + code to open yourself (headless / SSH)
+```
+
+This uses the OAuth 2.0 Device Authorization Grant (RFC 8628): the CLI shows a short code, you approve it at [releases.sh/device](https://releases.sh/device) in a signed-in browser, and a **read-only** key is minted and saved to `~/.releases/credentials`. Sign up / sign in to the web app first if you haven't. A read-only key is all that's self-serve today; write/admin keys are closed beta (see above).
+
+### Storing a token directly
+
+If you've been issued a token (for example a write/admin key during the closed beta), store it without the browser flow using the `auth` namespace, so you don't need `RELEASES_API_KEY` in your shell every time:
 
 ```bash
 releases auth login                     # interactive prompt (masked input)
@@ -223,7 +234,7 @@ releases auth logout                    # remove the stored token
 
 Nothing is required for reader access. For admin operations (closed beta — see above):
 
-- `RELEASES_API_KEY` — Bearer token for write endpoints. Overrides any stored credential from `releases auth login`. Required for any `releases admin …` command that mutates state if no stored credential is present. Keys are not self-serve right now.
+- `RELEASES_API_KEY` — Bearer token for write endpoints. Overrides any stored credential from `releases login` / `releases auth login`. Required for any `releases admin …` command that mutates state if no stored credential is present. Write/admin keys are not self-serve yet; a personal **read-only** key is available via `releases login`.
 - `RELEASES_API_URL` — Override the default `https://api.releases.sh` endpoint (useful for staging).
 - `RELEASES_TELEMETRY_DISABLED=1` — Opt out of anonymous usage pings. `DO_NOT_TRACK=1` is also honored.
 - `RELEASES_DISABLE_SKILL_UPDATE_CHECK=1` — Silence the "skills are behind, run `releases skills install`" stderr nag that fires (at most once per 24h) when the GitHub `skills/` tree has moved since your last install.
