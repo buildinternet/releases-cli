@@ -1,5 +1,17 @@
 # @buildinternet/releases
 
+## 0.57.0
+
+### Minor Changes
+
+- 1f92ee4: feat(cli): `releases login` — device authorization (RFC 8628) (#282)
+
+  Add a top-level `releases login` command that authenticates the CLI via the OAuth 2.0 Device Authorization Grant (RFC 8628): it requests a device/user code, opens the verification URL in the browser (with a headless copy-paste fallback), polls for approval, then exchanges the device session for a durable read-only `relu_` API key minted via `POST /v1/api-keys` and stores it through the existing credential path. Backfills the changeset omitted when #282 merged.
+
+- 8a6c994: feat(org): `admin org avatar <org> --from <source>` — one-step avatar ingest (#1406)
+
+  Resolve an image, mirror it to R2, and set the org avatar in a single command. `--from` accepts an `https://` URL, or a shortcut derived from the org's own data (no fuzzy matching): `github` (the org's linked GitHub handle → `github.com/{handle}.png`), `favicon` (the org domain's apple-touch-icon), or `appstore` (the org's App Store source → iTunes 1024px artwork). Resolution runs CLI-side; the server fetches, validates it's a square raster, and stores it — CF credentials stay server-side. Backed by `POST /v1/orgs/:slug/avatar` (api-types 0.30.0).
+
 ## 0.56.0
 
 ### Minor Changes
