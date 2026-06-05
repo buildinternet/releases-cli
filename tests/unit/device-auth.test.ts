@@ -21,10 +21,11 @@ describe("requestDeviceCode", () => {
       );
     }) as unknown as typeof fetch;
 
-    const res = await requestDeviceCode(BASE, "write", fakeFetch);
+    const res = await requestDeviceCode(BASE, fakeFetch);
     expect(res.user_code).toBe("ABCD1234");
     expect(seen!.url).toBe(`${BASE}/api/auth/device/code`);
-    expect(seen!.body).toEqual({ client_id: "releases-cli", scope: "write" });
+    // No OAuth scope: the minted key is read-only server-side, nothing to request.
+    expect(seen!.body).toEqual({ client_id: "releases-cli" });
   });
 });
 
@@ -113,7 +114,7 @@ describe("runDeviceLogin", () => {
             id: "ak_1",
             name: "releases-cli",
             start: "relu_sec",
-            scope: "write",
+            scope: "read",
             remaining: null,
             expiresAt: null,
             createdAt: "2026-06-05T00:00:00.000Z",
@@ -126,7 +127,6 @@ describe("runDeviceLogin", () => {
 
     const result = await runDeviceLogin({
       apiUrl,
-      scope: "write",
       openInBrowser: true,
       deps: {
         fetchImpl: fakeFetch,
@@ -142,8 +142,8 @@ describe("runDeviceLogin", () => {
 
     expect(result.token).toBe("relu_secretkey");
     expect(result.apiUrl).toBe(apiUrl);
-    // The server returns the granted ladder label; runDeviceLogin stores it as-is.
-    expect(result.scopes).toEqual(["write"]);
+    // User keys are read-only; the server returns the granted label, stored as-is.
+    expect(result.scopes).toEqual(["read"]);
     expect(opened).toBe(`${apiUrl}/device?user_code=ABCD1234`);
     // The user code is shown to the human at least once.
     expect(printed.join("\n")).toContain("ABCD1234");
