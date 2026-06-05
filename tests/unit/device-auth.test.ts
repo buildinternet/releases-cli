@@ -1,19 +1,7 @@
 import { describe, it, expect } from "bun:test";
-import {
-  scopeToApiPermissions,
-  requestDeviceCode,
-  pollForToken,
-  runDeviceLogin,
-} from "../../src/lib/device-auth.js";
+import { requestDeviceCode, pollForToken, runDeviceLogin } from "../../src/lib/device-auth.js";
 
 const BASE = "https://test.example.com";
-
-describe("scopeToApiPermissions", () => {
-  it("maps read/write to cumulative api actions", () => {
-    expect(scopeToApiPermissions("read")).toEqual({ api: ["read"] });
-    expect(scopeToApiPermissions("write")).toEqual({ api: ["read", "write"] });
-  });
-});
 
 describe("requestDeviceCode", () => {
   it("POSTs client_id + scope and returns the code payload", async () => {
@@ -118,14 +106,19 @@ describe("runDeviceLogin", () => {
           headers: { "content-type": "application/json" },
         });
       }
-      if (u.endsWith("/api/auth/api-key/create")) {
+      if (u.endsWith("/v1/api-keys")) {
         return new Response(
           JSON.stringify({
             key: "relu_secretkey",
+            id: "ak_1",
             name: "releases-cli",
-            scopes: ["read", "write"],
+            start: "relu_sec",
+            scope: "write",
+            remaining: null,
+            expiresAt: null,
+            createdAt: "2026-06-05T00:00:00.000Z",
           }),
-          { status: 200, headers: { "content-type": "application/json" } },
+          { status: 201, headers: { "content-type": "application/json" } },
         );
       }
       throw new Error(`unexpected url ${u}`);
@@ -149,7 +142,8 @@ describe("runDeviceLogin", () => {
 
     expect(result.token).toBe("relu_secretkey");
     expect(result.apiUrl).toBe(apiUrl);
-    expect(result.scopes).toEqual(["read", "write"]);
+    // The server returns the granted ladder label; runDeviceLogin stores it as-is.
+    expect(result.scopes).toEqual(["write"]);
     expect(opened).toBe(`${apiUrl}/device?user_code=ABCD1234`);
     // The user code is shown to the human at least once.
     expect(printed.join("\n")).toContain("ABCD1234");

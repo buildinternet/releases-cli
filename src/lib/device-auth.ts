@@ -7,6 +7,10 @@
  * requested scope) and hand it back to the caller to store.
  */
 
+// Must match DEVICE_AUTH_CLIENT_ID in @buildinternet/releases-core/api-token — the
+// worker's validateClient allow-list rejects any other client_id (fail closed).
+// Hard-coded until a published core version exposing that constant is adopted; keep
+// the literal in lockstep until then.
 const CLIENT_ID = "releases-cli";
 const GRANT_TYPE = "urn:ietf:params:oauth:grant-type:device_code";
 
@@ -19,15 +23,6 @@ export interface DeviceCodeResponse {
   verification_uri_complete?: string;
   expires_in: number;
   interval?: number;
-}
-
-/**
- * Cumulative `api`-resource actions matching the server's permission encoding
- * (`workers/api/src/auth/api-key-scope.ts` in the monorepo). Kept as a local copy
- * so the CLI doesn't import worker code; reconcile if the server encoding changes.
- */
-export function scopeToApiPermissions(scope: UserScope): Record<string, string[]> {
-  return scope === "write" ? { api: ["read", "write"] } : { api: ["read"] };
 }
 
 export async function requestDeviceCode(
@@ -128,17 +123,18 @@ export async function getSessionUser(
 
 export interface CreatedKey {
   key: string;
-  name?: string;
-  scopes?: string[];
+  name?: string | null;
+  /** Single ladder label the server granted ("read" | "write"). */
+  scope?: string;
 }
 
 /**
- * Exchange the device-flow session for a durable `relu_` API key. Calls the
- * `@better-auth/api-key` create endpoint with the session as a Bearer token
- * (requires the server `bearer()` plugin). The server caps the scope.
- *
- * Seam: confirm the create path + body against the installed plugin once the
- * monorepo Phase 1 lands. If the endpoint differs, change it here only.
+ * Exchange the device-flow session for a durable `relu_` API key. Hits the API
+ * worker's own `/v1/api-keys` route — the SAME surface the web panel uses, NOT
+ * Better Auth's raw `/api/auth/api-key/create` — so the server injects the owner,
+ * caps the scope to read/write, and encodes the permission ladder in one place. The
+ * device-flow session token rides as a Bearer credential, which the worker's
+ * `requireSession` honors via its `bearer()` plugin.
  */
 export async function createUserApiKey(
   apiUrl: string,
@@ -147,14 +143,14 @@ export async function createUserApiKey(
   scope: UserScope,
   fetchImpl: typeof fetch = fetch,
 ): Promise<CreatedKey> {
-  const res = await fetchImpl(`${apiUrl}/api/auth/api-key/create`, {
+  const res = await fetchImpl(`${apiUrl}/v1/api-keys`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
       authorization: `Bearer ${accessToken}`,
       "user-agent": CLIENT_ID,
     },
-    body: JSON.stringify({ name, permissions: scopeToApiPermissions(scope) }),
+    body: JSON.stringify({ name, scope }),
   });
   if (!res.ok) {
     throw new Error(`Login succeeded but issuing an API key failed (HTTP ${res.status}).`);
@@ -226,7 +222,7 @@ export async function runDeviceLogin(args: DeviceLoginArgs): Promise<DeviceLogin
   return {
     token: created.key,
     name: created.name ?? keyName,
-    scopes: created.scopes ?? scopeToApiPermissions(args.scope).api,
+    scopes: [created.scope ?? args.scope],
     apiUrl: args.apiUrl,
   };
 }
