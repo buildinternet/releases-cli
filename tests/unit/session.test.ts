@@ -75,6 +75,35 @@ describe("getSessionToken", () => {
     expect(cred?.token).toBe("relu_minted"); // valid non-empty token persisted
     expect(cred?.sessionToken).toBe("sess_full");
   });
+
+  it("does NOT reuse a session bound to a different environment", async () => {
+    // Credential established against prod; the active URL is staging.
+    writeCredential({
+      token: "relu_prod",
+      sessionToken: "sess_prod",
+      apiUrl: "https://api.releases.sh",
+      savedAt: "2026-06-06T00:00:00.000Z",
+    });
+    let refreshed = false;
+    const t = await getSessionToken("https://api-staging.releases.sh", {
+      deviceAuth: async () => {
+        refreshed = true;
+        return "sess_should_not_refresh_foreign";
+      },
+      deviceLogin: async () => ({
+        token: "relu_staging",
+        sessionToken: "sess_staging",
+        scopes: ["read"],
+      }),
+    });
+    // Foreign session is not returned; a full login rebinds to the active env.
+    expect(t).toBe("sess_staging");
+    expect(refreshed).toBe(false); // never refreshes onto a foreign-env credential
+    const cred = readCredential();
+    expect(cred?.apiUrl).toBe("https://api-staging.releases.sh");
+    expect(cred?.token).toBe("relu_staging");
+    expect(cred?.sessionToken).toBe("sess_staging");
+  });
 });
 
 describe("clearSessionToken", () => {

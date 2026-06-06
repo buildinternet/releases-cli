@@ -1,7 +1,29 @@
 import { describe, it, expect } from "bun:test";
-import { keysRequest } from "../../src/cli/commands/keys.js";
+import { InvalidArgumentError } from "commander";
+import { keysRequest, parseExpiresInDays } from "../../src/cli/commands/keys.js";
 
 const BASE = "https://test.example.com";
+
+describe("parseExpiresInDays", () => {
+  it("parses a valid integer in range", () => {
+    expect(parseExpiresInDays("30")).toBe(30);
+    expect(parseExpiresInDays("1")).toBe(1);
+    expect(parseExpiresInDays("365")).toBe(365);
+  });
+
+  it("rejects non-numeric input (never returns NaN)", () => {
+    expect(() => parseExpiresInDays("abc")).toThrow(InvalidArgumentError);
+    expect(() => parseExpiresInDays("30d")).toThrow(InvalidArgumentError);
+    expect(() => parseExpiresInDays("")).toThrow(InvalidArgumentError);
+  });
+
+  it("rejects non-integers and out-of-range values", () => {
+    expect(() => parseExpiresInDays("3.5")).toThrow(InvalidArgumentError);
+    expect(() => parseExpiresInDays("0")).toThrow(InvalidArgumentError);
+    expect(() => parseExpiresInDays("366")).toThrow(InvalidArgumentError);
+    expect(() => parseExpiresInDays("-5")).toThrow(InvalidArgumentError);
+  });
+});
 
 describe("keysRequest", () => {
   it("sends the session token as a Bearer credential", async () => {

@@ -42,16 +42,24 @@ function defaultDeviceLogin(apiUrl: string) {
  */
 export async function getSessionToken(apiUrl: string, deps: SessionDeps = {}): Promise<string> {
   const existing = readCredential();
-  if (existing?.sessionToken) return existing.sessionToken;
+  // A stored token is bound to the API URL it was verified against (prod/staging
+  // tokens don't cross DBs), so only reuse or refresh a credential established
+  // against THIS environment. A different (or missing) apiUrl is a non-match — we
+  // fall through to a full login that re-binds the credential to the active URL,
+  // never reusing a foreign session or writing a session onto a foreign credential.
+  const sameEnv = existing?.apiUrl === apiUrl;
 
-  if (existing?.token) {
-    // A durable relu_ key already exists — refresh the session only, mint nothing.
+  if (sameEnv && existing?.sessionToken) return existing.sessionToken;
+
+  if (sameEnv && existing?.token) {
+    // A durable relu_ key for this env already exists — refresh the session only, mint nothing.
     const sessionToken = await (deps.deviceAuth ?? defaultDeviceAuth)(apiUrl);
     writeCredential({ ...existing, sessionToken, savedAt: new Date().toISOString() });
     return sessionToken;
   }
 
-  // No stored credential — full login so a valid credential (key + session) lands.
+  // No usable same-env credential — full login so a valid credential (key + session),
+  // bound to this apiUrl, lands.
   const res = await (deps.deviceLogin ?? defaultDeviceLogin)(apiUrl);
   writeCredential({
     token: res.token,

@@ -1,4 +1,4 @@
-import { Command } from "commander";
+import { Command, InvalidArgumentError } from "commander";
 import chalk from "chalk";
 import type {
   UserApiKey,
@@ -12,6 +12,20 @@ import { renderTable } from "../render/table.js";
 import { promptConfirm, defaultPromptReader } from "../../lib/confirm.js";
 
 const UA = "releases-cli";
+
+/**
+ * Strict parser for `--expires-in-days`. `parseInt("abc")` yields NaN (which
+ * would serialize to `null`) and `parseInt("3d")` silently yields 3 — so parse
+ * with `Number`, require a whole number in 1–365, and reject anything else with
+ * a commander argument error rather than letting a bad value reach the server.
+ */
+export function parseExpiresInDays(raw: string): number {
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1 || n > 365) {
+    throw new InvalidArgumentError("must be an integer between 1 and 365.");
+  }
+  return n;
+}
 
 export interface KeysRequestDeps {
   getToken: (apiUrl: string) => Promise<string>;
@@ -73,12 +87,17 @@ export function registerKeysCommand(program: Command): void {
     .command("create")
     .description("Create a read-only API key (revealed once)")
     .requiredOption("--name <name>", "Label for the key")
-    .option("--expires-in-days <n>", "Expiry in days (1-365)", (v) => parseInt(v, 10))
+    .option("--expires-in-days <n>", "Expiry in days (1-365)", parseExpiresInDays)
     .option("--json", "Output as JSON")
     .action(async (opts: { name: string; expiresInDays?: number; json?: boolean }) => {
       const apiUrl = getApiUrl();
       const body: Record<string, unknown> = { name: opts.name, scope: "read" };
-      if (opts.expiresInDays !== undefined) body.expiresInDays = opts.expiresInDays;
+      // parseExpiresInDays guarantees a valid integer or commander exits before
+      // this runs; the Number.isInteger guard is belt-and-suspenders so a NaN/null
+      // can never be serialized into the request body.
+      if (opts.expiresInDays !== undefined && Number.isInteger(opts.expiresInDays)) {
+        body.expiresInDays = opts.expiresInDays;
+      }
       const res = await keysRequest(
         apiUrl,
         "/v1/api-keys",
