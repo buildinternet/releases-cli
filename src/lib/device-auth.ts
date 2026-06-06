@@ -176,21 +176,25 @@ export interface DeviceLoginArgs {
 
 export interface DeviceLoginResult {
   token: string;
+  sessionToken: string;
   name?: string;
   scopes?: string[];
   apiUrl: string;
 }
 
+export interface DeviceAuthResult {
+  sessionToken: string;
+  user: SessionUser | null;
+}
+
 /**
- * Orchestrate the full device-login flow and return a credential payload for the
- * caller to persist. Pure of I/O specifics via injectable deps (fetch, sleep,
- * browser, print) so it's unit-testable. Does NOT write to disk — the command
- * layer owns persistence so storage stays in one place.
+ * Run the RFC 8628 device flow and return the session token only — mints NO key.
+ * Used by `releases keys` to (re)establish a session for the management endpoints
+ * without polluting the user's key list.
  */
-export async function runDeviceLogin(args: DeviceLoginArgs): Promise<DeviceLoginResult> {
+export async function runDeviceAuth(args: DeviceLoginArgs): Promise<DeviceAuthResult> {
   const fetchImpl = args.deps?.fetchImpl ?? fetch;
   const print = args.deps?.print ?? ((l: string) => console.log(l));
-  const keyName = args.deps?.keyName ?? "releases-cli";
 
   const code = await requestDeviceCode(args.apiUrl, fetchImpl);
 
@@ -207,20 +211,35 @@ export async function runDeviceLogin(args: DeviceLoginArgs): Promise<DeviceLogin
   }
 
   print("Waiting for authorization...");
-  const accessToken = await pollForToken(args.apiUrl, code.device_code, {
+  const sessionToken = await pollForToken(args.apiUrl, code.device_code, {
     intervalSeconds: code.interval ?? 5,
     expiresInSeconds: code.expires_in,
     fetchImpl,
     sleep: args.deps?.sleep,
   });
 
-  const sessionUser = await getSessionUser(args.apiUrl, accessToken, fetchImpl);
-  if (sessionUser) print(`Authorized as ${sessionUser.name ?? sessionUser.email}.`);
+  const user = await getSessionUser(args.apiUrl, sessionToken, fetchImpl);
+  if (user) print(`Authorized as ${user.name ?? user.email}.`);
 
-  const created = await createUserApiKey(args.apiUrl, accessToken, keyName, fetchImpl);
+  return { sessionToken, user };
+}
+
+/**
+ * Orchestrate the full device-login flow and return a credential payload for the
+ * caller to persist. Pure of I/O specifics via injectable deps (fetch, sleep,
+ * browser, print) so it's unit-testable. Does NOT write to disk — the command
+ * layer owns persistence so storage stays in one place.
+ */
+export async function runDeviceLogin(args: DeviceLoginArgs): Promise<DeviceLoginResult> {
+  const fetchImpl = args.deps?.fetchImpl ?? fetch;
+  const keyName = args.deps?.keyName ?? "releases-cli";
+
+  const { sessionToken } = await runDeviceAuth(args);
+  const created = await createUserApiKey(args.apiUrl, sessionToken, keyName, fetchImpl);
 
   return {
     token: created.key,
+    sessionToken,
     name: created.name ?? keyName,
     scopes: [created.scope ?? "read"],
     apiUrl: args.apiUrl,

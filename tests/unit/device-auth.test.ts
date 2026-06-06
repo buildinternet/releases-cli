@@ -1,5 +1,10 @@
 import { describe, it, expect } from "bun:test";
-import { requestDeviceCode, pollForToken, runDeviceLogin } from "../../src/lib/device-auth.js";
+import {
+  requestDeviceCode,
+  pollForToken,
+  runDeviceLogin,
+  runDeviceAuth,
+} from "../../src/lib/device-auth.js";
 
 const BASE = "https://test.example.com";
 
@@ -147,5 +152,88 @@ describe("runDeviceLogin", () => {
     expect(opened).toBe(`${apiUrl}/device?user_code=ABCD1234`);
     // The user code is shown to the human at least once.
     expect(printed.join("\n")).toContain("ABCD1234");
+  });
+});
+
+describe("runDeviceAuth", () => {
+  it("returns the session token and mints no key", async () => {
+    const calls: string[] = [];
+    const fakeFetch = (async (url: string) => {
+      const u = String(url);
+      calls.push(u);
+      if (u.endsWith("/device/code"))
+        return new Response(
+          JSON.stringify({
+            device_code: "d",
+            user_code: "U",
+            verification_uri: "https://x/device",
+            expires_in: 900,
+            interval: 0,
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      if (u.endsWith("/device/token"))
+        return new Response(JSON.stringify({ access_token: "sess_tok" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      if (u.endsWith("/get-session"))
+        return new Response(JSON.stringify({ user: { email: "a@b.co", name: "A" } }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      throw new Error(`unexpected ${u}`);
+    }) as unknown as typeof fetch;
+
+    const res = await runDeviceAuth({
+      apiUrl: "https://test.example.com",
+      openInBrowser: false,
+      deps: { fetchImpl: fakeFetch, sleep: async () => {}, print: () => {} },
+    });
+    expect(res.sessionToken).toBe("sess_tok");
+    expect(calls.some((u) => u.endsWith("/v1/api-keys"))).toBe(false);
+  });
+});
+
+describe("runDeviceLogin returns sessionToken", () => {
+  it("includes the session token alongside the minted key", async () => {
+    const fakeFetch = (async (url: string) => {
+      const u = String(url);
+      if (u.endsWith("/device/code"))
+        return new Response(
+          JSON.stringify({
+            device_code: "d",
+            user_code: "U",
+            verification_uri: "https://x/device",
+            expires_in: 900,
+            interval: 0,
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      if (u.endsWith("/device/token"))
+        return new Response(JSON.stringify({ access_token: "sess_tok" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      if (u.endsWith("/get-session"))
+        return new Response(JSON.stringify({ user: { email: "a@b.co" } }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      if (u.endsWith("/v1/api-keys"))
+        return new Response(JSON.stringify({ key: "relu_new", name: "n", scope: "read" }), {
+          status: 201,
+          headers: { "content-type": "application/json" },
+        });
+      throw new Error(`unexpected ${u}`);
+    }) as unknown as typeof fetch;
+
+    const res = await runDeviceLogin({
+      apiUrl: "https://test.example.com",
+      openInBrowser: false,
+      deps: { fetchImpl: fakeFetch, sleep: async () => {}, print: () => {} },
+    });
+    expect(res.token).toBe("relu_new");
+    expect(res.sessionToken).toBe("sess_tok");
   });
 });

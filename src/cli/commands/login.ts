@@ -29,6 +29,7 @@ export function registerLoginCommand(program: Command): void {
 
         const cred: StoredCredential = {
           token: result.token,
+          sessionToken: result.sessionToken,
           name: result.name,
           scopes: result.scopes,
           apiUrl: result.apiUrl,
