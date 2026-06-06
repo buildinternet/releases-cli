@@ -66,8 +66,10 @@ export async function pollForToken(
     if (Date.now() > deadline) {
       throw new Error("Device code expired before it was approved. Run `releases login` again.");
     }
+    // oxlint-disable-next-line no-await-in-loop -- sequential device-flow poll (RFC 8628): wait the server interval before each request
     await sleep(interval * 1000);
 
+    // oxlint-disable-next-line no-await-in-loop -- sequential device-flow poll (RFC 8628): one outstanding poll request at a time
     const res = await fetchImpl(`${apiUrl}/api/auth/device/token`, {
       method: "POST",
       headers: { "content-type": "application/json", "user-agent": CLIENT_ID },
@@ -77,6 +79,7 @@ export async function pollForToken(
         client_id: CLIENT_ID,
       }),
     });
+    // oxlint-disable-next-line no-await-in-loop -- sequential device-flow poll (RFC 8628): parse this poll's response before the next iteration
     const data = (await res.json().catch(() => ({}))) as {
       access_token?: string;
       error?: string;
