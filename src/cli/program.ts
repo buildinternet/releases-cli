@@ -55,6 +55,7 @@ import { isAuthenticated } from "../lib/mode.js";
 import { preflightScopeWarning } from "../lib/preflight.js";
 import { registerAuthCommand } from "./commands/auth.js";
 import { registerLoginCommand } from "./commands/login.js";
+import { registerKeysCommand } from "./commands/keys.js";
 import { VERSION } from "./version.js";
 import { writeJson } from "../lib/output.js";
 
@@ -235,6 +236,7 @@ registerSubmitCommand(program);
 registerWhoamiCommand(program);
 registerAuthCommand(program);
 registerLoginCommand(program);
+registerKeysCommand(program);
 registerAgentContextCommand(program);
 registerCompletionCommand(program);
 registerSkillsCommand(program);
