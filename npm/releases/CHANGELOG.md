@@ -1,5 +1,11 @@
 # @buildinternet/releases
 
+## 0.58.0
+
+### Minor Changes
+
+- 67ff782: Add `releases keys` verbs (create/list/revoke) for self-serve, read-only user API keys. Authenticated via the device-flow session token persisted at login, with transparent re-auth on expiry.
+
 ## 0.57.0
 
 ### Minor Changes
