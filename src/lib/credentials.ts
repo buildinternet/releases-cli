@@ -12,6 +12,13 @@ import { getDataDir } from "@releases/lib/config";
 
 export interface StoredCredential {
   token: string;
+  /**
+   * Device-flow session token, used ONLY for the session-gated /v1/api-keys
+   * management endpoints (the `releases keys` verbs). Broader than `token` — it
+   * can manage the account — so it shares the same 0600 file and is cleared by
+   * `auth logout` / `clearCredential()`.
+   */
+  sessionToken?: string;
   name?: string;
   scopes?: string[];
   /** API URL the token was verified against (prod/staging tokens don't cross DBs). */
@@ -35,6 +42,12 @@ export function readCredential(): StoredCredential | null {
     if (typeof parsed.apiUrl !== "string" || !parsed.apiUrl) return null;
     if (typeof parsed.savedAt !== "string" || !parsed.savedAt) return null;
     if (parsed.name !== undefined && typeof parsed.name !== "string") return null;
+    if (
+      parsed.sessionToken !== undefined &&
+      (typeof parsed.sessionToken !== "string" || !parsed.sessionToken)
+    ) {
+      return null;
+    }
     // `scopes` is optional, but if present it must be a string array — a malformed
     // value (e.g. a hand-edited string) would crash callers that iterate or
     // `.join` it (auth status, the admin scope pre-flight).

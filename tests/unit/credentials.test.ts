@@ -1,5 +1,5 @@
 import { describe, it, expect, afterAll } from "bun:test";
-import { mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -67,5 +67,40 @@ describe("credentials", () => {
     expect(clearCredential()).toBe(true);
     expect(readCredential()).toBeNull();
     expect(clearCredential()).toBe(false);
+  });
+
+  it("round-trips an optional sessionToken", () => {
+    writeCredential({
+      token: "relu_abc",
+      sessionToken: "sess_xyz",
+      apiUrl: "https://api.releases.sh",
+      savedAt: "2026-06-06T00:00:00.000Z",
+    });
+    expect(readCredential()?.sessionToken).toBe("sess_xyz");
+    clearCredential();
+  });
+
+  it("accepts a credential with no sessionToken (back-compat)", () => {
+    writeCredential({
+      token: "relu_abc",
+      apiUrl: "https://api.releases.sh",
+      savedAt: "2026-06-06T00:00:00.000Z",
+    });
+    expect(readCredential()?.sessionToken).toBeUndefined();
+    clearCredential();
+  });
+
+  it("rejects a credential whose sessionToken is a non-string", () => {
+    writeCredential({
+      token: "relu_abc",
+      apiUrl: "https://api.releases.sh",
+      savedAt: "2026-06-06T00:00:00.000Z",
+    });
+    const path = join(dir, "credentials");
+    const obj = JSON.parse(readFileSync(path, "utf8"));
+    obj.sessionToken = 123;
+    writeFileSync(path, JSON.stringify(obj));
+    expect(readCredential()).toBeNull();
+    clearCredential();
   });
 });
