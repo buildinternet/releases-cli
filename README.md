@@ -204,6 +204,19 @@ releases login --no-browser # print the URL + code to open yourself (headless / 
 
 This uses the OAuth 2.0 Device Authorization Grant (RFC 8628): the CLI shows a short code, you approve it at [releases.sh/device](https://releases.sh/device) in a signed-in browser, and a **read-only** key is minted and saved to `~/.releases/credentials`. Sign up / sign in to the web app first if you haven't. A read-only key is all that's self-serve today; write/admin keys are closed beta (see above).
 
+### Managing keys
+
+List, create, and revoke your personal API keys without leaving the terminal:
+
+```bash
+releases keys list                                  # your keys (id, scope, prefix, created, expiry)
+releases keys create --name "ci-bot"                # mints a read-only key, shown once
+releases keys create --name "ci-bot" --expires-in-days 90
+releases keys revoke <id>                            # delete a key (confirm, or pass --yes)
+```
+
+Keys created here are **read-only** (write/admin are not self-serve). The created key string is shown exactly once — store it then. These commands reuse the session from `releases login`, re-prompting the browser approval only when it has expired; the session is bound to the API environment it was issued against, so switching `RELEASES_API_URL` re-authenticates rather than reusing a key from another environment.
+
 ### Storing a token directly
 
 If you've been issued a token (for example a write/admin key during the closed beta), store it without the browser flow using the `auth` namespace, so you don't need `RELEASES_API_KEY` in your shell every time:
