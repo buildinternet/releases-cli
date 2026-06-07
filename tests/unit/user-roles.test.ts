@@ -92,4 +92,13 @@ describe("user-role client wire contract", () => {
     expect(users).toHaveLength(1);
     expect(users[0]).toMatchObject({ email: "a@b.com", role: "admin" });
   });
+
+  it("listUserRoles throws on a 404 (route missing) instead of returning []", async () => {
+    responder = () =>
+      new Response(JSON.stringify({ error: "not_found" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
+    await expect(client.listUserRoles()).rejects.toThrow(/admin users route|404/i);
+  });
 });

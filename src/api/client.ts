@@ -464,8 +464,16 @@ export async function setUserRole(id: UserIdentifier, role: string): Promise<Set
 
 /** List users holding a curator or admin role. */
 export async function listUserRoles(): Promise<UserRole[]> {
-  const res = await apiFetch<{ users: UserRole[] }>(`/v1/admin/users/roles`);
-  return res?.users ?? [];
+  const res = await apiFetch<{ users: UserRole[] } | null>(`/v1/admin/users/roles`);
+  // An empty list is a 200 `{ users: [] }`; apiFetch only yields null on a 404,
+  // which here means the admin route is missing/undeployed. Surface that instead
+  // of masking it as "no curator/admin users".
+  if (!res) {
+    throw new Error(
+      "listUserRoles: 404/empty from /v1/admin/users/roles — is the admin users route deployed?",
+    );
+  }
+  return res.users ?? [];
 }
 
 // ── Content hash ──
