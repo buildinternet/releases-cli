@@ -426,6 +426,56 @@ export async function unsuppressRelease(releaseId: string): Promise<boolean> {
   return result?.unsuppressed ?? false;
 }
 
+// ── User roles (OAuth scope entitlement) ──
+
+/** A user's role row as returned by `/v1/admin/users/role`. `role` NULL → read-only. */
+export interface UserRole {
+  userId: string;
+  email: string;
+  role: string | null;
+}
+
+/** The PATCH response, which also carries the role the user held before the change. */
+export interface SetUserRoleResult extends UserRole {
+  previousRole: string | null;
+}
+
+/** Exactly one of email/userId must be set; the route enforces this too. */
+export type UserIdentifier = { email?: string; userId?: string };
+
+function userRoleQuery(id: UserIdentifier): string {
+  return id.userId
+    ? `userId=${encodeURIComponent(id.userId)}`
+    : `email=${encodeURIComponent(id.email ?? "")}`;
+}
+
+/** Read a user's current role. Returns null when no such user exists (404). */
+export async function getUserRole(id: UserIdentifier): Promise<UserRole | null> {
+  return apiFetch<UserRole | null>(`/v1/admin/users/role?${userRoleQuery(id)}`);
+}
+
+/** Set a user's role (user | curator | admin). Throws on 400/404. */
+export async function setUserRole(id: UserIdentifier, role: string): Promise<SetUserRoleResult> {
+  return apiFetch<SetUserRoleResult>(`/v1/admin/users/role`, {
+    method: "PATCH",
+    body: JSON.stringify({ ...id, role }),
+  });
+}
+
+/** List users holding a curator or admin role. */
+export async function listUserRoles(): Promise<UserRole[]> {
+  const res = await apiFetch<{ users: UserRole[] } | null>(`/v1/admin/users/roles`);
+  // An empty list is a 200 `{ users: [] }`; apiFetch only yields null on a 404,
+  // which here means the admin route is missing/undeployed. Surface that instead
+  // of masking it as "no curator/admin users".
+  if (!res) {
+    throw new Error(
+      "listUserRoles: 404/empty from /v1/admin/users/roles — is the admin users route deployed?",
+    );
+  }
+  return res.users ?? [];
+}
+
 // ── Content hash ──
 
 export async function checkContentHash(source: Source, contentHash: string): Promise<boolean> {
