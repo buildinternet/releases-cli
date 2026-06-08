@@ -1,5 +1,17 @@
 # @buildinternet/releases
 
+## 0.59.0
+
+### Minor Changes
+
+- 639d0cd: feat(admin): `releases admin oauth client …` verbs
+
+  Add CLI verbs to register and manage "Sign in with Releases" OAuth clients, wrapping the root-key-gated `/v1/admin/oauth/clients` routes from buildinternet/releases#1482. `create` (with `--redirect-uri`/`--scope` repeatable, `--trusted`, `--public`/PKCE, `--no-pkce`) prints the `reloc_` secret once; `list`/`get` are secret-free; `disable`/`enable` toggle the reversible kill switch; `trust`/`untrust` toggle consent-screen skipping; `rotate-secret` issues a new secret once; `delete` is a hard removal.
+
+- d3581d0: feat(admin): `releases admin user set-role | get-role | list-roles` (#288)
+
+  Add CLI verbs to manage user roles — the OAuth scope-entitlement source of truth (`user`→read, `curator`→read+write, `admin`→read+write+admin) — wrapping the root-key-gated `/v1/admin/users/role` routes from buildinternet/releases#1485. `set-role` shows `previousRole → role`; `get-role` reads one user; `list-roles` lists curator/admin users. Backfills the changeset omitted when #288 merged.
+
 ## 0.58.0
 
 ### Minor Changes
