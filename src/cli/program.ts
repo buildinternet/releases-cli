@@ -48,6 +48,7 @@ import { registerSubmitCommand, registerRecommendationAdminCommand } from "./com
 import { registerServeCommand } from "./commands/serve.js";
 import { registerWhoamiCommand } from "./commands/whoami.js";
 import { registerWebhookCommand } from "./commands/webhook.js";
+import { registerWebhookAdminCommand } from "./commands/admin/webhook.js";
 import { registerAgentContextCommand } from "./commands/agent-context.js";
 import { registerCompletionCommand } from "./commands/completion.js";
 import { completionNotice } from "./completion/hint.js";
@@ -242,6 +243,9 @@ registerKeysCommand(program);
 registerAgentContextCommand(program);
 registerCompletionCommand(program);
 registerSkillsCommand(program);
+// Subscriber-facing `webhook verify` — local signature check, no auth. The
+// admin webhook CRUD lives under `admin` (registerWebhookAdminCommand).
+registerWebhookCommand(program);
 
 const admin = program
   .command("admin")
@@ -309,7 +313,7 @@ registerWorkCommands(admin);
 const mcpAdmin = admin.command("mcp").description("MCP server management");
 registerServeCommand(mcpAdmin);
 
-registerWebhookCommand(admin);
+registerWebhookAdminCommand(admin);
 registerFeedbackAdminCommand(admin);
 registerRecommendationAdminCommand(admin);
 
