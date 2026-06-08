@@ -46,6 +46,13 @@ function statusLabel(sub: WebhookSubscription): string {
   return sub.enabled ? chalk.green("enabled") : chalk.red("disabled");
 }
 
+/** Parse + clamp `--limit` to the API's accepted range so no garbage reaches the URL. */
+function parseLimit(value: string): number {
+  const n = parseInt(value, 10);
+  if (Number.isNaN(n) || n === 0) return 20;
+  return Math.min(100, Math.max(1, n));
+}
+
 function printSubscription(sub: WebhookSubscription): void {
   logger.info(`${chalk.bold(sub.id)}  ${statusLabel(sub)}`);
   logger.info(`  url:     ${sub.url}`);
@@ -280,7 +287,7 @@ export function registerWebhookAdminCommand(program: Command) {
     .description("Show recent delivery attempts from Analytics Engine")
     .option("--failed", "Only failed attempts (retry / perm_fail / dlq / auto_disabled)")
     .option("--since <iso>", "Only attempts at or after this ISO timestamp (filtered client-side)")
-    .option("--limit <n>", "Max attempts to fetch (default 20, max 100)", (v) => parseInt(v, 10))
+    .option("--limit <n>", "Max attempts to fetch (default 20, max 100)", parseLimit)
     .option("--json", "Output JSON")
     .action(
       async (
