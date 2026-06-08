@@ -41,6 +41,7 @@ import { registerPlaybookCommand } from "./commands/admin/playbook.js";
 import { registerOverviewCommands } from "./commands/admin/overview.js";
 import { registerWorkCommands } from "./commands/admin/work.js";
 import { registerUserCommand } from "./commands/admin/user.js";
+import { registerOauthCommand } from "./commands/admin/oauth.js";
 import { registerTelemetryCommand } from "./commands/telemetry.js";
 import { registerFeedbackCommand, registerFeedbackAdminCommand } from "./commands/feedback.js";
 import { registerSubmitCommand, registerRecommendationAdminCommand } from "./commands/recommend.js";
@@ -284,6 +285,7 @@ registerProductCommand(admin);
 registerCollectionCommand(admin);
 registerReleaseCommand(admin);
 registerUserCommand(admin);
+registerOauthCommand(admin);
 
 const discoveryAdmin = admin
   .command("discovery")

@@ -476,6 +476,102 @@ export async function listUserRoles(): Promise<UserRole[]> {
   return res.users ?? [];
 }
 
+// ── OAuth clients ("Sign in with Releases") ──
+
+/** Secret-free public view of an OAuth client, as returned by every read path. */
+export interface OAuthClient {
+  clientId: string;
+  name: string | null;
+  redirectUris: string[];
+  scopes: string[];
+  /** Maps to skip_consent — a trusted client bypasses the consent screen. */
+  trusted: boolean;
+  disabled: boolean;
+  /** A public (PKCE) client has no secret (`tokenEndpointAuthMethod: "none"`). */
+  public: boolean;
+  type: string | null;
+  tokenEndpointAuthMethod: string | null;
+  createdAt?: unknown;
+  updatedAt?: unknown;
+}
+
+/** Fields accepted by `POST /v1/admin/oauth/clients`. */
+export interface CreateOAuthClientInput {
+  name?: string;
+  redirectUris: string[];
+  scopes: string[];
+  trusted?: boolean;
+  /** `none` ⇒ secretless public/PKCE client. */
+  tokenEndpointAuthMethod?: "none" | "client_secret_basic" | "client_secret_post";
+  type?: "web" | "native" | "user-agent-based";
+  grantTypes?: string[];
+  requirePKCE?: boolean;
+  clientUri?: string;
+  logoUri?: string;
+}
+
+/** Create response — carries the `reloc_` secret exactly once (null for public clients). */
+export interface CreateOAuthClientResult extends OAuthClient {
+  clientSecret: string | null;
+}
+
+/** Register a new OAuth client. The `clientSecret` is shown once and never again. */
+export async function createOAuthClient(
+  input: CreateOAuthClientInput,
+): Promise<CreateOAuthClientResult> {
+  return apiFetch<CreateOAuthClientResult>(`/v1/admin/oauth/clients`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+/** List all registered OAuth clients (secret-free). */
+export async function listOAuthClients(): Promise<OAuthClient[]> {
+  const res = await apiFetch<{ clients: OAuthClient[] } | null>(`/v1/admin/oauth/clients`);
+  if (!res) {
+    throw new Error(
+      "listOAuthClients: 404 from /v1/admin/oauth/clients — is the admin oauth route deployed?",
+    );
+  }
+  return res.clients ?? [];
+}
+
+/** Read one OAuth client by id. Returns null when no such client exists (404). */
+export async function getOAuthClient(clientId: string): Promise<OAuthClient | null> {
+  return apiFetch<OAuthClient | null>(`/v1/admin/oauth/clients/${encodeURIComponent(clientId)}`);
+}
+
+/** Atomically update the `disabled` and/or `trusted` flag on a client. */
+export async function updateOAuthClient(
+  clientId: string,
+  fields: { disabled?: boolean; trusted?: boolean },
+): Promise<OAuthClient> {
+  return apiFetch<OAuthClient>(`/v1/admin/oauth/clients/${encodeURIComponent(clientId)}`, {
+    method: "PATCH",
+    body: JSON.stringify(fields),
+  });
+}
+
+/** Rotate a confidential client's secret; returns the new `reloc_` secret once. */
+export async function rotateOAuthClientSecret(
+  clientId: string,
+): Promise<{ clientId: string; clientSecret: string }> {
+  return apiFetch<{ clientId: string; clientSecret: string }>(
+    `/v1/admin/oauth/clients/${encodeURIComponent(clientId)}/rotate-secret`,
+    { method: "POST" },
+  );
+}
+
+/** Delete a client (a hard removal — disable instead if you want a reversible kill switch). */
+export async function deleteOAuthClient(
+  clientId: string,
+): Promise<{ clientId: string; deleted: boolean }> {
+  return apiFetch<{ clientId: string; deleted: boolean }>(
+    `/v1/admin/oauth/clients/${encodeURIComponent(clientId)}`,
+    { method: "DELETE" },
+  );
+}
+
 // ── Content hash ──
 
 export async function checkContentHash(source: Source, contentHash: string): Promise<boolean> {
