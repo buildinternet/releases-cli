@@ -21,6 +21,7 @@ import type {
 import type {
   SourceWithOrg,
   Stats,
+  OrgCatalogResponse,
   UnifiedSearchResponse,
   SourceChangelogResponse,
   ReleaseWithSource,
@@ -760,6 +761,17 @@ export async function lookupDomain(domain: string): Promise<DomainLookupResponse
   return apiFetch<DomainLookupResponse | null>(
     `/v1/lookups/by-domain?domain=${encodeURIComponent(domain)}`,
   );
+}
+
+// ── Catalog (products + standalone sources, folded) ──
+
+/**
+ * Combined product + source catalog for one org, folded into a single list
+ * with an `entryType: "product" | "source"` discriminator. Backs the MCP
+ * `list_catalog` tool's org-scoped path (`GET /v1/orgs/:slug/catalog`).
+ */
+export async function getOrgCatalog(orgSlug: string): Promise<OrgCatalogResponse | null> {
+  return apiFetch<OrgCatalogResponse | null>(`/v1/orgs/${encodeURIComponent(orgSlug)}/catalog`);
 }
 
 // ── List sources with org ──

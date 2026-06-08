@@ -14,14 +14,12 @@ You have two kinds of tools:
 
 Connected via the Releases MCP server. Use for all read/search operations:
 
-- **search** — Unified hybrid lexical + semantic search across orgs, the catalog (products + standalone sources), and releases. Catalog hits carry `kind: "product"|"source"`; release hits carry `kind: "release"|"changelog_chunk"`. Replaces the separate `search_registry` / `search_releases` pair (both kept as deprecated aliases).
-- **list_catalog** — List catalog entries (products + standalone sources combined) with a `kind` discriminator. Replaces `list_products` + `list_sources` (both kept as deprecated aliases).
-- **get_catalog_entry** — Detail for a single catalog entry. Replaces `get_product` + `get_source` (both kept as deprecated aliases).
+- **search** — Unified hybrid lexical + semantic search across orgs, the catalog (products + standalone sources), and releases. Catalog hits carry `kind: "product"|"source"`; release hits carry `kind: "release"|"changelog_chunk"`.
+- **list_catalog** — List catalog entries (products + standalone sources combined) with a `kind` discriminator.
+- **get_catalog_entry** — Detail for a single catalog entry (product or source).
 - **get_latest_releases** — Recent releases for a product or organization
 - **list_organizations** — Search/list organizations
 - **get_organization** — Detailed view of a single org (accounts, tags, sources, products, aliases)
-- **summarize_changes** — AI-generated summary of recent changes
-- **compare_products** — AI comparison between two products
 
 ### CLI commands (writes + utilities)
 
