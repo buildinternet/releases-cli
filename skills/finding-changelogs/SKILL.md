@@ -130,7 +130,7 @@ Key fields in output:
 
 ## Checking Existing Sources
 
-Search with a domain or company name query to check what sources already exist. CLI: `releases list --query <text> --json`. Typed tool: `list_sources` with query param. Use as a starting point when you don't know where a company's changelogs live.
+Search with a domain or company name query to check what sources already exist. CLI: `releases list --query <text> --json`. Typed tool: `list_catalog` (filter `kind: "source"`). Use as a starting point when you don't know where a company's changelogs live.
 
 ## Pre-checks (automated)
 

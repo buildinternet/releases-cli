@@ -16,10 +16,13 @@ import {
   getOrgAccountsBySlug,
   getProductsByOrg,
   findProduct,
+  listProducts,
   listSourcesWithOrg,
+  getOrgCatalog,
   AmbiguousSourceError,
 } from "../api/client.js";
-import type { LatestRelease } from "../api/types.js";
+import type { LatestRelease, UnifiedSearchResponse } from "../api/types.js";
+import { searchToMarkdown } from "../lib/formatters.js";
 import { logger } from "@releases/lib/logger";
 import { recordEvent } from "../lib/telemetry.js";
 import { describeAmbiguousSource } from "../cli/suggest.js";
@@ -65,57 +68,47 @@ const server = new McpServer({
   };
 }
 
-// ── search_releases ──────────────────────────────────────────────────
+// ── search ───────────────────────────────────────────────────────────
 server.registerTool(
-  "search_releases",
+  "search",
   {
     description:
-      "Search indexed release notes. Proxies to api.releases.sh — supports hybrid lexical + semantic search.",
+      "Unified search across orgs, the catalog (products + standalone sources), and release content. Proxies to api.releases.sh — release retrieval supports hybrid lexical + semantic search. Pass `type` to restrict which result sections are returned.",
     inputSchema: {
       query: z.string().describe("Search query"),
-      organization: z
-        .string()
-        .optional()
-        .describe("Filter to sources belonging to this organization"),
       type: z
-        .enum(["feature", "rollup"])
+        .array(z.enum(["orgs", "catalog", "releases"]))
         .optional()
-        .describe(
-          "Filter by release type: 'feature' for individual releases, 'rollup' for seasonal/quarterly catch-all posts. Omit to include both.",
-        ),
-      limit: z.number().optional().describe("Max results to return (default 20)"),
+        .describe("Restrict results to these sections. Omit to include all three."),
+      organization: z.string().optional().describe("Scope results to this organization"),
       mode: z
         .enum(["lexical", "semantic", "hybrid"])
         .optional()
-        .describe("Retrieval strategy (default: hybrid)."),
+        .describe("Release retrieval strategy (default: hybrid)."),
+      limit: z.number().optional().describe("Max results per section (default 20)"),
     },
   },
-  async ({ query, organization, limit, mode }) => {
+  async ({ query, type, organization, mode, limit }) => {
     const maxResults = limit ?? 20;
 
-    const searchResult = await unifiedSearch(query, maxResults, {
+    const result = await unifiedSearch(query, maxResults, {
       org: organization,
       mode: mode ?? "hybrid",
     });
 
-    let results = searchResult.releases ?? [];
-    // type filter: SearchReleaseHit doesn't expose a type field in this API shape.
-    // The remote MCP worker at mcp.releases.sh handles type filtering natively.
+    // Section filtering happens client-side: the unified /v1/search endpoint
+    // always returns every section, so honor `type` by zeroing the others.
+    const want = type && type.length > 0 ? new Set(type) : null;
+    const filtered: UnifiedSearchResponse = want
+      ? {
+          ...result,
+          orgs: want.has("orgs") ? result.orgs : [],
+          catalog: want.has("catalog") ? result.catalog : [],
+          releases: want.has("releases") ? result.releases : [],
+        }
+      : result;
 
-    results = results.slice(0, maxResults);
-
-    if (results.length === 0) {
-      return textResult("No releases found matching the query.");
-    }
-
-    const text = results
-      .map((r) => {
-        const preview = (r.summary || r.content || "").slice(0, 300);
-        return `**${r.title}**\n${preview}`;
-      })
-      .join("\n\n---\n\n");
-
-    return textResult(text);
+    return textResult(searchToMarkdown(filtered));
   },
 );
 
@@ -194,45 +187,80 @@ server.registerTool(
   },
 );
 
-// ── list_sources ─────────────────────────────────────────────────────
+// ── list_catalog ─────────────────────────────────────────────────────
 server.registerTool(
-  "list_sources",
+  "list_catalog",
   {
-    description: "List all indexed changelog sources",
+    description:
+      'List catalog entries — products and standalone sources folded into one list, each row tagged with an `entryType: "product" | "source"` discriminator. Pass `organization` for one org\'s full folded catalog; omit it for the global catalog.',
     inputSchema: {
-      organization: z
-        .string()
-        .optional()
-        .describe("Filter to sources belonging to this organization"),
+      organization: z.string().optional().describe("Filter to one organization (slug or org_ id)"),
     },
   },
   async ({ organization }) => {
-    let allSources;
+    type CatalogRow = {
+      entryType: "product" | "source";
+      name: string;
+      slug: string;
+      extra: string;
+    };
+    let rows: CatalogRow[];
 
     if (organization) {
       const org = await findOrg(organization);
       if (!org) {
         return textResult(`No organization found matching "${organization}"`);
       }
-      allSources = await getSourcesByOrg(org.id);
+      const catalog = await getOrgCatalog(org.slug);
+      if (!catalog || catalog.items.length === 0) {
+        return textResult(`No catalog entries found for ${org.name}.`);
+      }
+      rows = catalog.items.map((item) =>
+        item.entryType === "product"
+          ? {
+              entryType: "product",
+              name: item.name,
+              slug: item.slug,
+              extra: `Category: ${item.category ?? "N/A"}`,
+            }
+          : {
+              entryType: "source",
+              name: item.name,
+              slug: item.slug,
+              extra: `Type: ${item.type} | URL: ${item.url}`,
+            },
+      );
     } else {
-      allSources = await listSourcesWithOrg();
+      // No global catalog endpoint exists, so fold the two global lists here:
+      // every product, plus the standalone sources (those not bound to a
+      // product — product-bound sources fold under their product row).
+      const [products, sources] = await Promise.all([
+        listProducts({ limit: 200 }),
+        listSourcesWithOrg(),
+      ]);
+      const productRows: CatalogRow[] = products.items.map((p) => ({
+        entryType: "product",
+        name: p.name,
+        slug: p.slug,
+        extra: `Category: ${p.category ?? "N/A"} | Sources: ${p.sourceCount ?? 0}`,
+      }));
+      const sourceRows: CatalogRow[] = sources
+        .filter((s) => !s.productSlug)
+        .map((s) => ({
+          entryType: "source",
+          name: s.name,
+          slug: s.slug,
+          extra: `Type: ${s.type} | URL: ${s.url}`,
+        }));
+      rows = [...productRows, ...sourceRows];
     }
 
-    if (allSources.length === 0) {
-      return textResult("No products indexed yet.");
+    if (rows.length === 0) {
+      return textResult("No catalog entries indexed yet.");
     }
 
-    const text = allSources
-      .map((s) =>
-        [
-          `**${s.name}**`,
-          `  Slug: ${s.slug}`,
-          `  Type: ${s.type}`,
-          `  URL: ${s.url}`,
-          `  Last fetched: ${s.lastFetchedAt ?? "Never"}`,
-        ].join("\n"),
-      )
+    const text = rows
+      .map((r) => [`**${r.name}** (${r.slug}) — _${r.entryType}_`, `  ${r.extra}`].join("\n"))
       .join("\n\n");
 
     return textResult(text);
@@ -469,70 +497,60 @@ server.registerTool(
   },
 );
 
-// ── list_products ─────────────────────────────────────────────────────
+// ── get_catalog_entry ─────────────────────────────────────────────────
 server.registerTool(
-  "list_products",
+  "get_catalog_entry",
   {
-    description: "List products, optionally scoped to one organization",
+    description:
+      "Get detail for a single catalog entry — a product or a standalone source. Accepts a slug, `prod_` id, or `src_` id and dispatches to the matching entity.",
     inputSchema: {
-      organization: z.string().optional().describe("Organization slug to filter by"),
-    },
-  },
-  async ({ organization }) => {
-    if (!organization) {
-      return textResult("Please provide an organization slug to list products.");
-    }
-
-    const org = await findOrg(organization);
-    if (!org) {
-      return textResult(`No organization found matching "${organization}"`);
-    }
-
-    const products = await getProductsByOrg(org.id);
-
-    if (products.length === 0) {
-      return textResult(`No products found for ${org.name}.`);
-    }
-
-    const text = products
-      .map((p) =>
-        [
-          `**${p.name}** (${p.slug})`,
-          p.description ? `  ${p.description}` : null,
-          `  Category: ${p.category ?? "N/A"} | Sources: ${p.sourceCount ?? 0}`,
-        ]
-          .filter(Boolean)
-          .join("\n"),
-      )
-      .join("\n\n");
-
-    return textResult(text);
-  },
-);
-
-// ── get_product ───────────────────────────────────────────────────────
-server.registerTool(
-  "get_product",
-  {
-    description: "Get detailed information about a single product",
-    inputSchema: {
-      identifier: z.string().describe("Product slug or ID"),
+      identifier: z
+        .string()
+        .describe("Product or source identifier — slug, `prod_` id, or `src_` id"),
     },
   },
   async ({ identifier }) => {
-    const product = await findProduct(identifier);
-    if (!product) {
-      return textResult(`No product found matching "${identifier}"`);
+    const renderProduct = async () => {
+      const product = await findProduct(identifier);
+      if (!product) return null;
+      const lines: string[] = [
+        `**Product: ${product.name}** _(product)_`,
+        `Slug: ${product.slug} | Category: ${product.category ?? "N/A"}`,
+      ];
+      if (product.description) lines.push(`Description: ${product.description}`);
+      if (product.url) lines.push(`URL: ${product.url}`);
+      return textResult(lines.join("\n"));
+    };
+
+    const renderSource = async () => {
+      let source;
+      try {
+        source = await findSource(identifier);
+      } catch (err) {
+        // A bare slug under more than one org: surface the candidates so the
+        // agent can re-call with an org/slug coordinate or src_ id (#264).
+        if (err instanceof AmbiguousSourceError) return textResult(describeAmbiguousSource(err));
+        throw err;
+      }
+      if (!source) return null;
+      const lines: string[] = [
+        `**Source: ${source.name}** _(source)_`,
+        `Slug: ${source.slug} | Type: ${source.type}`,
+        `URL: ${source.url}`,
+        `Last fetched: ${source.lastFetchedAt ?? "Never"}`,
+      ];
+      return textResult(lines.join("\n"));
+    };
+
+    // Dispatch on the identifier prefix; bare slugs try product then source.
+    const notFound = textResult(`No catalog entry found matching "${identifier}"`);
+    if (identifier.startsWith("src_")) {
+      return (await renderSource()) ?? notFound;
     }
-
-    const lines: string[] = [
-      `**Product: ${product.name}**`,
-      `Slug: ${product.slug} | Category: ${product.category ?? "N/A"}`,
-    ];
-    if (product.description) lines.push(`Description: ${product.description}`);
-    if (product.url) lines.push(`URL: ${product.url}`);
-
-    return textResult(lines.join("\n"));
+    if (identifier.startsWith("prod_")) {
+      return (await renderProduct()) ?? notFound;
+    }
+    return (await renderProduct()) ?? (await renderSource()) ?? notFound;
   },
 );
 

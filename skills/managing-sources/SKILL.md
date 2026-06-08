@@ -13,7 +13,7 @@ Operations can be performed via CLI commands or typed MCP/agent tools. Use which
 
 | Operation | CLI | Typed tool |
 |-----------|-----|------------|
-| List sources | `releases list [slug] --json [--org <org>] [--query <text>] [--has-feed] [--category <c>] [--compact] [--limit <n>] [--page <n>]` | `list_catalog` (filter `kind: "source"` to exclude products); `list_sources` is a deprecated alias |
+| List sources | `releases list [slug] --json [--org <org>] [--query <text>] [--has-feed] [--category <c>] [--compact] [--limit <n>] [--page <n>]` | `list_catalog` (filter `kind: "source"` to exclude products) |
 | Add source | `releases admin source create <name> --url <url> [--type <type>] [--org <org>] [--feed-url <url>] [--primary]` | `manage_source` action "add" with name, url, type, organization, feed_url, **is_primary** (type auto-detected if omitted; only pass is_primary=true when the source is the org's primary changelog — see "Primary Sources") |
 | Add App Store source | `releases admin source create-appstore <url-or-id> [--platform ios\|macos] [--org <slug>] [--product <slug>] [--storefront <code>]` | _(no typed tool yet — CLI only)_ |
 | Add video source | `releases admin source create-video <channel-or-playlist-url> --org <slug> [--product <slug>]` | _(no typed tool yet — CLI only)_ |
@@ -21,7 +21,7 @@ Operations can be performed via CLI commands or typed MCP/agent tools. Use which
 | Remove source | `releases admin source delete <slug> [--ignore --reason <reason>]` | `manage_source` action "remove" with identifier |
 | Fetch releases | `releases admin source fetch <slug> [--dry-run] [--max <n>]` | `manage_source` action "fetch" with identifier |
 | Get latest releases | `releases tail [slug] --json [--org <org>]` | `get_latest_releases` with source, organization, limit params |
-| Search releases | `releases search <query> --json` | `search` with `type: ["releases"]`; `search_releases` is a deprecated alias |
+| Search releases | `releases search <query> --json` | `search` with `type: ["releases"]` |
 | Evaluate URL | `releases admin discovery evaluate <url> --json` | `evaluate_url` with url param |
 | Add org | `releases admin org create <name> [--domain <d>] [--description <t>] [--category <c>] [--tags <t1,t2>]` | `manage_org` action "add" with name, domain, description, category, tags |
 | Edit org | `releases admin org update <slug> [--category <c>]` | `manage_org` action "edit" with identifier, category |
