@@ -6,285 +6,121 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![skills.sh](https://skills.sh/b/buildinternet/releases-cli)](https://skills.sh/buildinternet/releases-cli)
 
-The changelog & release-notes registry for developers and AI agents. A lean HTTP client for [releases.sh](https://releases.sh) — search and browse release notes from GitHub, RSS/Atom/JSON feeds, and product changelog pages without any local infrastructure.
+The changelog & release-notes registry for developers and AI agents — a lean HTTP client for [releases.sh](https://releases.sh). Search and browse release notes from GitHub, RSS/Atom/JSON feeds, and product changelog pages, with no local infrastructure.
 
-The CLI talks to the hosted registry at `api.releases.sh`. Reader commands work out of the box with no configuration.
-
-> **Reader access is open; admin access is closed beta.** Search and browse need no account. You can mint a personal **read-only** API key with `releases login` (browser sign-in — see [Authentication](#authentication)). `releases admin …` commands need a **write/admin** key, which isn't self-serve yet — open an issue for early access. Everything below the install section assumes reader-only use unless stated otherwise.
+The CLI talks to the hosted registry at `api.releases.sh`. **Search and browse work out of the box — no account or config.** Sign in with `releases login` to follow orgs and products and get a personalized feed; it mints a personal **read-only** API key (and earns you higher rate limits as those roll out). Write/admin access (`releases admin …`) is a separate, closed beta — open an issue for early access.
 
 ## Install
 
-### Homebrew (macOS / Linux)
-
 ```bash
-brew install buildinternet/tap/releases
+brew install buildinternet/tap/releases          # Homebrew (macOS / Linux)
+npm install -g @buildinternet/releases           # npm (macOS / Linux / Windows)
+curl -fsSL https://releases.sh/install | bash    # shell installer (macOS / Linux)
 ```
 
-### npm (macOS, Linux, Windows)
+Or run without installing: `npx @buildinternet/releases@latest search react` — always pin `@latest`, since bare `npx @buildinternet/releases` caches the first-fetched version forever. Signed, precompiled binaries for every platform are on the [Releases page](https://github.com/buildinternet/releases-cli/releases) (with checksums) for air-gapped installs or version pinning.
 
-```bash
-npm install -g @buildinternet/releases
-```
-
-Or run without installing:
-
-```bash
-npx @buildinternet/releases@latest search "react"
-```
-
-Always include the `@latest` tag — bare `npx @buildinternet/releases` caches the first-fetched version forever and won't pick up updates.
-
-### Shell installer (macOS, Linux)
-
-```bash
-curl -fsSL https://releases.sh/install | bash
-```
-
-Downloads the matching platform binary from npm. Respects `RELEASES_INSTALL_DIR` (default: `/usr/local/bin`). Windows users should use npm or the GitHub Releases archive below.
-
-### Precompiled binaries (GitHub Releases)
-
-Every version publishes signed archives for each platform on the [Releases page](https://github.com/buildinternet/releases-cli/releases) — `releases-{darwin-arm64,darwin-x64,linux-arm64,linux-x64}.gz` and `releases-windows-x64.zip`, each with a matching `.sha256` and a top-level `checksums.txt`. Useful for air-gapped installs, version pinning, or platforms where npm and Homebrew aren't an option.
-
-### Shell completion
-
-**Homebrew installs bash, zsh, and fish completions automatically** — nothing extra to do. For every other install path (npm, the `curl | bash` installer, and the raw GitHub binaries), enable completions once:
-
-```bash
-releases completion install          # auto-detects $SHELL
-releases completion install zsh      # or pick explicitly
-```
-
-`install` writes to the conventional location (`~/.zsh/completions/_releases`, `~/.local/share/bash-completion/completions/releases`, or `~/.config/fish/completions/releases.fish`) and prints any rc-file lines you may need to add. The bash and fish paths honor `$XDG_DATA_HOME` and `$XDG_CONFIG_HOME` respectively, so the file lands wherever those point if set. Pass `--path <file>` to override the destination. To pipe the script somewhere yourself:
-
-```bash
-releases completion zsh > /path/to/_releases
-```
-
-On an interactive terminal, a persistent, self-resolving notice on the landing screen and `--help` reminds you to run this until shell completion is detected — and stops on its own once completions are set up (including the automatic Homebrew install). Set `RELEASES_NO_COMPLETION_HINT=1` to silence it.
+Homebrew installs shell completions automatically. On every other path, enable them once with `releases completion install` (auto-detects `$SHELL`).
 
 ## Usage
 
 ```bash
 releases search "authentication"
-releases search "slack integration" --since 90d   # filter release hits by publish date
-releases tail next-js                    # or `releases tail -f` to follow new releases
-releases tail src_abc123                 # IDs work everywhere a slug does
-releases tail --since 30d                # only releases from the last 30 days
+releases search "slack integration" --since 90d   # bound release hits by publish date
+releases tail next-js                              # latest releases; `tail -f` to follow
 releases list --category ai
-releases get vercel                      # org, product, or source
-releases get org_abc123                  # typed IDs are accepted
-releases org overview vercel             # full AI-generated overview for an org
+releases get vercel                                # org, product, or source
+releases org overview vercel                       # full AI-generated org overview
 releases stats
-releases submit https://acme.dev/changelog        # suggest a source for the registry
-releases feedback "great tool, here's an idea…"   # send feedback to the maintainers
+releases submit https://acme.dev/changelog         # suggest a source for the registry
+releases feedback "great tool — here's an idea…"   # message the maintainers
 ```
 
-Every command that takes an org / product / source / release identifier accepts the typed ID form (`org_…`, `prod_…`, `src_…`, `rel_…`) interchangeably with the slug. IDs are stable across renames; slugs are friendlier when typing. Sources and products also accept the `org/slug` coordinate form (e.g. `vercel/next-js`).
+Identifiers are interchangeable: every command accepts a slug, a typed ID (`org_…`, `prod_…`, `src_…`, `rel_…`), or an `org/slug` coordinate (e.g. `vercel/next-js`). IDs are stable across renames. `search`, `tail`/`latest`, and `feed` take `--since` / `--until` to bound releases by date — an ISO date (`2026-01-01`) or relative shorthand (`90d`, `4w`, `6m`, `2y`).
 
-`search` and `tail`/`latest` accept `--since` and `--until` to bound releases by publish date — an ISO date (`2026-01-01`) or relative shorthand (`90d`, `4w`, `6m`, `2y`). On `search` the window applies to release hits only.
-
-Every reader command supports `--json` for machine-readable output. List commands emit a `{ items, pagination }` envelope — parse with `jq '.items[]'`, and check `.pagination.hasMore` before assuming you've seen every row. Nested `metadata` fields are returned as parsed objects (no `fromjson` needed). `org get` includes a short overview preview (with a stale warning when more than 30 days old); `org overview <identifier>` prints the full body.
-
-The release reader commands (`get`, `search`, `tail`/`latest`) return a **slim** release shape by default — `id`, `version`, `title`, `summary`, a markdown-stripped `excerpt`, `url`, `publishedAt`, nested `source`/`org`, and `contentChars`/`contentTokens` size hints — so agents aren't billed tokens for storage/pipeline internals. Pass `--full` to recover the complete payload (`content`, `contentHash`, `composition`, the `title*` variants, …). Note this is the inverse of the catalog `list` command, which is verbose by default and opts _into_ a lightweight shape with `--compact`.
-
-Tabular reader commands fit themselves to the terminal width when stdout is a TTY (column truncation with `…`) and switch to bare TSV when piped — no headers, no color, no truncation — so `releases org list | cut -f2` works without parsing ANSI. `COLUMNS=<n>` overrides the detected width. For complete, parseable output prefer `--json`. The `search` / `tail`/`latest` human view is a single aligned row per release (identity · description · relative age · dimmed `rel_…`); `search` adds a cleaned, markdown-stripped excerpt under each hit.
+Add `--json` to any reader command for machine-readable output — list commands emit a `{ items, pagination }` envelope. Release readers return a slim shape by default (id, version, title, summary, excerpt, url, dates); pass `--full` for the complete payload. Run `releases <command> --help` for per-command flags.
 
 ### Following & personalized feed
 
-Follow organizations and products to build a personalized release feed. These act on your own account, so they need a signed-in CLI — run `releases login` first (or set `RELEASES_API_KEY`).
+Follow orgs and products to build a personalized feed. These act on your own account, so sign in first (`releases login`):
 
 ```bash
-releases follow vercel              # an org slug…
-releases follow vercel/next-js      # …an org/product coordinate…
-releases follow prod_abc123         # …or a typed ID
+releases follow vercel              # org slug, org/product coordinate, or typed ID
 releases following                  # list what you follow
-releases feed                       # your personalized release timeline
-releases feed --limit 50 --page 2   # paginate (also --json)
+releases feed                       # your release timeline (--json, --page, --limit)
 releases unfollow vercel
 ```
 
-Following an organization includes all of its products. `feed` renders like `tail` (one aligned row per release, `--json` for machine output) and is page-paginated.
+Following an organization includes all of its products.
 
-### Feedback
+### Contribute to the registry
 
-Tell the maintainers about a bug, an idea, or anything else. No API key or account required:
-
-```bash
-releases feedback "tail -f reconnects slowly on flaky wifi"   # one-shot message
-releases feedback --type bug                                  # prompt for the text (interactive)
-echo "longer write-up…" | releases feedback                   # pipe from stdin
-releases feedback "love the tool" --contact you@example.com   # optional reply-to
-releases feedback "draft" --dry-run --json                    # preview the payload, send nothing
-```
-
-With no message argument in an interactive terminal, `feedback` prompts for the text (and an optional contact); otherwise pass it inline or pipe via stdin. `--type` accepts `bug`, `idea`, or `other`. Maintainers with admin access review submissions via `releases admin feedback list` (filter by `--type` / `--status`, `--include-archived`, paginate with `--cursor`) and triage them: `releases admin feedback triage <id> --status closed`, `releases admin feedback archive <id>` (`--undo` to restore), and `releases admin feedback delete <id>` (permanent — type the id to confirm, or pass `--yes`).
-
-### Submit a source
-
-Suggest a changelog or release-notes URL for the registry — the same review queue the [web submit form](https://releases.sh/submit) feeds. No API key or account required:
+Neither needs an account or API key:
 
 ```bash
-releases submit https://acme.dev/changelog                       # one-shot
-releases submit acme.dev/changelog                               # scheme optional — https:// is assumed
-releases submit                                                  # prompt for the URL (interactive)
-echo "https://acme.dev/releases" | releases submit               # pipe from stdin
-releases submit https://acme.dev/changelog --note "GitHub: acme/acme" --contact you@example.com
-releases submit https://acme.dev/changelog --dry-run --json      # preview the payload, send nothing
+releases submit https://acme.dev/changelog       # suggest a changelog / release-notes URL
+releases feedback "tail -f reconnects slowly"     # report a bug or share an idea
 ```
 
-Index pages, changelogs, GitHub releases, and feed URLs are all ideal. `--note` carries extra context (product name, GitHub repo, feed quirks) and `--contact` is an optional email to notify once it's reviewed. With no URL argument in an interactive terminal, `submit` prompts for it (and the optional note/contact); otherwise pass it inline or pipe via stdin. Maintainers with admin access review the queue via `releases admin recommendations list` (filter by `--status` / `--type`, `--include-archived`, paginate with `--cursor`) and triage them: `releases admin recommendations triage <id> --status closed`, `releases admin recommendations archive <id>` (`--undo` to restore), and `releases admin recommendations delete <id>` (permanent — type the id to confirm, or pass `--yes`).
+Both prompt interactively when run with no argument, accept input on stdin, and take `--dry-run --json` to preview the payload without sending. `feedback --type` is `bug` / `idea` / `other`; `submit --note` carries extra context (product name, repo, feed quirks). Submissions feed the same review queue as the [web submit form](https://releases.sh/submit).
 
-### MCP
+### MCP & Claude Code
 
-Point Claude Code (or any MCP-compatible agent) at the hosted MCP server:
+Point any MCP-compatible agent at the hosted server:
 
 ```bash
 npx mcp-remote https://mcp.releases.sh/mcp
 ```
 
-Or run a local stdio bridge that proxies the same tools to `api.releases.sh`:
-
-```bash
-releases admin mcp serve
-```
-
-### Claude Code plugins
-
-This repo is a Claude Code marketplace named `releases` that publishes two plugins. Add the marketplace once, then install whichever surfaces you want:
+This repo is also a Claude Code marketplace with two plugins — `releases` (reader: hosted MCP tools, a `/releases` lookup command, and auto-trigger skills) and `releases-admin` (source onboarding + maintenance; needs admin access):
 
 ```bash
 /plugin marketplace add buildinternet/releases-cli
-
-# Reader surface — search and look up releases:
-/plugin install releases@releases
-
-# Admin surface — onboard and maintain sources (requires admin API access):
-/plugin install releases-admin@releases
+/plugin install releases@releases          # reader
+/plugin install releases-admin@releases    # admin
 ```
 
-Or point at a local clone for development:
+Or install just the skills into any agent (Cursor, Codex, Gemini CLI, Windsurf, …):
 
 ```bash
-claude --plugin-dir .
+releases skills install        # or, without the CLI: npx skills add buildinternet/releases-cli
 ```
-
-**`releases` (reader)** — for anyone querying the registry:
-
-- **Hosted MCP connection** to `mcp.releases.sh` — search, lookup, and changelog slicing tools.
-- **`/releases <product> [query]`** command for manual lookups.
-- **Auto-trigger skills:**
-  - `releases-mcp` — activates on questions about releases, changelogs, or breaking changes ("what's new in Next.js 15?").
-  - `releases-cli` — activates when a user mentions or runs the `releases` CLI.
-  - `analyzing-releases` — competitive intel across multiple companies.
-  - `finding-changelogs` — discovering and evaluating changelog URLs.
-
-**`releases-admin`** — for maintainers running their own registry or contributing back:
-
-- **Agents** — `discovery` (finds and onboards sources) and `worker` (executes fetches).
-- **Auto-trigger skills:**
-  - `managing-sources` — CRUD on sources, ignored/blocked URLs, validation.
-  - `parsing-changelogs` — fetch and parse pipeline reference.
-  - `classify-media-relevance` — release-image classification helper.
-  - `seeding-playbooks` — bulk playbook authoring across orgs.
-
-> Claude Code plugins install atomically — there is no Claude Code–native flow for grabbing a single skill without the rest of the plugin. See the next section for an agent-neutral install path.
-
-### Standalone skills (any agent)
-
-The bundled skills are also available as a standalone package. The fastest way to install them is via the CLI:
-
-```bash
-releases skills install                       # detected agent, current project
-releases skills install --global              # user-wide instead of project
-releases skills install --agent cursor        # override detection
-releases skills install releases-mcp          # just the user-facing lookup skill
-```
-
-This is a thin wrapper around the [`skills`](https://github.com/vercel-labs/skills) CLI from the open agent-skills ecosystem (`vercel-labs/skills`), which auto-detects ~50 supported agents (Claude Code, Codex, Cursor, OpenCode, Gemini CLI, Windsurf, GitHub Copilot, …) and writes to the right per-agent skills directory. If you'd rather skip the `releases` CLI entirely, the underlying command is:
-
-```bash
-npx skills add buildinternet/releases-cli
-```
-
-Use this path when you only want the skill behavior (auto-triggering on release/CLI questions) without also registering the hosted MCP connection, agents, and `/releases` command that the plugin provides. Skills are symlinked by default, so re-running `releases skills install` (or `npx skills update releases-cli`) refreshes everything atomically.
 
 ## Authentication
 
-Most commands are reader-only and need no auth. The easiest way to get a personal API key is to sign in through your browser — no token to copy or paste:
+Search and browse need no auth. Signing in is what powers the personal touches — **following orgs/products and your customized feed** — and mints a personal **read-only** key (it can't write or administer anything; it just identifies you, and unlocks higher rate limits as those land). The easiest way in is your browser — nothing to copy or paste:
 
 ```bash
 releases login              # opens your browser to approve, then saves the key
 releases login --no-browser # print the URL + code to open yourself (headless / SSH)
 ```
 
-This uses the OAuth 2.0 Device Authorization Grant (RFC 8628): the CLI shows a short code, you approve it at [releases.sh/device](https://releases.sh/device) in a signed-in browser, and a **read-only** key is minted and saved to `~/.releases/credentials`. Sign up / sign in to the web app first if you haven't. A read-only key is all that's self-serve today; write/admin keys are closed beta (see above).
+This uses the OAuth 2.0 Device Authorization Grant (RFC 8628): approve a short code at [releases.sh/device](https://releases.sh/device) in a signed-in browser, and a read-only key is saved to `~/.releases/credentials` (`0600`). Manage keys with `releases keys list` / `create` / `revoke`.
 
-### Managing keys
-
-List, create, and revoke your personal API keys without leaving the terminal:
-
-```bash
-releases keys list                                  # your keys (id, scope, prefix, created, expiry)
-releases keys create --name "ci-bot"                # mints a read-only key, shown once
-releases keys create --name "ci-bot" --expires-in-days 90
-releases keys revoke <id>                            # delete a key (confirm, or pass --yes)
-```
-
-Keys created here are **read-only** (write/admin are not self-serve). The created key string is shown exactly once — store it then. These commands reuse the session from `releases login`, re-prompting the browser approval only when it has expired; the session is bound to the API environment it was issued against, so switching `RELEASES_API_URL` re-authenticates rather than reusing a key from another environment.
-
-### Storing a token directly
-
-If you've been issued a token (for example a write/admin key during the closed beta), store it without the browser flow using the `auth` namespace, so you don't need `RELEASES_API_KEY` in your shell every time:
-
-```bash
-releases auth login                     # interactive prompt (masked input)
-releases auth login --token <token>     # pass directly
-releases auth login --token -           # read from stdin (pipe-friendly)
-```
-
-The token is verified against `GET /v1/tokens/me` before being saved. If verification fails, nothing is written.
-
-```bash
-releases auth status                    # show current auth state
-releases auth status --json             # machine-readable (authenticated, source, scopes, …)
-releases auth status --verify           # re-check the token against the API live
-releases auth token                     # print the raw token (for scripts)
-releases auth logout                    # remove the stored token
-```
-
-`whoami` is an alias for `auth status`.
-
-**Credential precedence:** if `RELEASES_API_KEY` is set in the environment it takes priority over any stored credential — useful for CI or per-command overrides.
-
-**Storage:** credentials are written to `~/.releases/credentials` with `0600` permissions (owner read/write, rw-------). The file is JSON and contains the token, name, scopes, the API URL the token was verified against, and a `savedAt` timestamp.
+Already issued a token (e.g. a write/admin key during the closed beta)? Store it without the browser flow via `releases auth login` (interactive, `--token <token>`, or `--token -` for stdin); it's verified before being saved. `releases auth status` shows the current state (`whoami` is an alias). `RELEASES_API_KEY` in the environment overrides any stored credential — handy for CI.
 
 ## Environment
 
-Nothing is required for reader access. For admin operations (closed beta — see above):
+Reader access requires nothing. Useful overrides:
 
-- `RELEASES_API_KEY` — Bearer token for write endpoints. Overrides any stored credential from `releases login` / `releases auth login`. Required for any `releases admin …` command that mutates state if no stored credential is present. Write/admin keys are not self-serve yet; a personal **read-only** key is available via `releases login`.
-- `RELEASES_API_URL` — Override the default `https://api.releases.sh` endpoint (useful for staging).
-- `RELEASES_TELEMETRY_DISABLED=1` — Opt out of anonymous usage pings. `DO_NOT_TRACK=1` is also honored.
-- `RELEASES_DISABLE_SKILL_UPDATE_CHECK=1` — Silence the "skills are behind, run `releases skills install`" stderr nag that fires (at most once per 24h) when the GitHub `skills/` tree has moved since your last install.
-- `RELEASES_RUN_DIR` — When set, every `releases admin …` write appends one JSONL line (`{timestamp, command, target, result}`) to `$RELEASES_RUN_DIR/mutations.jsonl` — an audit trail for agent-driven maintenance batches. Unset → no-op. Also the default destination for managed-session traces (`--trace-dir` / `--save` override it). Part of the `~/.releases/work/` maintenance workspace.
+- `RELEASES_API_KEY` — Bearer token for write endpoints; overrides stored credentials.
+- `RELEASES_API_URL` — override the default `https://api.releases.sh` (e.g. staging).
+- `RELEASES_TELEMETRY_DISABLED=1` — opt out of anonymous usage pings (`DO_NOT_TRACK=1` also honored).
 
-Copy `.env.example` to `.env` to configure these locally.
+See [`.env.example`](./.env.example) for the full list.
+
+## Exit codes
+
+| Code  | Meaning                                                      |
+| ----- | ------------------------------------------------------------ |
+| `0`   | Success                                                      |
+| `1`   | Application error (network, API, unexpected state)           |
+| `2`   | Usage / provider error (bad arguments or upstream rejection) |
+| `130` | Cancellation (SIGINT)                                        |
 
 ## Contributing
 
 Build, test, and release instructions live in [CONTRIBUTING.md](CONTRIBUTING.md).
-
-## Exit codes
-
-| Code  | Meaning                                                                          |
-| ----- | -------------------------------------------------------------------------------- |
-| `0`   | Success — session completed or command finished cleanly                          |
-| `1`   | Application error — our-side failure (network, API, unexpected state)            |
-| `2`   | Usage / provider error — bad arguments or upstream provider rejected the request |
-| `130` | Cancellation — session was cancelled (mirrors the SIGINT convention)             |
-
-Defined in [`src/cli/commands/fetch-wait.ts`](./src/cli/commands/fetch-wait.ts) (`TerminalSummary.exitCode`).
 
 ## License
 

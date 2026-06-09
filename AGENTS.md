@@ -36,7 +36,7 @@ bun test                      # bun test
 - **`packages/skills/`** (`@buildinternet/releases-skills`) — thin wrapper around top-level `skills/` for consumers who want to load the bundled playbooks programmatically.
 - **`skills/`** — single source of truth for agent skills; there is no generated copy. The Claude plugin references these folders directly through `.claude-plugin/marketplace.json` (each plugin's `skills` array lists `./skills/<name>` paths, resolved against the repo root via `source: "./"`), so editing a skill is the whole change — nothing to re-sync. Cross-agent install runs through `releases skills install`, which shells out to `npx skills add buildinternet/releases-cli` (the `vercel-labs/skills` ecosystem). Wiring is in `src/cli/commands/skills.ts`; pure argv construction in `src/cli/skills/build-args.ts`.
 - **`plugins/claude/releases/`** — Claude Code plugin. Bundles the hosted MCP connection + the skills referenced from `skills/` via `marketplace.json`.
-- **`npm/`** — meta package (`@buildinternet/releases`) + four platform binary packages. CI writes the compiled binary into each platform package before publishing.
+- **`npm/`** — meta package (`@buildinternet/releases`) + five platform binary packages. CI writes the compiled binary into each platform package before publishing.
 
 ## Conventions
 
@@ -58,14 +58,14 @@ The CLI sends anonymous pings (command name, duration, exit code, CLI version, O
 
 ## Releasing
 
-**Every PR with user-visible changes MUST ship a `.changeset/*.md` file.** Run `bun changeset` (interactive) or write the file directly in `.changeset/`. Bump level: `patch` for bug fixes, `minor` for additive features, `major` for breaking changes. The seven fixed-group packages below must all appear in the changeset header — `bun changeset` selects them together; if writing by hand, copy the header from a prior changeset in git history.
+**Every PR with user-visible changes MUST ship a `.changeset/*.md` file.** Run `bun changeset` (interactive) or write the file directly in `.changeset/`. Bump level: `patch` for bug fixes, `minor` for additive features, `major` for breaking changes. The eight fixed-group packages below must all appear in the changeset header — `bun changeset` selects them together; if writing by hand, copy the header from a prior changeset in git history.
 
 **Never hand-edit a `version` field.** Not in the root `package.json`, not in `npm/*/package.json`, not in `packages/*/package.json`, and not in `src/cli/version.ts`. The release pipeline owns all of them — `changeset version` updates the package files, and `scripts/sync-version.ts` mirrors the result into `src/cli/version.ts`. The MCP server re-exports that constant (`src/mcp/server.ts` imports `VERSION` from `../cli/version.js`), so there's no separate string to sync.
 
-Changesets versions seven `@buildinternet/releases*` packages together (fixed group):
+Changesets versions eight `@buildinternet/releases*` packages together (fixed group):
 
 - `@buildinternet/releases` — meta package
-- `@buildinternet/releases-{darwin-arm64,darwin-x64,linux-arm64,linux-x64}` — platform binaries
+- `@buildinternet/releases-{darwin-arm64,darwin-x64,linux-arm64,linux-x64,windows-x64}` — platform binaries
 - `@buildinternet/releases-{lib,skills}` — shared libraries
 
 `@buildinternet/releases-core` is published independently from the monorepo and consumed here as a regular npm dependency — bump its pin in `package.json` when adopting a new schema. It is **not** part of the fixed group.
