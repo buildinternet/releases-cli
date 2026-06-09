@@ -38,7 +38,7 @@ releases feedback "great tool — here's an idea…"   # message the maintainers
 
 Identifiers are interchangeable: every command accepts a slug, a typed ID (`org_…`, `prod_…`, `src_…`, `rel_…`), or an `org/slug` coordinate (e.g. `vercel/next-js`). IDs are stable across renames. `search`, `tail`/`latest`, and `feed` take `--since` / `--until` to bound releases by date — an ISO date (`2026-01-01`) or relative shorthand (`90d`, `4w`, `6m`, `2y`).
 
-Add `--json` to any reader command for machine-readable output — list commands emit a `{ items, pagination }` envelope. Release readers return a slim shape by default (id, version, title, summary, excerpt, url, dates); pass `--full` for the complete payload. Run `releases <command> --help` for per-command flags.
+Add `--json` to any reader command for machine-readable output — list commands emit a `{ items, pagination }` envelope. Release readers return a slim shape by default (id, version, title, summary, excerpt, url, dates, plus any `media` with its `r2Url`); pass `--full` for the complete payload. `tail`/`latest` take `--count` (alias `--limit`, 1–100). Run `releases <command> --help` for per-command flags.
 
 ### Following & personalized feed
 

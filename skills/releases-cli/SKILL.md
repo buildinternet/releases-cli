@@ -43,7 +43,8 @@ Two commands built for agents specifically:
 ### Conventions worth knowing (all in the reader reference)
 
 - **IDs and slugs are interchangeable** wherever an identifier is expected (`org_…`, `prod_…`, `src_…`, `rel_…`); IDs are stable across renames. Source/product commands also take an `org/slug` coordinate (e.g. `vercel/vercel-ai-sdk`), which skips a resolver round-trip.
-- **`--json` everywhere** for stable output. Release readers (`get`, `search`, `tail`) return a **slim** shape by default (core fields + markdown-stripped `excerpt` + `contentTokens` hint) to save tokens; pass `--full` for the complete payload. (`list` is the inverse: verbose by default, `--compact` for less.)
+- **`--json` everywhere** for stable output. Release readers (`get`, `search`, `tail`) return a **slim** shape by default (core fields + markdown-stripped `excerpt` + `contentTokens` hint, plus `media[]` with R2 `r2Url` when present and a `contentTruncated` flag) to save tokens; pass `--full` for the complete payload. (`list` is the inverse: verbose by default — and carries a per-source `Releases` count column — `--compact` for less.)
+- **`tail`/`latest` row cap:** `--count` (alias `--limit`, clamped `1–100`) sets how many releases to return. Only the `--product` feed is cursor-paginated (`--cursor <token>`); the org-wide/global feeds are count-capped, so `--cursor` without `--product` errors.
 - **Piped output is bare TSV** (no headers/color/truncation), so `releases list | cut -f2` works without parsing ANSI — but note release rows repeat the title across several columns, so check the layout or just use `--json` before slicing by column number. `COLUMNS=<n>` overrides detected width.
 
 ### Reading a tracked changelog

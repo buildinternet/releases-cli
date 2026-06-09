@@ -39,6 +39,7 @@ describe("slimReleaseDetail", () => {
       [
         "contentChars",
         "contentTokens",
+        "contentTruncated",
         "excerpt",
         "id",
         "org",
@@ -57,6 +58,31 @@ describe("slimReleaseDetail", () => {
     expect(out).not.toHaveProperty("contentHash");
     expect(out).not.toHaveProperty("sourceId");
     expect(out).not.toHaveProperty("embeddedAt");
+  });
+  it("surfaces media[] (with r2Url) and a contentTruncated hint in the slim shape (#303)", () => {
+    const media = [
+      {
+        type: "image" as const,
+        url: "https://cdn/x.png",
+        r2Url: "https://media.releases.sh/x.png",
+      },
+    ];
+    const out = slimReleaseDetail({ ...rawDetail, media } as never, {
+      contentChars: 51,
+      contentTokens: 24,
+      full: false,
+    }) as Record<string, unknown>;
+    expect(out.media).toEqual(media);
+    expect(out.contentTruncated).toBe(true);
+  });
+  it("omits media when none present and omits contentTruncated for an empty body", () => {
+    const out = slimReleaseDetail({ ...rawDetail, content: "", media: [] } as never, {
+      contentChars: 0,
+      contentTokens: 0,
+      full: false,
+    }) as Record<string, unknown>;
+    expect(out).not.toHaveProperty("media");
+    expect(out).not.toHaveProperty("contentTruncated");
   });
   it("preserves zero content metrics (empty body is a real measurement)", () => {
     const out = slimReleaseDetail(rawDetail, {
