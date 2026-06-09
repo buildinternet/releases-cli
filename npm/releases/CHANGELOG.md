@@ -1,5 +1,12 @@
 # @buildinternet/releases
 
+## 0.61.0
+
+### Minor Changes
+
+- 695039d: Add personalized follows + feed verbs: `releases follow <org|product>`, `releases unfollow <org|product>`, `releases following` (list), and `releases feed` (your personalized release timeline). They act on the signed-in user's account via the API's `/v1/me/*` routes — sign in with `releases login` (or set `RELEASES_API_KEY`) first. `follow`/`unfollow` accept an org slug, an `org/product` coordinate, or an `org_…`/`prod_…` id; `feed` reuses the same renderer as `releases tail` and is page-paginated (`--page` / `--limit`, `--json`). Requires `@buildinternet/releases-api-types` ≥ 0.32.0 for the follows wire types.
+- de9ce26: Add `releases source fetch <source> --dry-run`: probe a single source without writing to D1 or dispatching (billing) the managed agent. For a client-rendered scrape source (`crawlEnabled`/`renderRequired`) it renders the index once via Browser Rendering and reports how many candidate release links were found — the cheap "can the steady-state cron render actually see releases here, or is it hitting an empty JS shell?" check that onboarding previously had no way to answer. For a feed/GitHub source it reports candidate releases parsed. Single source only; `--json` supported.
+
 ## 0.60.0
 
 ### Minor Changes
