@@ -4,6 +4,8 @@ Reader commands are unauthenticated — no API key required. They talk to `api.r
 
 **Release JSON is slim by default.** `get`, `search`, and `tail`/`latest` return a lean release shape — `id`, `version`, `title`, `summary`, a markdown-stripped `excerpt`, `url`, `publishedAt`, nested `source`/`org`, and `contentChars`/`contentTokens` size hints. This drops storage internals (`contentHash`, `sourceId`, `versionSort`, `fetchedAt`, …) and the redundant `title*` variants to keep token usage low. Add `--full` when you need the complete payload (including the full `content` body). `summary` may be `null`; lean on `excerpt` / `contentChars` to decide whether to pull more.
 
+Two fields survive into the slim shape because they answer common questions without a `--full` round-trip: **`media[]`** is included when the release carries media (each item keeps the R2-mirrored `r2Url`), so you can verify "did this image mirror to R2?" from the default output; and **`contentTruncated: true`** is stamped whenever a full `content` body exists but was projected to `excerpt`, signalling that `--full` will return more. Both are omitted when not applicable.
+
 > **Piping note:** in the default (non-`--json`) TSV output, release rows repeat the title across several columns (raw title, normalized title, version). Don't assume `cut -f2` lands on a unique field — check the row layout first, or just use `--json` for stable parsing.
 
 ## Search
@@ -47,11 +49,17 @@ releases tail                          # across all sources
 releases tail next-js                  # one source (slug)
 releases tail src_abc123               # one source (typed id)
 releases tail --org vercel --count 20  # whole org (org_…, slug, domain, name, or handle)
+releases tail --org vercel --limit 100 # --limit is an alias for --count (both clamp to 1–100)
+releases tail --product nextjs --cursor <token>  # page the product feed (see below)
 releases tail --product nextjs         # one product (prod_… or slug)
 releases tail --type feature           # filter by release type
 releases tail --json                   # slim shape
 releases tail --json --full            # complete payload
 ```
+
+`--count` (alias `--limit`) caps the rows returned and is clamped to `1–100`; a positive integer is required (anything else errors). When a one-shot listing fills the requested window, a truncation hint is printed to **stderr** so `--json` stdout stays clean.
+
+Pagination differs by feed: only the **product** feed (`--product`) is cursor-paginated — pass `--cursor <token>` to fetch the next page, chaining the token from the previous response. The org-wide and global feeds are **count-capped, not cursored**, so `--cursor` without `--product` errors rather than being silently ignored (and `--cursor` can't combine with `--follow`).
 
 ## List sources
 
@@ -69,6 +77,8 @@ releases list --json --compact         # lightweight JSON (id, slug, name, type,
 releases list --json --limit 20 --page 2  # pagination (server-side)
 ```
 
+The text table carries a per-source **`Releases`** count column (a dim `—` when unknown), so you can answer "how many releases does this source have?" without a follow-up call; the `--json` rows expose the same value as `releaseCount`.
+
 Aliased as `releases admin source list` for discoverability within admin workflows.
 
 ## Get any entity
@@ -84,6 +94,8 @@ releases get vercel                       # slug fallthrough (org → product �
 ```
 
 Use this when you have an ID from another tool output (search results, MCP tool responses, etc.) and want to inspect it without caring what kind of entity it is.
+
+For a release, `releases get rel_… --json` carries `media[]` (with each item's R2-mirrored `r2Url`) and a `contentTruncated` flag in the slim shape — enough to confirm media mirrored to R2 and whether there's a fuller body behind `--full`, without dropping to the raw API.
 
 ## Stats
 
