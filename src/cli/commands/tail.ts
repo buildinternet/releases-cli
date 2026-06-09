@@ -232,7 +232,7 @@ Examples:
           } else if (!productTarget && count >= 100) {
             logger.warn(
               "Hit the 100-release cap for the latest feed. Narrow with --since/--until, " +
-                "--source, or --org to page through more.",
+                "--org, or a <source> argument to page through more.",
             );
           } else if (!productTarget) {
             logger.warn(
