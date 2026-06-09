@@ -59,6 +59,7 @@ import { preflightScopeWarning } from "../lib/preflight.js";
 import { registerAuthCommand } from "./commands/auth.js";
 import { registerLoginCommand } from "./commands/login.js";
 import { registerKeysCommand } from "./commands/keys.js";
+import { registerFollowsCommands } from "./commands/follows.js";
 import { VERSION } from "./version.js";
 import { writeJson } from "../lib/output.js";
 
@@ -240,6 +241,7 @@ registerWhoamiCommand(program);
 registerAuthCommand(program);
 registerLoginCommand(program);
 registerKeysCommand(program);
+registerFollowsCommands(program);
 registerAgentContextCommand(program);
 registerCompletionCommand(program);
 registerSkillsCommand(program);

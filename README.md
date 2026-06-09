@@ -90,6 +90,22 @@ The release reader commands (`get`, `search`, `tail`/`latest`) return a **slim**
 
 Tabular reader commands fit themselves to the terminal width when stdout is a TTY (column truncation with `…`) and switch to bare TSV when piped — no headers, no color, no truncation — so `releases org list | cut -f2` works without parsing ANSI. `COLUMNS=<n>` overrides the detected width. For complete, parseable output prefer `--json`. The `search` / `tail`/`latest` human view is a single aligned row per release (identity · description · relative age · dimmed `rel_…`); `search` adds a cleaned, markdown-stripped excerpt under each hit.
 
+### Following & personalized feed
+
+Follow organizations and products to build a personalized release feed. These act on your own account, so they need a signed-in CLI — run `releases login` first (or set `RELEASES_API_KEY`).
+
+```bash
+releases follow vercel              # an org slug…
+releases follow vercel/next-js      # …an org/product coordinate…
+releases follow prod_abc123         # …or a typed ID
+releases following                  # list what you follow
+releases feed                       # your personalized release timeline
+releases feed --limit 50 --page 2   # paginate (also --json)
+releases unfollow vercel
+```
+
+Following an organization includes all of its products. `feed` renders like `tail` (one aligned row per release, `--json` for machine output) and is page-paginated.
+
 ### Feedback
 
 Tell the maintainers about a bug, an idea, or anything else. No API key or account required:
