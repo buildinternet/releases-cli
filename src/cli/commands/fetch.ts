@@ -10,6 +10,7 @@ import {
   findSource,
   findOrg,
   getSourcesByOrg,
+  triggerSourceFetch,
 } from "../../api/client.js";
 import { newCorrelationId } from "@buildinternet/releases-core/id";
 import { orgNotFound, sourceNotFound } from "../suggest.js";
@@ -45,6 +46,13 @@ export function registerFetchCommand(program: Command) {
       "With --local, override a Content-Signal refusal (ai-input=no / ai-train=no). " +
         "Use only with explicit publisher permission.",
     )
+    .option(
+      "--dry-run",
+      "Probe a single source without writing to D1 or billing the managed agent: " +
+        "feed/GitHub sources report candidate releases parsed; a client-rendered scrape source " +
+        "(crawlEnabled/renderRequired) renders its index once and reports candidate links found. " +
+        "Single source only.",
+    )
     .option("--unfetched", "Only fetch sources that have never been fetched")
     .option("--stale <hours>", "Only fetch sources older than N hours")
     .option("--changed", "Only fetch sources where poll detected upstream changes")
@@ -76,7 +84,8 @@ Examples:
   releases admin source fetch --org acme --wait     Wait for completion; exit non-zero on failure
   releases admin source fetch --org acme --wait 60  Wait up to 60 seconds
   releases admin source fetch my-source --local     Stage local-ingest handoff (no managed agent)
-  releases admin source fetch my-source --local --force   Override a Content-Signal refusal`,
+  releases admin source fetch my-source --local --force   Override a Content-Signal refusal
+  releases admin source fetch my-source --dry-run    Probe a source (render check / parse) without writing or billing`,
     )
     .action(
       async (
@@ -86,6 +95,7 @@ Examples:
           json?: boolean;
           local?: boolean;
           force?: boolean;
+          dryRun?: boolean;
           unfetched?: boolean;
           stale?: string;
           changed?: boolean;
@@ -102,31 +112,16 @@ Examples:
         // POSTs to /v1/workflows/update. Single-source only — the batch filters
         // and --org fan-out don't apply to a one-source handoff brief.
         if (opts.local) {
-          if (!identifier) {
-            logger.error(
-              "--local needs a single source identifier (src_…, org/slug coordinate, or slug).",
-            );
-            process.exit(1);
-          }
-          const conflicting = (
-            [
-              ["--org", opts.org],
-              ["--unfetched", opts.unfetched],
-              ["--stale", opts.stale],
-              ["--changed", opts.changed],
-              ["--retry-errors", opts.retryErrors],
-              ["--wait", opts.wait !== undefined],
-            ] as const
-          )
-            .filter(([, v]) => v)
-            .map(([name]) => name);
-          if (conflicting.length > 0) {
-            logger.error(
-              `--local stages a single-source handoff and can't combine with ${conflicting.join(", ")}.`,
-            );
-            process.exit(1);
-          }
-          return runLocalHandoff(identifier, { json: opts.json, force: opts.force });
+          requireSingleSourceFlag("--local", "stages a single-source handoff", identifier, opts);
+          return runLocalHandoff(identifier!, { json: opts.json, force: opts.force });
+        }
+
+        // --dry-run short-circuits to the per-source probe route — no managed
+        // agent, no D1 writes. Single source only; the batch filters and --org
+        // fan-out don't apply to a one-source probe.
+        if (opts.dryRun) {
+          requireSingleSourceFlag("--dry-run", "probes a single source", identifier, opts);
+          return runDryRunProbe(identifier!, { json: opts.json });
         }
 
         if (opts.force) {
@@ -271,6 +266,100 @@ Examples:
         }
       },
     );
+}
+
+/**
+ * Validate a single-source flag (`--local` / `--dry-run`): require a source
+ * identifier and reject the batch filters / `--org` / `--wait` that don't apply
+ * to a one-source operation. Exits the process on violation. Keeps the
+ * mutually-exclusive flag list defined in exactly one place.
+ */
+function requireSingleSourceFlag(
+  flag: string,
+  verb: string,
+  identifier: string | undefined,
+  opts: {
+    org?: string;
+    unfetched?: boolean;
+    stale?: string;
+    changed?: boolean;
+    retryErrors?: boolean;
+    wait?: string | true;
+  },
+): void {
+  if (!identifier) {
+    logger.error(`${flag} needs a single source identifier (src_…, org/slug coordinate, or slug).`);
+    process.exit(1);
+  }
+  const conflicting = (
+    [
+      ["--org", opts.org],
+      ["--unfetched", opts.unfetched],
+      ["--stale", opts.stale],
+      ["--changed", opts.changed],
+      ["--retry-errors", opts.retryErrors],
+      ["--wait", opts.wait !== undefined],
+    ] as const
+  )
+    .filter(([, v]) => v)
+    .map(([name]) => name);
+  if (conflicting.length > 0) {
+    logger.error(`${flag} ${verb} and can't combine with ${conflicting.join(", ")}.`);
+    process.exit(1);
+  }
+}
+
+/**
+ * Single-source dry-run probe: resolves the source, calls
+ * `POST /v1/sources/:id/fetch?dryRun=true`, and prints the result. For a
+ * client-rendered scrape source this is a render check (renders the index once,
+ * reports candidate links found); for a feed/GitHub source it reports candidate
+ * releases parsed. Never writes to D1, never dispatches a managed agent.
+ */
+async function runDryRunProbe(identifier: string, opts: { json?: boolean }): Promise<void> {
+  const src = await findSource(identifier);
+  if (!src) return sourceNotFound(identifier);
+
+  let result;
+  try {
+    result = await triggerSourceFetch(src.id, { dryRun: true });
+  } catch (err) {
+    logger.error(`Dry-run probe failed: ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(1);
+  }
+
+  if (opts.json) {
+    await writeJson({ source: src.slug, ...result });
+    return;
+  }
+
+  if (result.renderCheck) {
+    // Client-rendered scrape source render probe.
+    if (result.status === "error") {
+      logger.error(
+        chalk.red(`Render check failed for ${src.slug}: ${result.error ?? "unknown error"}`),
+      );
+      process.exit(1);
+    }
+    if (!result.rendered) {
+      logger.error(
+        chalk.red(
+          `${src.slug}: render returned an empty page — the index did not hydrate (0 candidate links). ` +
+            `The steady-state cron render likely can't see releases here.`,
+        ),
+      );
+      process.exit(1);
+    }
+    const n = result.candidateCount ?? 0;
+    const colour = n > 0 ? chalk.green : chalk.yellow;
+    logger.info(colour(`${src.slug}: render OK — ${n} candidate link(s) found on the index.`));
+    for (const u of result.sampleUrls ?? []) process.stderr.write(chalk.dim(`  ${u}\n`));
+    return;
+  }
+
+  // Feed/GitHub/scrape-with-feed dry-run.
+  const found = result.releasesFound ?? 0;
+  logger.info(chalk.green(`${src.slug}: parsed ${found} candidate release(s) (no writes).`));
 }
 
 /** Strict integer parse — `parseInt("60abc")` returns 60, which would silently misuse `--wait 60s`. */

@@ -270,6 +270,41 @@ export async function sourceChangelog(
   );
 }
 
+/** Result of `POST /v1/sources/:id/fetch` — union of the inline-fetch, queued,
+ * and render-dry-run branches. All fields optional; the caller inspects which
+ * branch fired (`renderCheck` / `fetched` / `queued`). */
+export interface SourceFetchResult {
+  fetched?: boolean;
+  queued?: boolean;
+  type?: string;
+  status?: string;
+  releasesFound?: number;
+  releasesInserted?: number;
+  // Render dry-run probe (#1528):
+  renderCheck?: boolean;
+  rendered?: boolean;
+  candidateCount?: number;
+  sampleUrls?: string[];
+  durationMs?: number;
+  error?: string;
+}
+
+/**
+ * Trigger a single-source fetch via `POST /v1/sources/:id/fetch`. With
+ * `dryRun`, the server runs the parser (or, for a client-rendered scrape
+ * source, renders the index once) without writing to D1 and without the
+ * managed-agent extraction loop. `idOrSlug` should be a resolved `src_…` id.
+ */
+export async function triggerSourceFetch(
+  idOrSlug: string,
+  opts: { dryRun?: boolean } = {},
+): Promise<SourceFetchResult> {
+  const qs = opts.dryRun ? "?dryRun=true" : "";
+  return apiFetch<SourceFetchResult>(`/v1/sources/${encodeURIComponent(idOrSlug)}/fetch${qs}`, {
+    method: "POST",
+  });
+}
+
 export async function findSourcesByUrls(urls: string[]): Promise<Source[]> {
   if (urls.length === 0) return [];
   const params = urls.map((u) => `url=${encodeURIComponent(u)}`).join("&");
