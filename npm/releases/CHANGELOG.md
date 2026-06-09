@@ -1,5 +1,15 @@
 # @buildinternet/releases
 
+## 0.60.0
+
+### Minor Changes
+
+- 5d191ea: Add `releases admin webhook` commands for managing outbound webhook subscriptions: `add`, `list`, `show`, `edit`, `remove`, `test`, `rotate-secret`, and `deliveries`. These wrap the existing root-key-gated `/v1/webhooks` API routes so Phase-A operators can manage subscriptions without raw API calls.
+
+  The subscriber-facing `webhook verify` (local signature check, no auth) moves from `admin webhook verify` to top-level `webhook verify`.
+
+- 313ffb0: Rename the local stdio MCP server's tools (`releases admin mcp serve`) to mirror the canonical names served by the hosted server at `mcp.releases.sh`: `search_releases` → `search` (now returns the full unified result — orgs, catalog, and releases — with an optional `type` section filter), `list_sources` + `list_products` → `list_catalog` (org-scoped via `GET /v1/orgs/:slug/catalog`; global path folds products + standalone sources), and `get_product` → `get_catalog_entry` (dispatches product vs. source on the identifier prefix). `get_source` / `get_source_changelog` are unchanged.
+
 ## 0.59.0
 
 ### Minor Changes
