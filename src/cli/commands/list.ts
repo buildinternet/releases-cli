@@ -205,6 +205,9 @@ Examples:
               { label: "URL" },
               { label: "Org" },
               { label: "Product" },
+              // Per-source release count \u2014 answers "how many releases does this
+              // source have?" without dropping to the raw API. #304
+              { label: "Releases", noTruncate: true },
               { label: "Last Fetched", noTruncate: true },
             ],
             rows: pageItems.map((row) => {
@@ -217,6 +220,7 @@ Examples:
                 row.url,
                 row.orgName ? stripAnsi(row.orgName) : chalk.dim("\u2014"),
                 row.productName ?? chalk.dim("\u2014"),
+                row.releaseCount != null ? String(row.releaseCount) : chalk.dim("\u2014"),
                 row.lastFetchedAt ?? chalk.dim("never"),
               ];
             }),

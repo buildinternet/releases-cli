@@ -46,7 +46,8 @@ export function registerTailCommand(program: Command) {
     .alias("latest")
     .description("Show the latest releases, optionally tailing a live feed")
     .argument("[source]", "Source ID (src_…) or slug to filter by")
-    .option("-c, --count <n>", "Number of releases to show", "10")
+    .option("-c, --count <n>", "Number of releases to show (1–100; alias --limit)", "10")
+    .option("--limit <n>", "Alias for --count (number of releases to show, 1–100)")
     .option(
       "--org <identifier>",
       "Filter to an organization (org_…, slug, domain, name, or handle)",
@@ -58,6 +59,10 @@ export function registerTailCommand(program: Command) {
     .option(
       "--include-coverage",
       "Include releases that are coverage of another (hidden by default)",
+    )
+    .option(
+      "--cursor <cursor>",
+      "Page token for the next page (only with --product; the global feed is count-capped, not cursored)",
     )
     .option(
       "--since <when>",
@@ -78,6 +83,7 @@ Examples:
   releases tail                         Latest releases across all sources
   releases tail my-source               Latest releases from one source
   releases tail --org acme --count 20   Latest 20 releases from an org
+  releases latest --org acme --limit 100   Up to 100 (--limit is an alias for --count)
   releases tail --product vercel/turborepo   One product's cross-source feed
   releases tail --since 30d             Releases from the last 30 days
   releases tail -f                      Follow new releases as they arrive (60s interval)
@@ -90,9 +96,11 @@ Examples:
         sourceArg: string | undefined,
         opts: {
           count: string;
+          limit?: string;
           org?: string;
           product?: string;
           includeCoverage?: boolean;
+          cursor?: string;
           since?: string;
           until?: string;
           follow?: boolean;
@@ -101,7 +109,18 @@ Examples:
           full?: boolean;
         },
       ) => {
-        const count = parseInt(opts.count, 10);
+        // `--limit` is an alias for `--count` (#304 — `--limit` is the form
+        // callers reach for; the absence was the footgun). When both are given,
+        // `--limit` wins. The server clamps to [1, 100]; mirror that locally so
+        // the truncation hint below reflects what was actually requested.
+        const MAX_COUNT = 100;
+        const rawCount = opts.limit ?? opts.count;
+        const parsedCount = Number(rawCount);
+        if (!Number.isInteger(parsedCount) || parsedCount <= 0) {
+          logger.error("--count/--limit must be a positive integer");
+          process.exit(1);
+        }
+        const count = Math.min(parsedCount, MAX_COUNT);
         const intervalSeconds = Math.max(5, parseInt(opts.interval, 10) || 60);
         if (opts.full && !opts.json) logger.warn("--full only affects --json output; ignoring.");
         // Validate locally; the API resolves relative shorthand server-side.
@@ -113,6 +132,18 @@ Examples:
         // global latest feed, so it can't combine with a [source] or --org filter.
         if (opts.product && (sourceArg || opts.org)) {
           logger.error("--product can't be combined with a [source] argument or --org.");
+          process.exit(1);
+        }
+
+        // --cursor only applies to the cursor-paginated product feed; the global
+        // latest feed is count-capped, not cursored. Fail loudly rather than
+        // silently ignore a cursor the user expected to honor.
+        if (opts.cursor && !opts.product) {
+          logger.error("--cursor only applies with --product (the latest feed is not cursored).");
+          process.exit(1);
+        }
+        if (opts.cursor && opts.follow) {
+          logger.error("--cursor can't be combined with --follow.");
           process.exit(1);
         }
 
@@ -145,6 +176,11 @@ Examples:
           until,
         };
 
+        // The product feed (GET /v1/orgs/:org/releases?product=…) is cursor-
+        // paginated; capture the latest page's cursor so the one-shot path can
+        // surface it. The global latest feed has no cursor (count-capped at 100).
+        let productNextCursor: string | null = null;
+
         // One page of the active feed (global latest, or the product feed when
         // --product is set). Follow mode re-invokes this each tick.
         const fetchPage = async (): Promise<LatestRelease[]> => {
@@ -153,11 +189,13 @@ Examples:
             orgRef: productTarget.orgRef,
             product: productTarget.product,
             count,
+            cursor: opts.cursor ?? null,
             includeCoverage: opts.includeCoverage,
             since,
             until,
           });
           if (!res) return productNotFound(opts.product!);
+          productNextCursor = res.nextCursor;
           return res.releases;
         };
 
@@ -178,6 +216,30 @@ Examples:
               `\n  More: "releases get <rel_id>" for full content · "releases tail <source>" to filter by source (src_… or slug)`,
             ),
           );
+        }
+
+        // Truncation signal for the one-shot listing: when the page filled the
+        // requested window there may be more. The global latest feed has no
+        // cursor (raise --limit, max 100, or window with --since); the product
+        // feed is cursor-paginated, so surface the opaque cursor. Goes to
+        // stderr so it never corrupts --json stdout. #304
+        if (!opts.follow && rows.length >= count) {
+          if (productTarget && productNextCursor) {
+            logger.warn(
+              `More releases available. Next page: append \`--cursor ${productNextCursor}\`, ` +
+                "or raise `--limit` (max 100).",
+            );
+          } else if (!productTarget && count >= 100) {
+            logger.warn(
+              "Hit the 100-release cap for the latest feed. Narrow with --since/--until, " +
+                "--source, or --org to page through more.",
+            );
+          } else if (!productTarget) {
+            logger.warn(
+              `Showing ${count} release${count === 1 ? "" : "s"}; more may exist. ` +
+                "Raise --limit (max 100) or window with --since/--until.",
+            );
+          }
         }
 
         if (!opts.follow) return;

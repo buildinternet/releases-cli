@@ -1,4 +1,9 @@
-import type { LatestRelease, ReleaseWithSource, SearchReleaseHit } from "../../api/types.js";
+import type {
+  LatestRelease,
+  MediaItem,
+  ReleaseWithSource,
+  SearchReleaseHit,
+} from "../../api/types.js";
 import { cleanExcerpt } from "../../lib/release-display.js";
 
 /**
@@ -9,10 +14,12 @@ import { cleanExcerpt } from "../../lib/release-display.js";
  */
 
 /** The live `/v1/releases/:id` payload carries fields not on the stale
- *  `ReleaseWithSource` interface (org, sourceType). Read them defensively. */
+ *  `ReleaseWithSource` interface (org, sourceType, media). Read them
+ *  defensively. */
 type RawReleaseDetail = ReleaseWithSource & {
   org?: { slug: string; name: string } | null;
   sourceType?: string | null;
+  media?: MediaItem[] | null;
 };
 
 function nullIfEmpty(s: string | null | undefined): string | null {
@@ -32,16 +39,26 @@ export function slimReleaseDetail(
   }
   const r = rel as RawReleaseDetail;
   const excerpt = cleanExcerpt(r.content);
+  // `media[]` is user-facing content (carries the R2-mirrored `r2Url`), not a
+  // storage/pipeline internal — surface it in the slim shape so callers can
+  // verify media presence (e.g. "did this mirror to R2?") without dropping to
+  // `--full` or hitting `GET /v1/releases/:id` directly. #303
+  const media = Array.isArray(r.media) ? r.media : [];
+  // Hint that the full body was projected to an excerpt so callers know `--full`
+  // (or `releases release get`) exists. Only when there's content to truncate.
+  const contentTruncated = (r.content?.length ?? 0) > 0 ? true : undefined;
   return omitUndefined({
     id: r.id,
     version: nullIfEmpty(r.version) ?? undefined,
     title: r.title,
     summary: nullIfEmpty(r.summary),
     excerpt: excerpt || undefined,
+    contentTruncated,
     url: r.url ?? undefined,
     publishedAt: r.publishedAt,
     source: { slug: r.sourceSlug ?? "", name: r.sourceName ?? "" },
     org: r.org ? { slug: r.org.slug, name: r.org.name } : undefined,
+    media: media.length > 0 ? media : undefined,
     // `?? undefined` not `|| undefined` — a zero-length body is a real metric
     // (empty release), and `get` always carries a content field. Keeping 0 also
     // matches slimLatest below.
