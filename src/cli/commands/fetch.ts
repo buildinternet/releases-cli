@@ -107,6 +107,13 @@ Examples:
       ) => {
         const identifier = slugArg ?? opts.source;
 
+        // The positional argument and --source are two spellings of the same
+        // thing — refuse both rather than silently preferring the positional.
+        if (slugArg && opts.source) {
+          logger.error("Pass one source — either the [identifier] argument or --source, not both.");
+          process.exit(1);
+        }
+
         // --local short-circuits the remote managed-agent path entirely: it stages
         // the local-ingest handoff (preflight + URL discovery + brief) and never
         // POSTs to /v1/workflows/update. Single-source only — the batch filters
@@ -128,6 +135,17 @@ Examples:
           logger.warn("--force only applies with --local; ignoring it for the remote fetch path.");
         }
 
+        // A single source identifier and --org are mutually exclusive — the
+        // org fan-out used to win silently, dropping the identifier and
+        // dispatching a managed-agent session over every active source in the
+        // org (#307). Mirrors `latest`'s --product/--org rejection.
+        if (identifier && opts.org) {
+          logger.error(
+            "A source identifier can't be combined with --org. Pass one source (src_…, org/slug, or --source), or use --org alone to fetch the whole org.",
+          );
+          process.exit(1);
+        }
+
         // Resolve --wait up front so a malformed value fails before we kick off a remote workflow.
         let waitSeconds: number | null = null;
         if (opts.wait !== undefined) {
@@ -146,15 +164,15 @@ Examples:
           const org = await findOrg(opts.org);
           if (!org) return orgNotFound(opts.org);
           orgId = org.id;
-          const activeSources = (await getSourcesByOrg(org.id)).filter(
-            (s) => !s.isHidden && s.fetchPriority !== "paused",
-          );
-          if (activeSources.length === 0) {
+          const { fetchable, skippedAgents } = selectOrgFetchSources(await getSourcesByOrg(org.id));
+          if (skippedAgents > 0)
+            logger.info(`Skipping ${skippedAgents} push-only agent source(s) (no fetch adapter)`);
+          if (fetchable.length === 0) {
             if (opts.json) await writeJsonLine({ sessionId: null, message: "No active sources" });
             else logger.info(`No active sources for ${org.name}.`);
             return;
           }
-          entries = activeSources.map((s) => ({ id: s.id, slug: s.slug }));
+          entries = fetchable.map((s) => ({ id: s.id, slug: s.slug }));
           label = `all sources for ${org.slug} (${entries.length})`;
         } else if (identifier) {
           const src = await findSource(identifier);
@@ -360,6 +378,21 @@ async function runDryRunProbe(identifier: string, opts: { json?: boolean }): Pro
   // Feed/GitHub/scrape-with-feed dry-run.
   const found = result.releasesFound ?? 0;
   logger.info(chalk.green(`${src.slug}: parsed ${found} candidate release(s) (no writes).`));
+}
+
+/**
+ * Select the org sources the `--org` fan-out should fetch: visible, unpaused,
+ * and not push-only. `agent` sources have no fetch adapter — releases are
+ * POSTed to them, never pulled — so dispatching a managed-agent session over
+ * one is a wasted no-op (#307). Hidden/paused sources were always excluded and
+ * don't count toward `skippedAgents`.
+ */
+export function selectOrgFetchSources<
+  T extends { isHidden?: boolean | null; fetchPriority?: string | null; type: string },
+>(sources: T[]): { fetchable: T[]; skippedAgents: number } {
+  const active = sources.filter((s) => !s.isHidden && s.fetchPriority !== "paused");
+  const fetchable = active.filter((s) => s.type !== "agent");
+  return { fetchable, skippedAgents: active.length - fetchable.length };
 }
 
 /** Strict integer parse — `parseInt("60abc")` returns 60, which would silently misuse `--wait 60s`. */
