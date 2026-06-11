@@ -9,6 +9,7 @@ import { registerUpdateCommand } from "./commands/update.js";
 import { registerRemoveCommand } from "./commands/remove.js";
 import { registerDeleteCommand } from "./commands/delete.js";
 import { registerListCommand } from "./commands/list.js";
+import { registerShowSourceCommand } from "./commands/source-show.js";
 import { registerFetchCommand } from "./commands/fetch.js";
 import { registerBackfillCommand, registerBackfillStatusCommand } from "./commands/backfill.js";
 import { registerReextractCommand } from "./commands/reextract.js";
@@ -267,6 +268,7 @@ const sourceAdmin = admin
   .description("Manage sources and source ingestion")
   .showSuggestionAfterError(true);
 registerListCommand(sourceAdmin);
+registerShowSourceCommand(sourceAdmin);
 // Canonical verbs: create, update, delete. Deprecated aliases: add, edit, remove (each emits a warning).
 registerCreateCommand(sourceAdmin);
 registerCreateAppStoreCommand(sourceAdmin);

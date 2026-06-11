@@ -405,7 +405,12 @@ export async function updateSourceAction(
   const displaySlug = updated?.slug ?? source.slug;
 
   if (opts.json) {
-    const refreshed = await findSource(displaySlug);
+    // Refresh through the globally-unique typed id, never the (possibly
+    // colliding) bare slug. A slug like `release-notes` matches sources in many
+    // orgs, so `findSource(displaySlug)` would throw AmbiguousSourceError here —
+    // *after* the update already applied — even though the source was addressed
+    // by an unambiguous `src_…` id (#294).
+    const refreshed = await findSource(updated?.id ?? source.id);
     await writeJson(refreshed);
   } else {
     logger.info(chalk.green(`Updated ${source.name} (${displaySlug}):`));
