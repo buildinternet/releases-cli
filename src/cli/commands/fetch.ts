@@ -59,7 +59,7 @@ export function registerFetchCommand(program: Command) {
     .option("--retry-errors", "Only fetch sources whose last fetch was an error")
     .option(
       "--org <org>",
-      "Fetch all active sources for an organization (org_…, slug, domain, name, or handle)",
+      "Fetch all active sources for an organization (org_…, slug, domain, name, or handle); skips push-only agent sources and can't be combined with a source identifier",
     )
     .option(
       "--wait [seconds]",

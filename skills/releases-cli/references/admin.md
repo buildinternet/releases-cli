@@ -145,6 +145,7 @@ Notes:
 
 - Default cap is 200 releases per source (GitHub paginates at ~10K). `--max <n>` or `--all` to override.
 - Remote mode **requires** a filter or slug. Bare `releases admin source fetch` with no args is blocked to prevent accidental bulk work.
+- A source identifier can't be combined with `--org` — pass one source (`src_…`, `org/slug`, or `--source`) or use `--org` alone to fetch the whole org; the CLI errors on the conflict. `--org` skips push-only `agent` sources (they have no fetch adapter).
 - Remote concurrency defaults to 3, capped at 5. Duplicate source fetches are detected and blocked.
 - Smart fetch backoff: sources returning no changes back off exponentially (1h → 48h); error backoff caps at 72h.
 
@@ -225,7 +226,7 @@ releases admin org update vercel --category developer-tools
 releases admin org link vercel --platform github --handle vercel
 releases admin org tag add vercel react serverless
 releases admin org alias add anthropic claude.ai claude.com
-releases admin source fetch --org vercel                  # fetch all of an org's active sources
+releases admin source fetch --org vercel                  # fetch all of an org's active sources (skips push-only agent sources)
 releases admin org delete vercel                          # reversible tombstone soft-delete
 releases admin org delete vercel --hard --yes             # permanent purge + FK cascade
 ```
