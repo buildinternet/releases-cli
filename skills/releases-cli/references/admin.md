@@ -130,21 +130,23 @@ Slug renames require `--confirm-slug-change` because they break existing web lin
 ### Fetch
 
 ```bash
-releases admin source fetch next-js              # one source
-releases admin source fetch --since 2025-01-01 --max 50
-releases admin source fetch --max 500            # override the 200/source default
-releases admin source fetch --all                # no date/count limits
+releases admin source fetch next-js              # one source (slug, src_… id, or org/slug)
+releases admin source fetch --org acme           # all of an org's active sources
 releases admin source fetch --stale 24           # only stale sources, with backoff
 releases admin source fetch --retry-errors       # retry sources whose last fetch failed
 releases admin source fetch --changed            # sources with upstream changes detected
-releases admin source fetch --unfetched --concurrency 5
-releases admin source fetch next-js --skip-changelog   # skip CHANGELOG.md refresh
+releases admin source fetch --unfetched          # never-fetched sources
+releases admin source fetch next-js --wait       # block until the dispatched session finishes
+releases admin source fetch next-js --dry-run    # probe without writing or billing
+releases admin source fetch next-js --local      # stage a local-ingest handoff (no managed agent)
 ```
 
 Notes:
 
-- Default cap is 200 releases per source (GitHub paginates at ~10K). `--max <n>` or `--all` to override.
+- The server caps each fetch at 200 releases per source (GitHub paginates at ~10K); there is no CLI override flag.
+- A fetch that inserts new releases also triggers a server-side fill pass over the source's missing AI titles/summaries (up to 100 rows) when the org has `auto_generate_content` enabled — no flag, no second step.
 - Remote mode **requires** a filter or slug. Bare `releases admin source fetch` with no args is blocked to prevent accidental bulk work.
+- A source identifier can't be combined with `--org` — pass one source (`src_…`, `org/slug`, or `--source`) or use `--org` alone to fetch the whole org; the CLI errors on the conflict. `--org` skips push-only `agent` sources (they have no fetch adapter).
 - Remote concurrency defaults to 3, capped at 5. Duplicate source fetches are detected and blocked.
 - Smart fetch backoff: sources returning no changes back off exponentially (1h → 48h); error backoff caps at 72h.
 
@@ -225,7 +227,7 @@ releases admin org update vercel --category developer-tools
 releases admin org link vercel --platform github --handle vercel
 releases admin org tag add vercel react serverless
 releases admin org alias add anthropic claude.ai claude.com
-releases admin source fetch --org vercel                  # fetch all of an org's active sources
+releases admin source fetch --org vercel                  # fetch all of an org's active sources (skips push-only agent sources)
 releases admin org delete vercel                          # reversible tombstone soft-delete
 releases admin org delete vercel --hard --yes             # permanent purge + FK cascade
 ```
