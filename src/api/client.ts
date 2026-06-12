@@ -360,13 +360,6 @@ export async function listOrgs(opts?: {
   return apiFetch<ListResponse<Organization>>(`/v1/orgs${qs ? `?${qs}` : ""}`);
 }
 
-export async function getOrgAccountByPlatform(
-  orgId: string,
-  platform: string,
-): Promise<OrgAccount | null> {
-  return apiFetch<OrgAccount | null>(`/v1/orgs/${orgId}/accounts?platform=${platform}`);
-}
-
 // ── Ignored URLs (org-scoped) ──
 
 export async function findIgnoredUrl(url: string, orgId: string): Promise<IgnoredUrl | null> {
