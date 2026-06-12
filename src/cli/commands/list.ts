@@ -13,14 +13,7 @@ import {
   type ListResponse,
 } from "@buildinternet/releases-core/cli-contracts";
 import { isValidKind, KIND_VALUES, type Kind } from "@buildinternet/releases-core/kinds";
-
-function getFetchMethod(type: string, meta: Record<string, unknown> | null): string {
-  if (type === "github") return "github";
-  if (type === "feed") return "feed";
-  if (meta?.feedUrl) return "feed";
-  if (meta?.noFeedFound) return "ai";
-  return "-";
-}
+import { getFetchMethod } from "../../lib/source-display.js";
 
 function paginateExample(json: boolean): string {
   return `releases list${json ? " --json" : ""} --limit <n> --page <p>`;
