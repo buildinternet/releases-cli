@@ -116,6 +116,18 @@ function styledCompletionNotice(): string | null {
   return notice ? chalk.dim(notice) : null;
 }
 
+// One-line account nudge for the curated landing screen, or null when a
+// credential is already configured or output isn't a TTY (piped/scripted
+// output stays clean — agents and CI never see it). Mirrors the completion
+// notice: passive, dim, self-resolving once the user signs in.
+function signedOutAccountNotice(): string | null {
+  if (!process.stdout.isTTY) return null;
+  if (isAuthenticated()) return null;
+  return chalk.dim(
+    `Create a free account for personalized feeds and higher rate limits — run ${chalk.white('"releases login"')}.`,
+  );
+}
+
 function printStyledHelp(): string {
   const lines: string[] = [];
 
@@ -160,6 +172,12 @@ function printStyledHelp(): string {
       `Run ${chalk.white('"releases --help"')} to see all commands, or ${chalk.white('"releases <command> --help"')} for details on one.`,
     ),
   );
+
+  const accountNotice = signedOutAccountNotice();
+  if (accountNotice) {
+    lines.push("");
+    lines.push(accountNotice);
+  }
 
   const notice = styledCompletionNotice();
   if (notice) {
