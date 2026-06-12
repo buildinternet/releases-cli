@@ -10,7 +10,7 @@ import {
   findOrg,
   createOrg,
   findSourcesByUrls,
-  getOrgAccountByPlatform,
+  getOrgAccountsBySlug,
   linkOrgAccount,
   createSource,
   findProduct,
@@ -23,6 +23,38 @@ interface ManifestAccount {
   platform: string;
   handle: string;
 }
+
+/**
+ * Split desired org accounts into the ones to link vs. the ones already linked,
+ * keying on the exact `(platform, handle)` pair — not platform alone (#283).
+ *
+ * `org_accounts` is one-to-many (the server's unique index is on the pair, and
+ * the DELETE route keys on it too), so an org can hold a second handle on a
+ * platform it's already linked to. Keying on platform alone silently skipped
+ * that second handle. Matching is case-sensitive to mirror the server's index.
+ * A pair listed twice in one manifest links once, then reports the rest as
+ * already linked.
+ */
+export function partitionAccounts(
+  existing: Array<{ platform: string; handle: string }>,
+  desired: Array<{ platform: string; handle: string }>,
+): { toLink: ManifestAccount[]; alreadyLinked: ManifestAccount[] } {
+  const seen = new Set(existing.map(accountKey));
+  const toLink: ManifestAccount[] = [];
+  const alreadyLinked: ManifestAccount[] = [];
+  for (const acc of desired) {
+    const key = accountKey(acc);
+    if (seen.has(key)) {
+      alreadyLinked.push(acc);
+    } else {
+      seen.add(key);
+      toLink.push(acc);
+    }
+  }
+  return { toLink, alreadyLinked };
+}
+
+const accountKey = (a: { platform: string; handle: string }) => `${a.platform}/${a.handle}`;
 
 interface ManifestSource {
   name: string;
@@ -228,7 +260,21 @@ Examples:
               }
 
               if (orgEntry.accounts) {
-                for (const acc of orgEntry.accounts) {
+                // Mirror the apply-path dedup so the preview is honest about a
+                // second handle on an already-linked platform (#283). A to-be-
+                // created org has no accounts yet, so everything would link.
+                // eslint-disable-next-line no-await-in-loop
+                const linked = existing ? await getOrgAccountsBySlug(orgSlug) : [];
+                const { toLink, alreadyLinked } = partitionAccounts(linked, orgEntry.accounts);
+                for (const acc of alreadyLinked) {
+                  if (!opts.json)
+                    logger.info(
+                      chalk.yellow(
+                        `[dry-run] Account already linked: ${acc.platform}/${acc.handle}`,
+                      ),
+                    );
+                }
+                for (const acc of toLink) {
                   if (!opts.json)
                     logger.info(
                       chalk.green(
@@ -325,28 +371,30 @@ Examples:
             }
 
             if (orgEntry.accounts) {
-              for (const acc of orgEntry.accounts) {
-                // eslint-disable-next-line no-await-in-loop
-                const existing = await getOrgAccountByPlatform(org.id, acc.platform);
-                if (existing) {
+              // Dedup on the exact (platform, handle) pair (#283): an org can
+              // hold a second handle on a platform it's already linked to.
+              // eslint-disable-next-line no-await-in-loop
+              const linked = await getOrgAccountsBySlug(org.slug);
+              const { toLink, alreadyLinked } = partitionAccounts(linked, orgEntry.accounts);
+              for (const acc of alreadyLinked) {
+                if (!opts.json)
+                  logger.info(
+                    chalk.yellow(`Account already linked: ${acc.platform}/${acc.handle}`),
+                  );
+              }
+              for (const acc of toLink) {
+                try {
+                  // eslint-disable-next-line no-await-in-loop
+                  await linkOrgAccount(org.slug, acc.platform, acc.handle);
+                  report.created.accounts++;
                   if (!opts.json)
                     logger.info(
-                      chalk.yellow(`Account already linked: ${acc.platform}/${acc.handle}`),
+                      chalk.green(`Linked account: ${acc.platform}/${acc.handle} -> ${org.slug}`),
                     );
-                } else {
-                  try {
-                    // eslint-disable-next-line no-await-in-loop
-                    await linkOrgAccount(org.slug, acc.platform, acc.handle);
-                    report.created.accounts++;
-                    if (!opts.json)
-                      logger.info(
-                        chalk.green(`Linked account: ${acc.platform}/${acc.handle} -> ${org.slug}`),
-                      );
-                  } catch (err) {
-                    const msg = `Failed to link account ${acc.platform}/${acc.handle}: ${err instanceof Error ? err.message : String(err)}`;
-                    report.errors.push(msg);
-                    if (!opts.json) logger.error(chalk.red(msg));
-                  }
+                } catch (err) {
+                  const msg = `Failed to link account ${acc.platform}/${acc.handle}: ${err instanceof Error ? err.message : String(err)}`;
+                  report.errors.push(msg);
+                  if (!opts.json) logger.error(chalk.red(msg));
                 }
               }
             }
