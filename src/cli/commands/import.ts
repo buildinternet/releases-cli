@@ -43,10 +43,11 @@ export function partitionAccounts(
   const toLink: ManifestAccount[] = [];
   const alreadyLinked: ManifestAccount[] = [];
   for (const acc of desired) {
-    if (seen.has(accountKey(acc))) {
+    const key = accountKey(acc);
+    if (seen.has(key)) {
       alreadyLinked.push(acc);
     } else {
-      seen.add(accountKey(acc));
+      seen.add(key);
       toLink.push(acc);
     }
   }
