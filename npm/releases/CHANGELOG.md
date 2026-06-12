@@ -1,5 +1,15 @@
 # @buildinternet/releases
 
+## 0.62.1
+
+### Patch Changes
+
+- 09aec58: `releases admin source fetch` no longer silently drops a source identifier when combined with `--org` (#307). Previously `source fetch <identifier> --org <org>` ignored the identifier and dispatched a managed-agent session over every active source in the org; it now errors out on the conflict, matching `releases latest`'s `--product`/`--org` rejection. Passing both the positional identifier and `--source` is also rejected instead of silently preferring the positional. The `--org` fan-out additionally skips push-only `agent` sources — they have no fetch adapter, so dispatching a session over one was a wasted no-op — and reports how many were skipped.
+- ec76928: `releases import` now dedups org accounts on the exact `(platform, handle)` pair instead of platform alone (#283). `org_accounts` is one-to-many — the server's unique index is on the pair — so an org can hold a second handle on a platform it's already linked to (e.g. Cloudflare's `x/Cloudflare` plus `x/cfchangelog`). Previously, importing a manifest that added a second handle on an already-linked platform was silently skipped, logging "already linked" for a handle that was never linked. The import now fetches the org's full account list and links any pair it doesn't already hold; an exact already-linked pair still reports "already linked" and is not re-created. The `--dry-run` preview mirrors the same dedup so it no longer over-reports accounts it would link.
+- 4c3f42f: Add `releases admin source show <src_…|org/slug|slug>` (alias `get`) to inspect a single source's config — type, fetch method, priority/paused state, last-fetch, and the metadata flags operators care about (render/crawl, feed URL, parse instructions, etc.). `--json` returns the source with parsed metadata instead of the raw JSON-in-JSON string. Previously the only way to read a source's config was to dump the whole org and filter the `sources` array by hand (#295).
+
+  Fix `source update <src_…> --json`: the JSON-refresh step re-resolved the source by its bare slug, so updating a source whose slug collides across orgs (e.g. `release-notes`) threw `AmbiguousSourceError` _after_ the update had already applied — even though the source was addressed by an unambiguous `src_…` id. The refresh now resolves through the typed id (#294).
+
 ## 0.62.0
 
 ### Minor Changes
