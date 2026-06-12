@@ -4,20 +4,8 @@ import { findSource } from "../../api/client.js";
 import { sourceNotFound } from "../suggest.js";
 import { stripAnsi } from "../../lib/sanitize.js";
 import { writeJson } from "../../lib/output.js";
+import { getFetchMethod } from "../../lib/source-display.js";
 import { parseMetadataObject } from "@buildinternet/releases-core/cli-contracts";
-
-/**
- * Derive the effective fetch method from the source type + discovered metadata.
- * Mirrors the same calc in `list.ts` so the inspect view and the list detail
- * agree on what a source actually fetches with.
- */
-function fetchMethod(type: string, meta: Record<string, unknown> | null): string {
-  if (type === "github") return "github";
-  if (type === "feed") return "feed";
-  if (meta?.feedUrl) return "feed";
-  if (meta?.noFeedFound) return "ai";
-  return "—";
-}
 
 /**
  * Well-known metadata keys surfaced (in this order) under "Fetch config" with
@@ -60,13 +48,13 @@ export async function showSourceAction(identifier: string, opts: ShowSourceOpts)
   if (!source) return sourceNotFound(identifier);
 
   const meta = parseMetadataObject(source.metadata);
-  const method = fetchMethod(source.type, meta);
+  const method = getFetchMethod(source.type, meta);
 
   if (opts.json) {
     // Return the parsed metadata object (not the raw JSON-in-JSON string) so
     // agents reading `--json` get structured fetch config without a second
     // JSON.parse, plus the derived `method`. Matches `list <source> --json`.
-    await writeJson({ ...source, method, metadata: meta ?? source.metadata });
+    await writeJson({ ...source, method, metadata: meta });
     return;
   }
 
@@ -91,7 +79,7 @@ export async function showSourceAction(identifier: string, opts: ShowSourceOpts)
   console.log(row("Type", source.type));
   if (s.kind) console.log(row("Kind", s.kind));
   console.log(row("URL", source.url));
-  console.log(row("Method", method));
+  console.log(row("Method", method === "-" ? null : method));
   console.log(row("Status", s.isHidden ? chalk.red("disabled") : chalk.green("active")));
   if (s.isPrimary) console.log(row("Primary", "yes"));
   const priority = s.fetchPriority ?? "normal";
