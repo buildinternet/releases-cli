@@ -1,0 +1,10 @@
+{
+  "$schema": "https://releases.sh/schemas/releases.json",
+  "product": {
+    "name": "CLI",
+    "slug": "cli",
+    "description": "The Releases command-line interface — search, inspect, and manage the changelog registry from your terminal.",
+    "category": "developer-tools",
+    "kind": "tool"
+  }
+}
