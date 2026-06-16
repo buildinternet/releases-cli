@@ -5,6 +5,7 @@
 [![Test](https://github.com/buildinternet/releases-cli/actions/workflows/test.yml/badge.svg)](https://github.com/buildinternet/releases-cli/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![skills.sh](https://skills.sh/b/buildinternet/releases-cli)](https://skills.sh/buildinternet/releases-cli)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/buildinternet/releases-cli)
 
 The changelog & release-notes registry for developers and AI agents — a lean HTTP client for [releases.sh](https://releases.sh). Search and browse release notes from GitHub, RSS/Atom/JSON feeds, and product changelog pages, with no local infrastructure.
 
