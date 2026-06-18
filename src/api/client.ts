@@ -319,45 +319,7 @@ export async function removeBlockedUrl(pattern: string): Promise<void> {
   await apiFetch(`/v1/admin/blocklist/${encodeURIComponent(pattern)}`, { method: "DELETE" });
 }
 
-// ── Release CRUD ──
-
-export async function getRelease(id: string): Promise<ReleaseWithSource | null> {
-  return apiFetch<ReleaseWithSource | null>(`/v1/releases/${id}`);
-}
-
-export async function deleteRelease(id: string): Promise<boolean> {
-  const result = await apiFetch<{ deleted: boolean } | null>(`/v1/releases/${id}`, {
-    method: "DELETE",
-  });
-  return result?.deleted ?? false;
-}
-
-export async function updateRelease(
-  id: string,
-  data: Record<string, unknown>,
-): Promise<ReleaseWithSource> {
-  return apiFetch<ReleaseWithSource>(`/v1/releases/${id}`, {
-    method: "PATCH",
-    body: JSON.stringify(data),
-  });
-}
-
-// ── Release suppression ──
-
-export async function suppressRelease(releaseId: string, reason?: string): Promise<boolean> {
-  const result = await apiFetch<{ suppressed: boolean }>(`/v1/releases/${releaseId}/suppress`, {
-    method: "POST",
-    body: JSON.stringify({ reason }),
-  });
-  return result?.suppressed ?? false;
-}
-
-export async function unsuppressRelease(releaseId: string): Promise<boolean> {
-  const result = await apiFetch<{ unsuppressed: boolean }>(`/v1/releases/${releaseId}/unsuppress`, {
-    method: "POST",
-  });
-  return result?.unsuppressed ?? false;
-}
+export * from "./releases.js";
 
 // ── User follows + personalized feed (`/v1/me/*`) ──
 //
@@ -785,103 +747,6 @@ export async function getStuckSources(opts?: {
   return apiFetch<StuckSourcesResponse>(`/v1/admin/sources/stuck${qs ? `?${qs}` : ""}`);
 }
 
-// ── Latest releases ──
-
-export async function getLatestReleases(opts: {
-  /** Source identifier (src_… or slug). */
-  source?: string;
-  /** Organization identifier (org_… or slug). */
-  org?: string;
-  count: number;
-  includeCoverage?: boolean;
-  /** ISO date or relative shorthand (90d/4w/6m/2y); resolved server-side. */
-  since?: string;
-  until?: string;
-}): Promise<LatestRelease[]> {
-  const qs = new URLSearchParams();
-  qs.set("count", String(opts.count));
-  if (opts.source) qs.set("source", opts.source);
-  if (opts.org) qs.set("org", opts.org);
-  if (opts.includeCoverage) qs.set("include_coverage", "true");
-  if (opts.since) qs.set("since", opts.since);
-  if (opts.until) qs.set("until", opts.until);
-
-  const data = await apiFetch<{ releases: LatestReleaseWire[] }>(
-    `/v1/releases/latest?${qs.toString()}`,
-  );
-  if (!data) return [];
-  return data.releases.map(toLatestRelease);
-}
-
-/**
- * Resolve a product identifier to the `{ orgRef, product }` pair the org
- * release feed needs (`GET /v1/orgs/:orgRef/releases?product=…`). Mirrors the
- * identifier shapes `resolveProductTarget` accepts:
- *   - `prod_…` ids: fetch the product to recover its org (the feed is
- *     org-scoped; the org path segment accepts `org_…` ids).
- *   - `org/slug` coordinates: split locally, no round-trip. Existence is
- *     validated by the feed call (a bad coord 404s → `getProductReleases`
- *     returns `null`).
- *   - bare slugs: bounce through `/v1/lookups/product-by-slug` for the
- *     canonical org.
- * Returns `null` when a `prod_…`/bare slug doesn't resolve to a product.
- */
-export async function resolveProductFeedTarget(
-  identifier: string,
-): Promise<{ orgRef: string; product: string } | null> {
-  if (identifier.startsWith("prod_")) {
-    const product = await findProduct(identifier);
-    if (!product) return null;
-    return { orgRef: product.orgId, product: identifier };
-  }
-  const slash = identifier.indexOf("/");
-  if (slash > 0 && slash < identifier.length - 1) {
-    return { orgRef: identifier.slice(0, slash), product: identifier.slice(slash + 1) };
-  }
-  const resolved = await apiFetch<{
-    productId: string;
-    productSlug: string;
-    orgSlug: string;
-  } | null>(`/v1/lookups/product-by-slug?slug=${encodeURIComponent(identifier)}`);
-  if (!resolved) return null;
-  return { orgRef: resolved.orgSlug, product: resolved.productSlug };
-}
-
-/**
- * One product's cross-source release feed via `GET /v1/orgs/:orgRef/releases?
- * product=…`. Cursor-paginated; the server's cursor is opaque to the CLI.
- * Returns `null` when the org or product is unknown (the endpoint 404s), which
- * `apiFetch` maps to `null` for GETs — distinct from a valid-but-empty product
- * (`{ releases: [], … }`).
- */
-export async function getProductReleases(opts: {
-  orgRef: string;
-  product: string;
-  count: number;
-  cursor?: string | null;
-  includeCoverage?: boolean;
-  since?: string;
-  until?: string;
-}): Promise<{ releases: LatestRelease[]; nextCursor: string | null } | null> {
-  const qs = new URLSearchParams();
-  qs.set("product", opts.product);
-  qs.set("limit", String(opts.count));
-  if (opts.cursor) qs.set("cursor", opts.cursor);
-  if (opts.includeCoverage) qs.set("include_coverage", "true");
-  if (opts.since) qs.set("since", opts.since);
-  if (opts.until) qs.set("until", opts.until);
-
-  const data = await apiFetch<{
-    releases: LatestReleaseWire[];
-    pagination?: { nextCursor: string | null };
-  } | null>(`/v1/orgs/${encodeURIComponent(opts.orgRef)}/releases?${qs.toString()}`);
-  if (!data) return null;
-  return {
-    releases: data.releases.map(toLatestRelease),
-    nextCursor: data.pagination?.nextCursor ?? null,
-  };
-}
-
 // ── Known releases for incremental parsing ──
 
 export async function getKnownReleasesForSource(
@@ -936,64 +801,6 @@ export async function deleteSource(
   // fresh. See #1184.
   const query = opts?.hard ? "?hard=true" : "";
   await apiFetch(`/v1/sources/${encodeURIComponent(source.id)}${query}`, { method: "DELETE" });
-}
-
-export async function insertReleasesBatch(
-  source: Pick<Source, "id">,
-  releaseRows: Array<{
-    version?: string | null;
-    title: string;
-    content: string;
-    url?: string | null;
-    contentHash?: string | null;
-    publishedAt?: string | null;
-    type?: ReleaseType;
-  }>,
-): Promise<{ inserted: number; total: number }> {
-  const chunks: (typeof releaseRows)[] = [];
-  for (let i = 0; i < releaseRows.length; i += 5) {
-    chunks.push(releaseRows.slice(i, i + 5));
-  }
-  const path = `/v1/sources/${encodeURIComponent(source.id)}/releases/batch`;
-  const settled = await Promise.allSettled(
-    chunks.map((chunk) =>
-      apiFetch<{ inserted: number; total: number }>(path, {
-        method: "POST",
-        body: JSON.stringify({ releases: chunk }),
-      }),
-    ),
-  );
-
-  const succeeded = settled.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
-  const failures = settled.flatMap((r) => (r.status === "rejected" ? [r.reason] : []));
-
-  if (succeeded.length === 0 && failures.length > 0) {
-    throw failures[0];
-  }
-
-  if (failures.length > 0) {
-    logger.warn(
-      `insertReleasesBatch(${source.id}): ${failures.length}/${chunks.length} chunk(s) failed — ${failures.map(String).join("; ")}`,
-    );
-  }
-
-  const inserted = succeeded.reduce((sum, r) => sum + r.inserted, 0);
-  const total = succeeded[succeeded.length - 1]?.total ?? 0;
-  return { inserted, total };
-}
-
-export async function deleteReleasesForSource(
-  source: Pick<Source, "id">,
-  opts?: { hard?: boolean },
-): Promise<{ suppressed: number } | { deleted: number; hard: true }> {
-  // Default (soft) suppresses rows with reason "force_refetch" but leaves them
-  // occupying UNIQUE(source_id, url) — a re-fetch upserts on top but never
-  // un-suppresses, so the rows stay hidden. `?hard=true` removes them so the
-  // dedup slot frees up and a corrected re-fetch ingests clean. See #1184.
-  const query = opts?.hard ? "?hard=true" : "";
-  return apiFetch(`/v1/sources/${encodeURIComponent(source.id)}/releases${query}`, {
-    method: "DELETE",
-  });
 }
 
 export async function createSource(data: {
@@ -1226,44 +1033,6 @@ export async function postStatusEvent(event: {
   }
 }
 
-// ── Recent releases ──
-
-export async function getRecentReleases(
-  sourceIdentifier: string,
-  cutoffIso: string,
-): Promise<Release[]> {
-  return apiFetch<Release[]>(
-    `/v1/sources/${encodeURIComponent(sourceIdentifier)}/recent-releases?cutoff=${cutoffIso}`,
-  );
-}
-
-// ── Release summaries ──
-
-export async function getSummariesForSource(sourceSlugOrId: string): Promise<ReleaseSummary[]> {
-  return apiFetch<ReleaseSummary[]>(`/v1/sources/${encodeURIComponent(sourceSlugOrId)}/summaries`);
-}
-
-export async function upsertSummary(
-  sourceSlugOrId: string,
-  data: Omit<NewReleaseSummary, "sourceId" | "orgId">,
-): Promise<void> {
-  await apiFetch(`/v1/sources/${encodeURIComponent(sourceSlugOrId)}/summaries`, {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
-}
-
-export async function getMonthlySummary(
-  sourceSlugOrId: string,
-  year: number,
-  month: number,
-): Promise<ReleaseSummary | undefined> {
-  const rows = await apiFetch<ReleaseSummary[]>(
-    `/v1/sources/${encodeURIComponent(sourceSlugOrId)}/summaries?type=monthly&year=${year}&month=${month}`,
-  );
-  return rows?.[0];
-}
-
 // ── Overview / Playbook Pages ──
 
 /**
@@ -1406,12 +1175,6 @@ export async function insertMediaAssets(assets: MediaAssetInput[]): Promise<{ in
 
 export async function getMediaAssetStats(): Promise<{ count: number; totalBytes: number }> {
   return apiFetch("/v1/media/assets/stats");
-}
-
-export async function queryReleasesWithMedia(): Promise<
-  { id: string; sourceId: string; media: string }[]
-> {
-  return apiFetch("/v1/releases?hasMedia=true&fields=id,sourceId,media");
 }
 
 // ── Sessions ──
