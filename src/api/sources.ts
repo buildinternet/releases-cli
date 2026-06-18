@@ -1,4 +1,3 @@
-import { logger } from "@releases/lib/logger";
 import { daysAgoIso } from "@buildinternet/releases-core/dates";
 import type { Kind } from "@buildinternet/releases-core/kinds";
 import type { Source, KnowledgePage } from "@buildinternet/releases-core/schema";
