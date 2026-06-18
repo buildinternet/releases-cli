@@ -1949,7 +1949,7 @@ export async function getMonthlySummary(
   const rows = await apiFetch<ReleaseSummary[]>(
     `/v1/sources/${encodeURIComponent(sourceSlugOrId)}/summaries?type=monthly&year=${year}&month=${month}`,
   );
-  return rows[0];
+  return rows?.[0];
 }
 
 // ── Overview / Playbook Pages ──

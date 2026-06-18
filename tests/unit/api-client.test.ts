@@ -797,3 +797,32 @@ describe("getFetchLogs activeSession overlay (#1360)", () => {
     expect(result.activeSession).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// getMonthlySummary — null-safe 404 handling (#002)
+// ---------------------------------------------------------------------------
+
+describe("getMonthlySummary", () => {
+  let originalFetch: typeof globalThis.fetch;
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it("returns undefined from getMonthlySummary on GET 404", async () => {
+    mockFetch(404);
+    const result = await client.getMonthlySummary("src_123", 2026, 6);
+    expect(result).toBeUndefined();
+  });
+
+  it("returns the first row on 200", async () => {
+    const summaryRow = { id: "sum_1", sourceId: "src_123", year: 2026, month: 6 } as any;
+    mockFetch(200, [summaryRow]);
+    const result = await client.getMonthlySummary("src_123", 2026, 6);
+    expect(result).toEqual(summaryRow);
+  });
+});
