@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import {
   chmodSync,
   existsSync,
@@ -9,6 +10,7 @@ import {
 } from "node:fs";
 import { dirname, join } from "node:path";
 import { getDataDir } from "@releases/lib/config";
+import { logger } from "@releases/lib/logger";
 
 export interface StoredCredential {
   token: string;
@@ -63,7 +65,23 @@ export function readCredential(): StoredCredential | null {
   }
 }
 
-export function writeCredential(cred: StoredCredential): void {
+function hardenWindowsAcl(path: string): void {
+  const user = process.env.USERDOMAIN
+    ? `${process.env.USERDOMAIN}\\${process.env.USERNAME}`
+    : process.env.USERNAME;
+  if (!user) return; // can't identify the user; leave default ACLs
+  try {
+    execFileSync("icacls", [path, "/inheritance:r"], { stdio: "ignore" });
+    execFileSync("icacls", [path, "/grant:r", `${user}:F`], { stdio: "ignore" });
+  } catch (err) {
+    logger.warn(`Could not restrict credential file permissions on Windows: ${String(err)}`);
+  }
+}
+
+export function writeCredential(
+  cred: StoredCredential,
+  platform: NodeJS.Platform = process.platform,
+): void {
   const path = credentialPath();
   mkdirSync(dirname(path), { recursive: true });
   // Atomic write: temp file + rename so a crash never leaves a partial file.
@@ -71,7 +89,8 @@ export function writeCredential(cred: StoredCredential): void {
   writeFileSync(tmp, JSON.stringify(cred, null, 2), { mode: 0o600 });
   chmodSync(tmp, 0o600);
   renameSync(tmp, path);
-  chmodSync(path, 0o600);
+  chmodSync(path, 0o600); // no-op on Windows, harmless
+  if (platform === "win32") hardenWindowsAcl(path);
 }
 
 /** Remove the stored credential. Returns true if a file was actually removed. */

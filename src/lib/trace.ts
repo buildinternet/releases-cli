@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { getRunsDir, expandHome } from "@releases/lib/config";
 import { resolveRunDir } from "./run-dir.js";
 import type { Session } from "@buildinternet/releases-api-types";
@@ -144,6 +144,23 @@ export function buildBatchOverviewSummaryMarkdown(
   ].join("\n");
 }
 
+/**
+ * Trace IDs come from API responses (session/instance IDs). Constrain them to a
+ * single safe path segment so a malicious or tampered response can't traverse
+ * out of the trace dir (`../`, absolute paths, separators). Fail closed: an
+ * unusable id throws rather than writing to an unexpected location.
+ */
+function safeTraceSegment(id: string): string {
+  const seg = basename(id);
+  // Reject anything that isn't already a clean single segment. `basename`
+  // normalizes ("../escape" -> "escape"), so comparing the result back to the
+  // input is what actually rejects traversal/separators/absolute paths.
+  if (!seg || seg === "." || seg === ".." || seg !== id) {
+    throw new Error(`Unsafe trace id: ${JSON.stringify(id)}`);
+  }
+  return seg;
+}
+
 /** Low-level writer. `traceDir` must already be resolved (see resolveTraceDir). */
 export function writeTrace(opts: {
   traceDir: string;
@@ -151,7 +168,7 @@ export function writeTrace(opts: {
   record: unknown;
   summaryMarkdown: string;
 }): string {
-  const dir = join(opts.traceDir, opts.id);
+  const dir = join(opts.traceDir, safeTraceSegment(opts.id));
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, "trace.json"), JSON.stringify(opts.record, null, 2) + "\n");
   writeFileSync(join(dir, "summary.md"), opts.summaryMarkdown);

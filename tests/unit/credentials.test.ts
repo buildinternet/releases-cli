@@ -90,6 +90,32 @@ describe("credentials", () => {
     clearCredential();
   });
 
+  it("non-Windows: writeCredential with platform=darwin writes file correctly", () => {
+    const cred = {
+      token: "relk_darwin_test",
+      apiUrl: "https://api.releases.sh",
+      savedAt: "2026-06-18T00:00:00.000Z",
+    };
+    expect(() => writeCredential(cred, "darwin")).not.toThrow();
+    const read = readCredential();
+    expect(read?.token).toBe("relk_darwin_test");
+    clearCredential();
+  });
+
+  it("Windows: writeCredential with platform=win32 does not throw even though icacls is unavailable", () => {
+    const cred = {
+      token: "relk_win32_test",
+      apiUrl: "https://api.releases.sh",
+      savedAt: "2026-06-18T00:00:00.000Z",
+    };
+    // icacls will fail on macOS — the soft-fail catch must swallow it
+    expect(() => writeCredential(cred, "win32")).not.toThrow();
+    // File must still be persisted despite the icacls failure
+    const read = readCredential();
+    expect(read?.token).toBe("relk_win32_test");
+    clearCredential();
+  });
+
   it("rejects a credential whose sessionToken is a non-string", () => {
     writeCredential({
       token: "relu_abc",
