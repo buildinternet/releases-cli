@@ -4,7 +4,7 @@ import { createInterface } from "node:readline/promises";
 import { getApiUrl } from "../../lib/mode.js";
 import { writeJson } from "../../lib/output.js";
 import { RELEASES_CLI_UA } from "../../lib/user-agent.js";
-import { apiFetch } from "../../api/client.js";
+import { apiFetch } from "../../api/core.js";
 import { stripAnsi } from "../../lib/sanitize.js";
 import { promptConfirm } from "../../lib/confirm.js";
 import { logger } from "@releases/lib/logger";

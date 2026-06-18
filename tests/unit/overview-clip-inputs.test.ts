@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import { clipInputsContent } from "../../src/cli/commands/admin/overview.js";
-import type { OverviewInputs, OverviewInputRelease } from "../../src/api/client.js";
+import { type OverviewInputs, type OverviewInputRelease } from "../../src/api/sources.js";
 
 function release(overrides: Partial<OverviewInputRelease> = {}): OverviewInputRelease {
   return {

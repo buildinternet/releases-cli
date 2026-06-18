@@ -1,4 +1,4 @@
-import type { OverviewCitation } from "../../../../api/client.js";
+import { type OverviewCitation } from "../../../../api/types.js";
 
 export class ParseCitationsError extends Error {}
 

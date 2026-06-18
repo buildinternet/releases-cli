@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import { findOrg, listIgnoredUrls, addIgnoredUrl, removeIgnoredUrl } from "../../api/client.js";
+import { findOrg, listIgnoredUrls, addIgnoredUrl, removeIgnoredUrl } from "../../api/orgs.js";
 import { logger } from "@releases/lib/logger";
 import { writeJson } from "../../lib/output.js";
 import {

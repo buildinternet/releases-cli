@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import { findSourcesBySlugs, deleteSources, addIgnoredUrl } from "../../api/client.js";
+import { addIgnoredUrl } from "../../api/orgs.js";
+import { findSourcesBySlugs, deleteSources } from "../../api/sources.js";
 import { logger } from "@releases/lib/logger";
 import { writeJson } from "../../lib/output.js";
 

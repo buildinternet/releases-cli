@@ -11,6 +11,8 @@ import { Command } from "commander";
 import chalk from "chalk";
 import { logger } from "@releases/lib/logger";
 import { writeJson } from "../../../lib/output.js";
+import { findOrg } from "../../../api/orgs.js";
+import { findSource } from "../../../api/sources.js";
 import {
   createWebhookSubscription,
   listWebhookSubscriptions,
@@ -20,11 +22,9 @@ import {
   rotateWebhookSecret,
   testWebhookSubscription,
   getWebhookDeliveries,
-  findOrg,
-  findSource,
   type WebhookSubscription,
   type WebhookDeliveryRow,
-} from "../../../api/client.js";
+} from "../../../api/webhooks.js";
 import { renderTable } from "../../render/table.js";
 import { orgNotFound, sourceNotFound } from "../../suggest.js";
 

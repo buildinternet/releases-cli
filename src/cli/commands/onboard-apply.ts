@@ -1,13 +1,9 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import { logger } from "@releases/lib/logger";
-import {
-  addIgnoredUrl,
-  findOrg,
-  createSource,
-  findProduct,
-  createProduct,
-} from "../../api/client.js";
+import { addIgnoredUrl, findOrg } from "../../api/orgs.js";
+import { findProduct, createProduct } from "../../api/products.js";
+import { createSource } from "../../api/sources.js";
 import { writeJson } from "../../lib/output.js";
 import type { Product } from "@buildinternet/releases-core/schema";
 

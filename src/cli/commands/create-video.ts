@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import { createVideoSource, findProduct } from "../../api/client.js";
+import { findProduct } from "../../api/products.js";
+import { createVideoSource } from "../../api/sources.js";
 import { logger } from "@releases/lib/logger";
 import { writeJson } from "../../lib/output.js";
 

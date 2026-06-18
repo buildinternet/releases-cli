@@ -16,7 +16,7 @@ import {
   rotateOAuthClientSecret,
   deleteOAuthClient,
   type OAuthClient,
-} from "../../../api/client.js";
+} from "../../../api/admin.js";
 import { renderTable } from "../../render/table.js";
 
 /** Commander collector for repeatable options (`--redirect-uri a --redirect-uri b`). */

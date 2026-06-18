@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { AmbiguousSourceError } from "../../src/api/client.js";
+import { AmbiguousSourceError } from "../../src/api/sources.js";
 import { formatAmbiguousSourceError, describeAmbiguousSource } from "../../src/cli/suggest.js";
 import { stripAnsi } from "../../src/lib/sanitize.js";
 

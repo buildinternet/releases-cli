@@ -8,9 +8,8 @@
 import type { Command } from "commander";
 import chalk from "chalk";
 import { renderTable, type ColumnSpec } from "../../render/table.js";
+import { findOrg, listOrgs } from "../../../api/orgs.js";
 import {
-  findOrg,
-  listOrgs,
   getOverview,
   getOverviewInputs,
   getOverviewInputsCheck,
@@ -18,12 +17,11 @@ import {
   upsertOverview,
   triggerBatchOverview,
   getBatchOverviewStatus,
-  type OverviewCitation,
   type OverviewInputs,
-  type OverviewManifestRow,
   type BatchOverviewTriggerBody,
   type BatchOverviewStatusResponse,
-} from "../../../api/client.js";
+} from "../../../api/sources.js";
+import { type OverviewCitation, type OverviewManifestRow } from "../../../api/types.js";
 import { orgNotFound } from "../../suggest.js";
 import { writeJson } from "../../../lib/output.js";
 import { trySaveBatchOverviewTrace } from "../../../lib/trace.js";

@@ -3,23 +3,23 @@ import chalk from "chalk";
 import { renderTable, type ColumnSpec } from "../render/table.js";
 import {
   findOrg,
-  findProduct,
-  listProducts,
   listOrgs,
-  createProduct,
-  updateProduct,
-  deleteProduct,
   getSourcesByOrg,
-  updateSource,
   removeOrg,
   getOrgAccountsBySlug,
   linkOrgAccount,
+} from "../../api/orgs.js";
+import {
+  findProduct,
+  listProducts,
+  createProduct,
+  updateProduct,
+  deleteProduct,
   addTagsToProduct,
   removeTagsFromProduct,
   getTagsForProduct,
-  getAliases,
-  setAliases,
-} from "../../api/client.js";
+} from "../../api/products.js";
+import { updateSource, getAliases, setAliases } from "../../api/sources.js";
 import { toSlug } from "@buildinternet/releases-core/slug";
 import { isValidCategory, CATEGORIES } from "@buildinternet/releases-core/categories";
 import { isValidKind, KIND_VALUES, type Kind } from "@buildinternet/releases-core/kinds";

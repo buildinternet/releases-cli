@@ -21,8 +21,17 @@ afterAll(() => {
   else process.env.RELEASES_API_KEY = prevEnv.key;
 });
 
-const { deleteReleasesForSource, deleteSource, deleteSources } =
-  await import("../../src/api/client.js");
+const { deleteReleasesForSource, deleteSource, deleteSources } = {
+  ...(await import("../../src/api/core.js")),
+  ...(await import("../../src/api/admin.js")),
+  ...(await import("../../src/api/collections.js")),
+  ...(await import("../../src/api/follows.js")),
+  ...(await import("../../src/api/orgs.js")),
+  ...(await import("../../src/api/products.js")),
+  ...(await import("../../src/api/releases.js")),
+  ...(await import("../../src/api/sources.js")),
+  ...(await import("../../src/api/webhooks.js")),
+};
 
 describe("delete --hard wire contract", () => {
   let originalFetch: typeof globalThis.fetch;

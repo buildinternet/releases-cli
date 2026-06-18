@@ -8,7 +8,7 @@ import {
   isBackfillAsync,
   type SourceBackfillReport,
   type BackfillAsyncResponse,
-} from "../../api/client.js";
+} from "../../api/sources.js";
 import { sourceNotFound } from "../suggest.js";
 import { writeJson } from "../../lib/output.js";
 import { readContentArg } from "../../lib/input.js";

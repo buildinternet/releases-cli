@@ -120,7 +120,17 @@ function makeSource(slug: string, productId?: string) {
 // ---------------------------------------------------------------------------
 // Import client lazily (after env is set).
 // ---------------------------------------------------------------------------
-const client = await import("../../src/api/client.js");
+const client = {
+  ...(await import("../../src/api/core.js")),
+  ...(await import("../../src/api/admin.js")),
+  ...(await import("../../src/api/collections.js")),
+  ...(await import("../../src/api/follows.js")),
+  ...(await import("../../src/api/orgs.js")),
+  ...(await import("../../src/api/products.js")),
+  ...(await import("../../src/api/releases.js")),
+  ...(await import("../../src/api/sources.js")),
+  ...(await import("../../src/api/webhooks.js")),
+};
 
 // ---------------------------------------------------------------------------
 // (a) No product tags — sources attach org-direct, no products created

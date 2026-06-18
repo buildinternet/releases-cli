@@ -15,7 +15,7 @@ import {
   embedEntities,
   embedChangelogs,
   getEmbedStatus,
-} from "../../../api/client.js";
+} from "../../../api/sources.js";
 import type { EmbedBackfillResponse } from "../../../api/types.js";
 import { writeJson } from "../../../lib/output.js";
 

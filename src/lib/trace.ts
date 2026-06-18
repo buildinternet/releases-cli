@@ -3,7 +3,7 @@ import { basename, join } from "node:path";
 import { getRunsDir, expandHome } from "@releases/lib/config";
 import { resolveRunDir } from "./run-dir.js";
 import type { Session } from "@buildinternet/releases-api-types";
-import type { BatchOverviewStatusResponse } from "../api/client.js";
+import { type BatchOverviewStatusResponse } from "../api/sources.js";
 
 /**
  * Managed-session traces. Server-triggered sessions (`onboard`,

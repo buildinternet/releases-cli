@@ -8,7 +8,7 @@
  * assert the parsed shape, then simulate the JSON payload the action builds.
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "bun:test";
-import type { OverviewCitation } from "../../src/api/client.js";
+import { type OverviewCitation } from "../../src/api/types.js";
 
 const prevEnv: { url?: string; key?: string } = {};
 beforeAll(() => {
@@ -71,7 +71,7 @@ describe("getOverview citations (#228)", () => {
   it("carries the citations array through from the org overview GET", async () => {
     mockGet({ ...BASE_PAGE, citations: CITATIONS });
 
-    const { getOverview } = await import("../../src/api/client.js");
+    const { getOverview } = await import("../../src/api/sources.js");
     const overview = await getOverview("org", "railway");
 
     expect(overview).not.toBeNull();
@@ -82,7 +82,7 @@ describe("getOverview citations (#228)", () => {
   it("treats a citationless page as zero citations (count derivation is safe)", async () => {
     mockGet({ ...BASE_PAGE }); // no `citations` field — pages pre-#846
 
-    const { getOverview } = await import("../../src/api/client.js");
+    const { getOverview } = await import("../../src/api/sources.js");
     const overview = await getOverview("org", "railway");
 
     const citations = overview?.citations ?? [];
@@ -92,7 +92,7 @@ describe("getOverview citations (#228)", () => {
   it("builds the --json payload shape with citationCount matching the array", async () => {
     mockGet({ ...BASE_PAGE, citations: CITATIONS });
 
-    const { getOverview } = await import("../../src/api/client.js");
+    const { getOverview } = await import("../../src/api/sources.js");
     const overview = await getOverview("org", "railway");
     const citations = overview?.citations ?? [];
 
@@ -115,7 +115,7 @@ describe("getOverview citations (#228)", () => {
     // the org or page is missing — it does not 404 — so this is the real shape.
     mockGet(null);
 
-    const { getOverview } = await import("../../src/api/client.js");
+    const { getOverview } = await import("../../src/api/sources.js");
     const overview = await getOverview("org", "railway");
 
     expect(overview).toBeNull();
@@ -124,7 +124,7 @@ describe("getOverview citations (#228)", () => {
   it("returns null on a 404 too (generic apiFetch GET-404 → null path)", async () => {
     mockGet({ message: "Not found" }, 404);
 
-    const { getOverview } = await import("../../src/api/client.js");
+    const { getOverview } = await import("../../src/api/sources.js");
     const overview = await getOverview("org", "nope");
 
     expect(overview).toBeNull();

@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import { getUsageStats, type UsageBreakdownRow } from "../../api/client.js";
+import { getUsageStats } from "../../api/sources.js";
+import { type UsageBreakdownRow } from "../../api/types.js";
 
 function printBreakdown(title: string, rows: UsageBreakdownRow[], labelWidth: number) {
   if (rows.length === 0) return;

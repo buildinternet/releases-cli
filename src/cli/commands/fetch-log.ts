@@ -1,7 +1,8 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import { renderTable } from "../render/table.js";
-import { findSource, getFetchLogs, type ActiveFetchSession } from "../../api/client.js";
+import { findSource, getFetchLogs } from "../../api/sources.js";
+import { type ActiveFetchSession } from "../../api/types.js";
 import { timeAgo } from "@buildinternet/releases-core/dates";
 import { stripAnsi } from "../../lib/sanitize.js";
 import { writeJson } from "../../lib/output.js";

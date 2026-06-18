@@ -13,7 +13,7 @@ import {
   setUserRole,
   listUserRoles,
   type UserIdentifier,
-} from "../../../api/client.js";
+} from "../../../api/admin.js";
 import { renderTable } from "../../render/table.js";
 
 /** Settable roles — mirrors the API's ROLE_LADDER (the route is authoritative). */

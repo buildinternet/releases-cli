@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import { findSource, sourceChangelog } from "../../api/client.js";
+import { findSource, sourceChangelog } from "../../api/sources.js";
 import { formatChangelogSliceLine } from "@buildinternet/releases-core/changelog-slice";
 import { sourceNotFound } from "../suggest.js";
 import { logger } from "@releases/lib/logger";

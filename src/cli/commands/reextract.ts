@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import { logger } from "@releases/lib/logger";
-import { findSource, reextractSource } from "../../api/client.js";
+import { findSource, reextractSource } from "../../api/sources.js";
 import { sourceNotFound } from "../suggest.js";
 import { writeJson } from "../../lib/output.js";
 import { parsePositiveIntFlag } from "../../lib/flags.js";

@@ -2,25 +2,27 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import * as z from "zod/v4";
 import {
-  findSource,
   getSourcesByOrg,
   findOrg,
   listOrgs,
+  getTagsForOrg,
+  getOrgAccountsBySlug,
+  getOrgCatalog,
+} from "../api/orgs.js";
+import { getProductsByOrg, findProduct, listProducts } from "../api/products.js";
+import {
   getLatestReleases,
   getProductReleases,
   resolveProductFeedTarget,
+} from "../api/releases.js";
+import {
+  findSource,
   unifiedSearch,
   sourceChangelog,
   getAliases,
-  getTagsForOrg,
-  getOrgAccountsBySlug,
-  getProductsByOrg,
-  findProduct,
-  listProducts,
   listSourcesWithOrg,
-  getOrgCatalog,
   AmbiguousSourceError,
-} from "../api/client.js";
+} from "../api/sources.js";
 import type { LatestRelease, UnifiedSearchResponse } from "../api/types.js";
 import { searchToMarkdown } from "../lib/formatters.js";
 import { logger } from "@releases/lib/logger";

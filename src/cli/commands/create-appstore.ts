@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import { createAppStoreSource } from "../../api/client.js";
+import { createAppStoreSource } from "../../api/sources.js";
 import { logger } from "@releases/lib/logger";
 import { writeJson } from "../../lib/output.js";
 
