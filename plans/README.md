@@ -16,7 +16,7 @@ Bun + Commander, pure HTTP client to `api.releases.sh`).
 | 003  | Wrap apiFetch transport errors with endpoint context    | P3       | S      | —          | DONE   |
 | 004  | Harden credential file permissions on Windows           | P2       | M      | —          | DONE   |
 | 005  | Characterization tests for untested client.ts functions | P1       | M      | —          | DONE   |
-| 006  | Split src/api/client.ts into domain modules             | P3       | L      | 005        | TODO   |
+| 006  | Split src/api/client.ts into domain modules             | P3       | L      | 005        | DONE   |
 
 DONE plans 001–005 implemented and committed on this branch (one commit each).
 006 is intentionally deferred to its own follow-up PR — it now has its
