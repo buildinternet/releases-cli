@@ -11,12 +11,16 @@ Bun + Commander, pure HTTP client to `api.releases.sh`).
 
 | Plan | Title                                                   | Priority | Effort | Depends on | Status |
 | ---- | ------------------------------------------------------- | -------- | ------ | ---------- | ------ |
-| 001  | Sanitize API-derived IDs before trace file writes       | P1       | S      | —          | TODO   |
-| 002  | Guard 404-nullable fetch results against null deref     | P2       | S      | —          | TODO   |
-| 003  | Wrap apiFetch transport errors with endpoint context    | P3       | S      | —          | TODO   |
-| 004  | Harden credential file permissions on Windows           | P2       | M      | —          | TODO   |
-| 005  | Characterization tests for untested client.ts functions | P1       | M      | —          | TODO   |
+| 001  | Sanitize API-derived IDs before trace file writes       | P1       | S      | —          | DONE   |
+| 002  | Guard 404-nullable fetch results against null deref     | P2       | S      | —          | DONE   |
+| 003  | Wrap apiFetch transport errors with endpoint context    | P3       | S      | —          | DONE   |
+| 004  | Harden credential file permissions on Windows           | P2       | M      | —          | DONE   |
+| 005  | Characterization tests for untested client.ts functions | P1       | M      | —          | DONE   |
 | 006  | Split src/api/client.ts into domain modules             | P3       | L      | 005        | TODO   |
+
+DONE plans 001–005 implemented and committed on this branch (one commit each).
+006 is intentionally deferred to its own follow-up PR — it now has its
+prerequisite (005's characterization tests) in place.
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED (one-line rationale)
 
