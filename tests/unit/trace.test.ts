@@ -7,6 +7,7 @@ import {
   resolveTraceDir,
   buildSessionSummaryMarkdown,
   buildBatchOverviewSummaryMarkdown,
+  writeTrace,
   writeSessionTrace,
   trySaveSessionTrace,
 } from "../../src/lib/trace.js";
@@ -135,6 +136,73 @@ describe("writeSessionTrace", () => {
       expect(existsSync(join(out, "trace.json"))).toBe(true);
     } finally {
       rmSync(runDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("writeTrace path-segment sanitization", () => {
+  it("happy path: writes trace.json and summary.md under <traceDir>/<id>/", () => {
+    const traceDir = mkdtempSync(join(tmpdir(), "rel-trace-seg-"));
+    try {
+      const out = writeTrace({
+        traceDir,
+        id: "sess_abc123",
+        record: { ok: true },
+        summaryMarkdown: "# Summary",
+      });
+      expect(out).toBe(join(traceDir, "sess_abc123"));
+      expect(existsSync(join(out, "trace.json"))).toBe(true);
+      expect(existsSync(join(out, "summary.md"))).toBe(true);
+    } finally {
+      rmSync(traceDir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects a traversal id (../escape) and writes nothing outside the temp dir", () => {
+    const traceDir = mkdtempSync(join(tmpdir(), "rel-trace-seg-"));
+    try {
+      expect(() =>
+        writeTrace({
+          traceDir,
+          id: "../escape",
+          record: {},
+          summaryMarkdown: "",
+        }),
+      ).toThrow(/Unsafe trace id/);
+    } finally {
+      rmSync(traceDir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects an id with a path separator (a/b)", () => {
+    const traceDir = mkdtempSync(join(tmpdir(), "rel-trace-seg-"));
+    try {
+      expect(() =>
+        writeTrace({
+          traceDir,
+          id: "a/b",
+          record: {},
+          summaryMarkdown: "",
+        }),
+      ).toThrow(/Unsafe trace id/);
+    } finally {
+      rmSync(traceDir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects an absolute path id (/etc/evil)", () => {
+    const traceDir = mkdtempSync(join(tmpdir(), "rel-trace-seg-"));
+    try {
+      expect(() =>
+        writeTrace({
+          traceDir,
+          id: "/etc/evil",
+          record: {},
+          summaryMarkdown: "",
+        }),
+      ).toThrow(/Unsafe trace id/);
+    } finally {
+      rmSync(traceDir, { recursive: true, force: true });
     }
   });
 });
