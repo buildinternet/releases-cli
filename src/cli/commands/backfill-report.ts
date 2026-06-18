@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import { logger } from "@releases/lib/logger";
-import type { SourceBackfillReport } from "../../api/client.js";
+import { type SourceBackfillReport } from "../../api/sources.js";
 
 /** ISO timestamp → YYYY-MM-DD, or an em dash when the bound is null. */
 export function shortDate(iso: string | null): string {

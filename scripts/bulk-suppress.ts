@@ -6,7 +6,7 @@
 // Usage:
 //   cat suppressions.ndjson | bun scripts/bulk-suppress.ts [--concurrency 8]
 
-import { suppressRelease } from "../src/api/client.ts";
+import { suppressRelease } from "../src/api/releases.ts";
 
 const CONCURRENCY = (() => {
   const idx = process.argv.indexOf("--concurrency");

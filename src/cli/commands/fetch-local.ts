@@ -13,7 +13,8 @@
  */
 
 import chalk from "chalk";
-import { findSource, findOrg } from "../../api/client.js";
+import { findOrg } from "../../api/orgs.js";
+import { findSource } from "../../api/sources.js";
 import { sourceNotFound } from "../suggest.js";
 import { writeJson } from "../../lib/output.js";
 import {

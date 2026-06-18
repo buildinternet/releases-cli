@@ -6,7 +6,7 @@ import { recordEvent, maybeShowFirstRunNotice } from "./lib/telemetry.js";
 import { checkForUpdate } from "./lib/update-check.js";
 import { checkForSkillsUpdate } from "./lib/skills-update-check.js";
 import { maybeShowCompletionHint } from "./cli/completion/hint.js";
-import { AmbiguousSourceError } from "./api/client.js";
+import { AmbiguousSourceError } from "./api/sources.js";
 import { formatAmbiguousSourceError } from "./cli/suggest.js";
 
 const LEGACY_COMMAND_ALIASES: Record<string, string[]> = {

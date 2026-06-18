@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import { findOrg, getPlaybook, updatePlaybookNotes } from "../../../api/client.js";
+import { findOrg } from "../../../api/orgs.js";
+import { getPlaybook, updatePlaybookNotes } from "../../../api/sources.js";
 import { orgNotFound } from "../../suggest.js";
 import { writeJson } from "../../../lib/output.js";
 import { readContentArg } from "../../../lib/input.js";

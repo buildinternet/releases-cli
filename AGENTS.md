@@ -58,7 +58,7 @@ The CLI sends anonymous pings (command name, duration, exit code, CLI version, O
 
 ## Releasing
 
-**Every PR with user-visible changes MUST ship a `.changeset/*.md` file.** Run `bun changeset` (interactive) or write the file directly in `.changeset/`. Bump level: `patch` for bug fixes, `minor` for additive features, `major` for breaking changes. The eight fixed-group packages below must all appear in the changeset header — `bun changeset` selects them together; if writing by hand, copy the header from a prior changeset in git history.
+**Every PR with user-visible changes MUST ship a `.changeset/*.md` file.** Run `bun changeset` (interactive) or write the file directly in `.changeset/`. Bump level: `patch` for bug fixes, `minor` for additive features, `major` for breaking changes. The header needs only the single meta package — `"@buildinternet/releases": patch` — on its own line; the `fixed` group in `.changeset/config.json` automatically bumps the other seven packages to match, so do **not** list them. (Every changeset in git history follows this one-line form.)
 
 **Never hand-edit a `version` field.** Not in the root `package.json`, not in `npm/*/package.json`, not in `packages/*/package.json`, and not in `src/cli/version.ts`. The release pipeline owns all of them — `changeset version` updates the package files, and `scripts/sync-version.ts` mirrors the result into `src/cli/version.ts`. The MCP server re-exports that constant (`src/mcp/server.ts` imports `VERSION` from `../cli/version.js`), so there's no separate string to sync.
 

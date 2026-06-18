@@ -3,7 +3,7 @@ import chalk from "chalk";
 import { logger } from "@releases/lib/logger";
 import { legacyEnv } from "@releases/lib/legacy-env";
 import { registerOnboardApplyCommand } from "./onboard-apply.js";
-import { apiFetch } from "../../api/client.js";
+import { apiFetch } from "../../api/core.js";
 import { getApiUrl } from "../../lib/mode.js";
 import { writeJson } from "../../lib/output.js";
 import { trySaveSessionTrace } from "../../lib/trace.js";

@@ -9,7 +9,7 @@ import { resolveRunDir } from "./run-dir.js";
  * No active run → no-op. Fully fail-open: a logging failure must never break
  * the write it was recording.
  *
- * The chokepoint is the api-client's `apiFetch` (see `src/api/client.ts`), so
+ * The chokepoint is the api-client's `apiFetch` (see `src/api/core.ts`), so
  * the gate keys on the HTTP verb rather than per-command wiring.
  *
  * See `docs/architecture/maintenance-workspace.md` in the monorepo.

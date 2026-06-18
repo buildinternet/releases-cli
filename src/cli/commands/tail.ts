@@ -1,12 +1,12 @@
 import { Command } from "commander";
 import chalk from "chalk";
+import { findOrg } from "../../api/orgs.js";
 import {
-  findOrg,
-  findSource,
   getLatestReleases,
   getProductReleases,
   resolveProductFeedTarget,
-} from "../../api/client.js";
+} from "../../api/releases.js";
+import { findSource } from "../../api/sources.js";
 import type { LatestRelease } from "../../api/types.js";
 import { orgNotFound, productNotFound, sourceNotFound } from "../suggest.js";
 import { stripAnsi } from "../../lib/sanitize.js";

@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import { unifiedSearch } from "../../api/client.js";
+import { unifiedSearch } from "../../api/sources.js";
 import { stripAnsi } from "../../lib/sanitize.js";
 import { logger } from "@releases/lib/logger";
 import { isValidKind, KIND_VALUES, type Kind } from "@buildinternet/releases-core/kinds";

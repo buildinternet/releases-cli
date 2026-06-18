@@ -2,14 +2,14 @@ import { Command } from "commander";
 import { createHash } from "crypto";
 import chalk from "chalk";
 import {
-  findSource,
   suppressRelease,
   unsuppressRelease,
   getRelease,
   deleteRelease,
   updateRelease,
   deleteReleasesForSource,
-} from "../../api/client.js";
+} from "../../api/releases.js";
+import { findSource } from "../../api/sources.js";
 import { stripAnsi } from "../../lib/sanitize.js";
 import { humanDate } from "../../lib/release-display.js";
 import { normalizeReleaseId } from "@buildinternet/releases-core/id";

@@ -1,5 +1,6 @@
 import chalk from "chalk";
-import { suggestOrgs, suggestSources, type AmbiguousSourceError } from "../api/client.js";
+import { suggestOrgs, suggestSources } from "../api/orgs.js";
+import { type AmbiguousSourceError } from "../api/sources.js";
 
 export async function orgNotFound(identifier: string): Promise<never> {
   console.error(chalk.red(`Organization not found: ${identifier}`));

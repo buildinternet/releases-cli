@@ -9,15 +9,12 @@ import { readContentArg } from "../../lib/input.js";
 import {
   findOrg,
   createOrg,
-  findSourcesByUrls,
   getOrgAccountsBySlug,
   linkOrgAccount,
-  createSource,
-  findProduct,
-  createProduct,
   addTagsToOrg,
-  addTagsToProduct,
-} from "../../api/client.js";
+} from "../../api/orgs.js";
+import { findProduct, createProduct, addTagsToProduct } from "../../api/products.js";
+import { findSourcesByUrls, createSource } from "../../api/sources.js";
 
 interface ManifestAccount {
   platform: string;

@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import { renderTable } from "../render/table.js";
-import { findSource, listSourcesWithOrg } from "../../api/client.js";
+import { findSource, listSourcesWithOrg } from "../../api/sources.js";
 import { timeAgo } from "@buildinternet/releases-core/dates";
 import { stripAnsi } from "../../lib/sanitize.js";
 import { writeJson } from "../../lib/output.js";

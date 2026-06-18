@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import * as apiClient from "../../api/client.js";
+import { listSessions, getSession, cancelSession } from "../../api/sources.js";
 import { writeJson } from "../../lib/output.js";
 import { writeSessionTrace } from "../../lib/trace.js";
 import { logger } from "@releases/lib/logger";
@@ -40,7 +40,7 @@ async function resolveSessionIdFromPrefix(prefix: string): Promise<string> {
   let page = 1;
   while (true) {
     // oxlint-disable-next-line no-await-in-loop -- pagination cursor depends on prior page; can't run in parallel
-    const { items, pagination } = await apiClient.listSessions({ page });
+    const { items, pagination } = await listSessions({ page });
     for (const s of items) {
       if (s.sessionId.startsWith(prefix)) matches.push(s);
     }
@@ -89,7 +89,7 @@ export function registerTaskCommand(program: Command) {
       }
       const page = parsedPage;
 
-      const { items: sessions, pagination } = await apiClient.listSessions({
+      const { items: sessions, pagination } = await listSessions({
         limit: pageSize,
         page,
       });
@@ -147,7 +147,7 @@ export function registerTaskCommand(program: Command) {
     .action(async (sessionIdArg: string, opts: { json?: boolean; save?: string | boolean }) => {
       const sessionId = await resolveSessionIdFromPrefix(sessionIdArg);
 
-      const session = (await apiClient.getSession(sessionId)) as Session | null;
+      const session = (await getSession(sessionId)) as Session | null;
       if (!session) {
         console.error(chalk.red(`Session not found: ${sessionId}`));
         process.exit(1);
@@ -253,7 +253,7 @@ export function registerTaskCommand(program: Command) {
     .argument("<sessionId>", "Session ID (or prefix) to cancel")
     .action(async (sessionIdArg: string) => {
       const sessionId = await resolveSessionIdFromPrefix(sessionIdArg);
-      const result = await apiClient.cancelSession(sessionId);
+      const result = await cancelSession(sessionId);
       if (result.ok) {
         console.log(chalk.green(`Cancel requested for session ${sessionId.slice(0, 8)}.`));
       } else {

@@ -1,13 +1,8 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import {
-  findSource,
-  findOrg,
-  createOrg,
-  updateSource,
-  findProduct,
-  updateSourceMeta,
-} from "../../api/client.js";
+import { findOrg, createOrg } from "../../api/orgs.js";
+import { findProduct } from "../../api/products.js";
+import { findSource, updateSource, updateSourceMeta } from "../../api/sources.js";
 import { sourceNotFound } from "../suggest.js";
 import { toSlug } from "@buildinternet/releases-core/slug";
 import { isValidKind, KIND_VALUES, type Kind } from "@buildinternet/releases-core/kinds";

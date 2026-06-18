@@ -8,7 +8,7 @@ import {
   addFollow,
   removeFollow,
   getMyFeed,
-} from "../../api/client.js";
+} from "../../api/follows.js";
 import { writeJson } from "../../lib/output.js";
 import { renderTable } from "../render/table.js";
 import { renderReleaseRows } from "../render/releases-table.js";

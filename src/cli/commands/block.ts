@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import { listBlockedUrls, addBlockedUrl, removeBlockedUrl } from "../../api/client.js";
+import { listBlockedUrls, addBlockedUrl, removeBlockedUrl } from "../../api/orgs.js";
 import { logger } from "@releases/lib/logger";
 import { writeJson } from "../../lib/output.js";
 import {

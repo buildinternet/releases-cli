@@ -105,7 +105,7 @@ describe("search command lookup rendering", () => {
     mockSearch({ ...BASE_RESPONSE, lookup });
 
     const { restore } = captureLog();
-    const { unifiedSearch } = await import("../../src/api/client.js");
+    const { unifiedSearch } = await import("../../src/api/sources.js");
     const response = await unifiedSearch("koute/bytehound", 10);
     restore();
 
@@ -125,7 +125,7 @@ describe("search command lookup rendering", () => {
     };
     mockSearch({ ...BASE_RESPONSE, query: "noorg/norepo", lookup });
 
-    const { unifiedSearch } = await import("../../src/api/client.js");
+    const { unifiedSearch } = await import("../../src/api/sources.js");
     const response = await unifiedSearch("noorg/norepo", 10);
 
     expect(response.lookup?.status).toBe("not_found");
@@ -151,7 +151,7 @@ describe("search command lookup rendering", () => {
     };
     mockSearch({ ...BASE_RESPONSE, lookup });
 
-    const { unifiedSearch } = await import("../../src/api/client.js");
+    const { unifiedSearch } = await import("../../src/api/sources.js");
     const response = await unifiedSearch("vercel/next.js", 10);
 
     expect(response.lookup?.status).toBe("existing");
@@ -168,7 +168,7 @@ describe("search command lookup rendering", () => {
     };
     mockSearch({ ...BASE_RESPONSE, lookup });
 
-    const { unifiedSearch } = await import("../../src/api/client.js");
+    const { unifiedSearch } = await import("../../src/api/sources.js");
     const response = await unifiedSearch("koute/bytehound", 10);
 
     expect(response.lookup?.status).toBe("empty");
@@ -183,7 +183,7 @@ describe("search command lookup rendering", () => {
     };
     mockSearch({ ...BASE_RESPONSE, lookup });
 
-    const { unifiedSearch } = await import("../../src/api/client.js");
+    const { unifiedSearch } = await import("../../src/api/sources.js");
     const response = await unifiedSearch("koute/bytehound", 10);
 
     expect(response.lookup?.status).toBe("deferred");
@@ -192,7 +192,7 @@ describe("search command lookup rendering", () => {
   it("returns null lookup when field is absent", async () => {
     mockSearch(BASE_RESPONSE);
 
-    const { unifiedSearch } = await import("../../src/api/client.js");
+    const { unifiedSearch } = await import("../../src/api/sources.js");
     const response = await unifiedSearch("nextjs", 10);
 
     expect(response.lookup == null).toBe(true);
@@ -208,7 +208,7 @@ describe("search command lookup rendering", () => {
     const apiResponse = { ...BASE_RESPONSE, lookup };
     mockSearch(apiResponse);
 
-    const { unifiedSearch } = await import("../../src/api/client.js");
+    const { unifiedSearch } = await import("../../src/api/sources.js");
     const response = await unifiedSearch("koute/bytehound", 10);
 
     // Simulate what the JSON path does: include lookup when non-null

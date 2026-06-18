@@ -3,7 +3,7 @@ import chalk from "chalk";
 import { renderTable } from "../render/table.js";
 import { timeAgo } from "@buildinternet/releases-core/dates";
 import { stripAnsi } from "../../lib/sanitize.js";
-import { getStatsSummary } from "../../api/client.js";
+import { getStatsSummary } from "../../api/sources.js";
 
 export function registerStatsCommand(program: Command) {
   program

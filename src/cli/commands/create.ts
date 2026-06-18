@@ -1,13 +1,8 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import {
-  findOrg,
-  createOrg,
-  createSource,
-  findSourcesByUrls,
-  isUrlExcluded,
-  findProduct,
-} from "../../api/client.js";
+import { findOrg, createOrg } from "../../api/orgs.js";
+import { findProduct } from "../../api/products.js";
+import { createSource, findSourcesByUrls, isUrlExcluded } from "../../api/sources.js";
 import { toSlug } from "@buildinternet/releases-core/slug";
 import { SOURCE_TYPES, type SourceType } from "@buildinternet/releases-core/source-enums";
 import { logger } from "@releases/lib/logger";

@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import { lookupDomain } from "../../api/client.js";
+import { lookupDomain } from "../../api/sources.js";
 import { stripAnsi } from "../../lib/sanitize.js";
 import { logger } from "@releases/lib/logger";
 import { writeJson } from "../../lib/output.js";

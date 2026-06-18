@@ -10,17 +10,15 @@ import {
   getOrgAccountsBySlug,
   linkOrgAccount,
   unlinkOrgAccount,
-  getProductsByOrg,
   addTagsToOrg,
   removeTagsFromOrg,
   getTagsForOrg,
   updateOrg,
-  getAliases,
-  setAliases,
-  getOverview,
   getOrgDependents,
   setOrgAvatar,
-} from "../../api/client.js";
+} from "../../api/orgs.js";
+import { getProductsByOrg } from "../../api/products.js";
+import { getAliases, setAliases, getOverview } from "../../api/sources.js";
 import {
   githubAvatarUrl,
   faviconAvatarUrl,

@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import { logger } from "@releases/lib/logger";
-import * as apiClient from "../../../api/client.js";
+import { evaluateUrl } from "../../../api/sources.js";
 import { writeJson } from "../../../lib/output.js";
 
 interface EvaluateOpts {
@@ -22,7 +22,7 @@ export function registerEvaluateCommand(program: Command) {
         process.exit(1);
       }
 
-      const result = await apiClient.evaluateUrl(url);
+      const result = await evaluateUrl(url);
 
       if (opts.json) {
         await writeJson(result);

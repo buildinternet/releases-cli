@@ -1,18 +1,10 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import {
-  findSource,
-  findOrg,
-  findProduct,
-  getRelease,
-  getLatestReleases,
-  getProductReleases,
-  getOrgCollections,
-  getSourcesByOrg,
-  getProductsByOrg,
-  getTagsForOrg,
-  getTagsForProduct,
-} from "../../api/client.js";
+import { getOrgCollections } from "../../api/collections.js";
+import { findOrg, getSourcesByOrg, getTagsForOrg } from "../../api/orgs.js";
+import { findProduct, getProductsByOrg, getTagsForProduct } from "../../api/products.js";
+import { getRelease, getLatestReleases, getProductReleases } from "../../api/releases.js";
+import { findSource } from "../../api/sources.js";
 import type { CollectionListItem } from "@buildinternet/releases-api-types";
 import type { Source } from "@buildinternet/releases-core/schema";
 import { stripAnsi } from "../../lib/sanitize.js";

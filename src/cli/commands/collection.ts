@@ -11,7 +11,7 @@ import {
   replaceCollectionMembers,
   addCollectionMember,
   removeCollectionMember,
-} from "../../api/client.js";
+} from "../../api/collections.js";
 import { stripAnsi } from "../../lib/sanitize.js";
 import { writeJson } from "../../lib/output.js";
 

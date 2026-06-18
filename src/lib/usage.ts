@@ -1,4 +1,4 @@
-import * as apiClient from "../api/client.js";
+import { postUsageLog } from "../api/sources.js";
 
 export async function logUsage(params: {
   operation: string;
@@ -18,5 +18,5 @@ export async function logUsage(params: {
   };
 
   // Fire-and-forget — usage logging shouldn't block the caller.
-  apiClient.postUsageLog(values).catch(() => {});
+  postUsageLog(values).catch(() => {});
 }

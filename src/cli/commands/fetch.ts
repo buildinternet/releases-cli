@@ -1,17 +1,16 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import { logger } from "@releases/lib/logger";
+import { apiFetch } from "../../api/core.js";
+import { findOrg, getSourcesByOrg } from "../../api/orgs.js";
 import {
-  apiFetch,
   getActiveSources,
   getSession,
   listFetchableSources,
   listSourcesWithChanges,
   findSource,
-  findOrg,
-  getSourcesByOrg,
   triggerSourceFetch,
-} from "../../api/client.js";
+} from "../../api/sources.js";
 import { newCorrelationId } from "@buildinternet/releases-core/id";
 import { orgNotFound, sourceNotFound } from "../suggest.js";
 import { writeJson, writeJsonLine } from "../../lib/output.js";

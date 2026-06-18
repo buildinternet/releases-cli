@@ -6,7 +6,7 @@ import { writeJson } from "../../lib/output.js";
 import { RELEASES_CLI_UA } from "../../lib/user-agent.js";
 import { VERSION } from "../version.js";
 import { isTelemetryEnabled, getOrCreateAnonId } from "../../lib/telemetry.js";
-import { apiFetch } from "../../api/client.js";
+import { apiFetch } from "../../api/core.js";
 import { stripAnsi } from "../../lib/sanitize.js";
 import { promptConfirm } from "../../lib/confirm.js";
 import { logger } from "@releases/lib/logger";

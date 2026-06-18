@@ -25,7 +25,19 @@ afterAll(() => {
   else process.env.RELEASES_API_KEY = prevEnv.key;
 });
 
-const client = await import("../../src/api/client.js");
+// The client.ts barrel was split into per-domain modules; merge them back into a
+// single namespace so these characterization tests keep referencing `client.<fn>`.
+const client = {
+  ...(await import("../../src/api/core.js")),
+  ...(await import("../../src/api/admin.js")),
+  ...(await import("../../src/api/collections.js")),
+  ...(await import("../../src/api/follows.js")),
+  ...(await import("../../src/api/orgs.js")),
+  ...(await import("../../src/api/products.js")),
+  ...(await import("../../src/api/releases.js")),
+  ...(await import("../../src/api/sources.js")),
+  ...(await import("../../src/api/webhooks.js")),
+};
 
 function mockFetch(status: number, body: unknown = null) {
   globalThis.fetch = (async () =>
