@@ -186,8 +186,7 @@ The root test script isolates `workers/api`-style concerns differently, but for
 this client repo `bun run test` runs everything. Confirm no leakage (the env-based
 approach should keep these tests hermetic).
 
-**Verify**: `bun run test` → all pass; `bun run typecheck` → exit 0; `bun run
-lint` → exit 0.
+**Verify**: `bun run test` → all pass; `bun run typecheck` → exit 0; `bun run lint` → exit 0.
 
 ## Test plan
 
@@ -205,8 +204,7 @@ lint` → exit 0.
 - [ ] `bun run test` passes; ≥15 new tests for previously-untested client.ts
       functions exist
 - [ ] Every chosen function asserts at least path + method (+ body for mutations)
-- [ ] `src/api/client.ts` is unchanged (`git diff --stat eccfd5f..HEAD --
-    src/api/client.ts` shows no changes from this branch)
+- [ ] `src/api/client.ts` is unchanged (`git diff --stat eccfd5f..HEAD -- src/api/client.ts` shows no changes from this branch)
 - [ ] No production files modified (`git status` shows only test files, maybe a
       changeset)
 - [ ] `plans/README.md` status row updated; note this unblocks Plan 006

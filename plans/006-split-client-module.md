@@ -194,8 +194,7 @@ When all domains are extracted, `client.ts` should be a short barrel (just
       `grep -cE "^export (async )?function" src/api/client.ts` → 0
 - [ ] Total exported-function count across `src/api/*.ts` equals the pre-split
       count (no function lost or duplicated)
-- [ ] No consumer import sites changed (Strategy A): `git diff --stat
-    eccfd5f..HEAD -- src/cli src/mcp` shows no import-only churn
+- [ ] No consumer import sites changed (Strategy A): `git diff --stat eccfd5f..HEAD -- src/cli src/mcp` shows no import-only churn
 - [ ] `plans/README.md` status row updated
 
 ## STOP conditions
