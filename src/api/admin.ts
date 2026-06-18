@@ -17,6 +17,19 @@ export interface SetUserRoleResult extends UserRole {
 /** Exactly one of email/userId must be set; the route enforces this too. */
 export type UserIdentifier = { email?: string; userId?: string };
 
+/**
+ * Fail closed before building a query/body: a zero-identifier id would emit
+ * `email=` and both-set would silently prefer userId — either is a malformed
+ * request. Require exactly one.
+ */
+function assertSingleIdentifier(id: UserIdentifier): void {
+  const hasEmail = id.email != null && id.email !== "";
+  const hasUserId = id.userId != null && id.userId !== "";
+  if (hasEmail === hasUserId) {
+    throw new Error("UserIdentifier requires exactly one of email or userId");
+  }
+}
+
 function userRoleQuery(id: UserIdentifier): string {
   return id.userId
     ? `userId=${encodeURIComponent(id.userId)}`
@@ -25,11 +38,13 @@ function userRoleQuery(id: UserIdentifier): string {
 
 /** Read a user's current role. Returns null when no such user exists (404). */
 export async function getUserRole(id: UserIdentifier): Promise<UserRole | null> {
+  assertSingleIdentifier(id);
   return apiFetch<UserRole | null>(`/v1/admin/users/role?${userRoleQuery(id)}`);
 }
 
 /** Set a user's role (user | curator | admin). Throws on 400/404. */
 export async function setUserRole(id: UserIdentifier, role: string): Promise<SetUserRoleResult> {
+  assertSingleIdentifier(id);
   return apiFetch<SetUserRoleResult>(`/v1/admin/users/role`, {
     method: "PATCH",
     body: JSON.stringify({ ...id, role }),

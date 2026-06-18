@@ -155,7 +155,7 @@ export async function getRecentReleases(
   cutoffIso: string,
 ): Promise<Release[]> {
   return apiFetch<Release[]>(
-    `/v1/sources/${encodeURIComponent(sourceIdentifier)}/recent-releases?cutoff=${cutoffIso}`,
+    `/v1/sources/${encodeURIComponent(sourceIdentifier)}/recent-releases?cutoff=${encodeURIComponent(cutoffIso)}`,
   );
 }
 

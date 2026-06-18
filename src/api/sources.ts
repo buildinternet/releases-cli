@@ -428,7 +428,10 @@ export async function getFetchLogs(opts: {
   const env = await apiFetch<{
     items: RawFetchLogRow[];
     activeSession?: ActiveFetchSession | null;
-  }>(`/v1/admin/logs/fetch?${params}`);
+  } | null>(`/v1/admin/logs/fetch?${params}`);
+  // apiFetch yields null on a 404 (e.g. the admin logs route is undeployed);
+  // treat that as "no logs" rather than dereferencing null.
+  if (!env) return { logs: [], activeSession: null };
   return {
     logs: (env.items ?? []).map(toFetchLogEntry),
     activeSession: env.activeSession ?? null,
