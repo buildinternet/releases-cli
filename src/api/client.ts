@@ -128,7 +128,10 @@ export async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T> 
         error: err instanceof Error ? err.message : String(err),
       });
     }
-    throw err;
+    const detail = err instanceof Error ? err.message : String(err);
+    throw new Error(`API request failed on ${opts?.method ?? "GET"} ${path}: ${detail}`, {
+      cause: err,
+    });
   }
 
   if (res.status === 404 && (!opts?.method || opts.method === "GET")) return null as T;

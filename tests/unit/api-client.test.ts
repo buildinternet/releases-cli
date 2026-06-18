@@ -826,3 +826,19 @@ describe("getMonthlySummary", () => {
     expect(result).toEqual(summaryRow);
   });
 });
+
+describe("apiFetch transport error context", () => {
+  it("wraps transport errors with endpoint context", async () => {
+    const original = globalThis.fetch;
+    globalThis.fetch = (async () => {
+      throw new Error("ECONNREFUSED");
+    }) as any;
+    try {
+      await expect(client.findSource("anything")).rejects.toThrow(
+        /API request failed on GET .*: ECONNREFUSED/,
+      );
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+});
