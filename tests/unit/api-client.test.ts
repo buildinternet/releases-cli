@@ -842,3 +842,547 @@ describe("apiFetch transport error context", () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// Characterization tests: request contract (path + method + body + result)
+// for previously-untested exported functions.
+// ---------------------------------------------------------------------------
+
+function captureFetch(status: number, body: unknown = null) {
+  const calls: Array<{ url: string; init: RequestInit | undefined }> = [];
+  globalThis.fetch = (async (url: string, init?: RequestInit) => {
+    calls.push({ url, init });
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as any;
+  return calls;
+}
+
+// ── Admin roles ─────────────────────────────────────────────────────────────
+
+describe("admin roles", () => {
+  let originalFetch: typeof globalThis.fetch;
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+  });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it("getUserRole GETs /v1/admin/users/role?email=…", async () => {
+    const calls = captureFetch(200, { userId: "u1", email: "a@b.com", role: "curator" });
+    const result = await client.getUserRole({ email: "a@b.com" });
+    expect(calls[0].url).toContain("/v1/admin/users/role");
+    expect(calls[0].url).toContain("email=a%40b.com");
+    expect(calls[0].init?.method).toBeUndefined(); // GET
+    expect(result?.role).toBe("curator");
+  });
+
+  it("setUserRole PATCHes /v1/admin/users/role with email+role body", async () => {
+    const calls = captureFetch(200, {
+      userId: "u1",
+      email: "a@b.com",
+      role: "admin",
+      previousRole: null,
+    });
+    const result = await client.setUserRole({ email: "a@b.com" }, "admin");
+    expect(calls[0].url).toContain("/v1/admin/users/role");
+    expect(calls[0].init?.method).toBe("PATCH");
+    const body = JSON.parse(calls[0].init!.body as string);
+    expect(body.email).toBe("a@b.com");
+    expect(body.role).toBe("admin");
+    expect(result.previousRole).toBeNull();
+  });
+
+  it("listUserRoles GETs /v1/admin/users/roles and unwraps the envelope", async () => {
+    const calls = captureFetch(200, {
+      users: [{ userId: "u1", email: "a@b.com", role: "curator" }],
+    });
+    const result = await client.listUserRoles();
+    expect(calls[0].url).toContain("/v1/admin/users/roles");
+    expect(Array.isArray(result)).toBe(true);
+    expect(result[0].role).toBe("curator");
+  });
+
+  it("listUserRoles throws on 404 instead of returning null", async () => {
+    captureFetch(404);
+    await expect(client.listUserRoles()).rejects.toThrow(/listUserRoles: 404/);
+  });
+});
+
+// ── OAuth clients ────────────────────────────────────────────────────────────
+
+describe("OAuth clients", () => {
+  let originalFetch: typeof globalThis.fetch;
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+  });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const baseClient = {
+    clientId: "reloc_abc",
+    name: "My App",
+    redirectUris: ["https://app.example.com/callback"],
+    scopes: ["read"],
+    trusted: false,
+    disabled: false,
+    public: false,
+    type: "web",
+    tokenEndpointAuthMethod: "client_secret_basic",
+  };
+
+  it("createOAuthClient POSTs to /v1/admin/oauth/clients", async () => {
+    const calls = captureFetch(201, { ...baseClient, clientSecret: "reloc_secret" });
+    const result = await client.createOAuthClient({
+      name: "My App",
+      redirectUris: ["https://app.example.com/callback"],
+      scopes: ["read"],
+    });
+    expect(calls[0].url).toContain("/v1/admin/oauth/clients");
+    expect(calls[0].init?.method).toBe("POST");
+    const body = JSON.parse(calls[0].init!.body as string);
+    expect(body.name).toBe("My App");
+    expect(body.scopes).toEqual(["read"]);
+    expect(result.clientSecret).toBe("reloc_secret");
+  });
+
+  it("listOAuthClients GETs /v1/admin/oauth/clients and unwraps envelope", async () => {
+    const calls = captureFetch(200, { clients: [baseClient] });
+    const result = await client.listOAuthClients();
+    expect(calls[0].url).toContain("/v1/admin/oauth/clients");
+    expect(calls[0].init?.method).toBeUndefined();
+    expect(result[0].clientId).toBe("reloc_abc");
+  });
+
+  it("updateOAuthClient PATCHes /v1/admin/oauth/clients/:id", async () => {
+    const calls = captureFetch(200, { ...baseClient, disabled: true });
+    const result = await client.updateOAuthClient("reloc_abc", { disabled: true });
+    expect(calls[0].url).toContain("/v1/admin/oauth/clients/reloc_abc");
+    expect(calls[0].init?.method).toBe("PATCH");
+    const body = JSON.parse(calls[0].init!.body as string);
+    expect(body.disabled).toBe(true);
+    expect(result.disabled).toBe(true);
+  });
+
+  it("rotateOAuthClientSecret POSTs to …/rotate-secret", async () => {
+    const calls = captureFetch(200, { clientId: "reloc_abc", clientSecret: "newSecret" });
+    const result = await client.rotateOAuthClientSecret("reloc_abc");
+    expect(calls[0].url).toContain("/v1/admin/oauth/clients/reloc_abc/rotate-secret");
+    expect(calls[0].init?.method).toBe("POST");
+    expect(result.clientSecret).toBe("newSecret");
+  });
+
+  it("deleteOAuthClient DELETEs /v1/admin/oauth/clients/:id", async () => {
+    const calls = captureFetch(200, { clientId: "reloc_abc", deleted: true });
+    const result = await client.deleteOAuthClient("reloc_abc");
+    expect(calls[0].url).toContain("/v1/admin/oauth/clients/reloc_abc");
+    expect(calls[0].init?.method).toBe("DELETE");
+    expect(result.deleted).toBe(true);
+  });
+});
+
+// ── Webhook subscriptions ────────────────────────────────────────────────────
+
+describe("webhook subscriptions", () => {
+  let originalFetch: typeof globalThis.fetch;
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+  });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const baseSub = {
+    id: "wh_1",
+    orgId: "org_x",
+    url: "https://example.com/hook",
+    sourceId: null,
+    enabled: true,
+    description: null,
+    secretVersion: 1,
+    createdAt: "2026-01-01T00:00:00Z",
+    lastSuccessAt: null,
+    lastErrorAt: null,
+    lastErrorMsg: null,
+    consecutiveFailures: 0,
+    disabledReason: null,
+  };
+
+  it("createWebhookSubscription POSTs to /v1/webhooks", async () => {
+    const calls = captureFetch(201, { ...baseSub, signingKey: "whs_key" });
+    const result = await client.createWebhookSubscription({
+      orgId: "org_x",
+      url: "https://example.com/hook",
+    });
+    expect(calls[0].url).toContain("/v1/webhooks");
+    expect(calls[0].init?.method).toBe("POST");
+    const body = JSON.parse(calls[0].init!.body as string);
+    expect(body.orgId).toBe("org_x");
+    expect(body.url).toBe("https://example.com/hook");
+    expect(result.signingKey).toBe("whs_key");
+  });
+
+  it("listWebhookSubscriptions GETs /v1/webhooks?org=… and unwraps", async () => {
+    const calls = captureFetch(200, { subscriptions: [baseSub] });
+    const result = await client.listWebhookSubscriptions("org_x");
+    expect(calls[0].url).toContain("/v1/webhooks");
+    expect(calls[0].url).toContain("org=org_x");
+    expect(result[0].id).toBe("wh_1");
+  });
+
+  it("rotateWebhookSecret POSTs to …/rotate-secret", async () => {
+    const calls = captureFetch(200, { secretVersion: 2, signingKey: "new_key" });
+    const result = await client.rotateWebhookSecret("wh_1");
+    expect(calls[0].url).toContain("/v1/webhooks/wh_1/rotate-secret");
+    expect(calls[0].init?.method).toBe("POST");
+    expect(result.secretVersion).toBe(2);
+  });
+});
+
+// ── Sessions ─────────────────────────────────────────────────────────────────
+
+describe("sessions", () => {
+  let originalFetch: typeof globalThis.fetch;
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+  });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it("listSessions GETs /v1/sessions and passes query params", async () => {
+    const calls = captureFetch(200, { items: [], pagination: {} });
+    await client.listSessions({ limit: 10, type: "discovery", status: "running" });
+    expect(calls[0].url).toContain("/v1/sessions");
+    expect(calls[0].url).toContain("limit=10");
+    expect(calls[0].url).toContain("type=discovery");
+    expect(calls[0].url).toContain("status=running");
+    expect(calls[0].init?.method).toBeUndefined();
+  });
+
+  it("getSession GETs /v1/sessions/:id", async () => {
+    const calls = captureFetch(200, { id: "ma_1", status: "complete" });
+    const result = await client.getSession("ma_1");
+    expect(calls[0].url).toContain("/v1/sessions/ma_1");
+    expect(calls[0].init?.method).toBeUndefined();
+    expect((result as any).id).toBe("ma_1");
+  });
+
+  it("cancelSession POSTs to /v1/sessions/:id/cancel", async () => {
+    const calls = captureFetch(200, { ok: true });
+    const result = await client.cancelSession("ma_1");
+    expect(calls[0].url).toContain("/v1/sessions/ma_1/cancel");
+    expect(calls[0].init?.method).toBe("POST");
+    expect(result.ok).toBe(true);
+  });
+});
+
+// ── Backfill / re-extract ────────────────────────────────────────────────────
+
+describe("backfill and re-extract", () => {
+  let originalFetch: typeof globalThis.fetch;
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+  });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const syncReport = {
+    source: { id: "src_1", slug: "blog" },
+    via: "fetch" as const,
+    windows: 2,
+    cappedAtWindow: false,
+    droppedChars: 0,
+    extracted: 5,
+    deduped: 5,
+    dateRange: { from: null, to: null },
+    found: 5,
+    inserted: 3,
+    dryRun: false,
+  };
+
+  it("backfillSource POSTs to /v1/workflows/backfill-source with sourceId+dryRun", async () => {
+    const calls = captureFetch(200, syncReport);
+    const result = await client.backfillSource({ sourceId: "src_1", dryRun: true });
+    expect(calls[0].url).toContain("/v1/workflows/backfill-source");
+    expect(calls[0].init?.method).toBe("POST");
+    const body = JSON.parse(calls[0].init!.body as string);
+    expect(body.sourceId).toBe("src_1");
+    expect(body.dryRun).toBe(true);
+    expect(client.isBackfillAsync(result as any)).toBe(false);
+  });
+
+  it("backfillSource returns async shape when 202 responds with instanceId", async () => {
+    const asyncResp = { instanceId: "inst_1", async: true, statusUrl: "https://api/status/inst_1" };
+    const calls = captureFetch(200, asyncResp);
+    const result = await client.backfillSource({ sourceId: "src_1", dryRun: false });
+    expect(client.isBackfillAsync(result as any)).toBe(true);
+    const async_ = result as typeof asyncResp;
+    expect(async_.instanceId).toBe("inst_1");
+    void calls; // captured for symmetry
+  });
+
+  it("getBackfillStatus GETs /v1/workflows/backfill-source/status/:id", async () => {
+    const calls = captureFetch(200, {
+      instanceId: "inst_1",
+      status: "complete",
+      output: syncReport,
+    });
+    const result = await client.getBackfillStatus("inst_1");
+    expect(calls[0].url).toContain("/v1/workflows/backfill-source/status/inst_1");
+    expect(calls[0].init?.method).toBeUndefined();
+    expect(result?.status).toBe("complete");
+  });
+
+  it("reextractSource POSTs to /v1/workflows/reextract-source", async () => {
+    const calls = captureFetch(200, { ...syncReport, via: "snapshot" });
+    const result = await client.reextractSource({ sourceId: "src_1", dryRun: true });
+    expect(calls[0].url).toContain("/v1/workflows/reextract-source");
+    expect(calls[0].init?.method).toBe("POST");
+    const body = JSON.parse(calls[0].init!.body as string);
+    expect(body.sourceId).toBe("src_1");
+    expect(body.dryRun).toBe(true);
+    expect(result.via).toBe("snapshot");
+  });
+});
+
+// ── Batch overview ───────────────────────────────────────────────────────────
+
+describe("batch overview workflow", () => {
+  let originalFetch: typeof globalThis.fetch;
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+  });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it("triggerBatchOverview POSTs to /v1/workflows/batch-overview", async () => {
+    const calls = captureFetch(200, {
+      instanceId: "inst_ov",
+      statusUrl: "https://api/status/inst_ov",
+    });
+    const result = await client.triggerBatchOverview({ maxCostUsd: 1.0, dryRun: false } as any);
+    expect(calls[0].url).toContain("/v1/workflows/batch-overview");
+    expect(calls[0].init?.method).toBe("POST");
+    const body = JSON.parse(calls[0].init!.body as string);
+    expect(body.maxCostUsd).toBe(1.0);
+    expect(result.instanceId).toBe("inst_ov");
+  });
+
+  it("getBatchOverviewStatus GETs /v1/workflows/batch-overview/status/:id", async () => {
+    const calls = captureFetch(200, { instanceId: "inst_ov", status: "running" });
+    const result = await client.getBatchOverviewStatus("inst_ov");
+    expect(calls[0].url).toContain("/v1/workflows/batch-overview/status/inst_ov");
+    expect(calls[0].init?.method).toBeUndefined();
+    expect(result.status).toBe("running");
+  });
+
+  it("getBatchOverviewStatus throws when instance not found (null body)", async () => {
+    captureFetch(404);
+    await expect(client.getBatchOverviewStatus("bad_id")).rejects.toThrow(
+      /Workflow instance not found/,
+    );
+  });
+});
+
+// ── Media assets ─────────────────────────────────────────────────────────────
+
+describe("media assets", () => {
+  let originalFetch: typeof globalThis.fetch;
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+  });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it("insertMediaAssets POSTs to /v1/media/assets with assets array", async () => {
+    const calls = captureFetch(200, { inserted: 2 });
+    const result = await client.insertMediaAssets([
+      {
+        releaseId: "rel_1",
+        url: "https://cdn.test/img.png",
+        contentHash: "abc",
+        mimeType: "image/png",
+        bytes: 100,
+      } as any,
+    ]);
+    expect(calls[0].url).toContain("/v1/media/assets");
+    expect(calls[0].init?.method).toBe("POST");
+    const body = JSON.parse(calls[0].init!.body as string);
+    expect(Array.isArray(body.assets)).toBe(true);
+    expect(result.inserted).toBe(2);
+  });
+
+  it("queryReleasesWithMedia GETs /v1/releases?hasMedia=true&fields=…", async () => {
+    const calls = captureFetch(200, [{ id: "rel_1", sourceId: "src_1", media: "[]" }]);
+    const result = await client.queryReleasesWithMedia();
+    expect(calls[0].url).toContain("/v1/releases");
+    expect(calls[0].url).toContain("hasMedia=true");
+    expect(calls[0].url).toContain("fields=id");
+    expect(result[0].id).toBe("rel_1");
+  });
+});
+
+// ── URL evaluation ───────────────────────────────────────────────────────────
+
+describe("evaluateUrl", () => {
+  let originalFetch: typeof globalThis.fetch;
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+  });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it("GETs /v1/evaluate?url=… with encoded URL", async () => {
+    const calls = captureFetch(200, { recommendation: "include", confidence: 0.9 });
+    const result = await client.evaluateUrl("https://example.com/changelog");
+    expect(calls[0].url).toContain("/v1/evaluate");
+    expect(calls[0].url).toContain("url=https%3A%2F%2Fexample.com%2Fchangelog");
+    expect(calls[0].init?.method).toBeUndefined();
+    expect((result as any).recommendation).toBe("include");
+  });
+});
+
+// ── updateSourceMeta ─────────────────────────────────────────────────────────
+
+describe("updateSourceMeta", () => {
+  let originalFetch: typeof globalThis.fetch;
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+  });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it("merges new keys into existing metadata and PATCHes /v1/sources/:id", async () => {
+    const calls = captureFetch(200, {});
+    const source = { id: "src_1", metadata: JSON.stringify({ existing: "value" }) } as any;
+    await client.updateSourceMeta(source, { newKey: "newVal" });
+    expect(calls[0].url).toContain("/v1/sources/src_1");
+    expect(calls[0].init?.method).toBe("PATCH");
+    const body = JSON.parse(calls[0].init!.body as string);
+    const merged = JSON.parse(body.metadata);
+    expect(merged.existing).toBe("value");
+    expect(merged.newKey).toBe("newVal");
+  });
+
+  it("removes keys set to undefined from metadata", async () => {
+    const calls = captureFetch(200, {});
+    const source = { id: "src_1", metadata: JSON.stringify({ keep: "yes", remove: "old" }) } as any;
+    await client.updateSourceMeta(source, { remove: undefined });
+    const body = JSON.parse(calls[0].init!.body as string);
+    const merged = JSON.parse(body.metadata);
+    expect(merged.keep).toBe("yes");
+    expect("remove" in merged).toBe(false);
+  });
+});
+
+// ── createProduct ────────────────────────────────────────────────────────────
+
+describe("createProduct", () => {
+  let originalFetch: typeof globalThis.fetch;
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+  });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it("POSTs to /v1/products with orgId, name, and opts", async () => {
+    const calls = captureFetch(201, {
+      id: "prod_1",
+      orgId: "org_x",
+      name: "My Product",
+      slug: "my-product",
+    });
+    const result = await client.createProduct("org_x", "My Product", {
+      slug: "my-product",
+      kind: "sdk",
+    });
+    expect(calls[0].url).toContain("/v1/products");
+    expect(calls[0].init?.method).toBe("POST");
+    const body = JSON.parse(calls[0].init!.body as string);
+    expect(body.orgId).toBe("org_x");
+    expect(body.name).toBe("My Product");
+    expect(body.slug).toBe("my-product");
+    expect(body.kind).toBe("sdk");
+    expect(result.id).toBe("prod_1");
+  });
+});
+
+// ── suppressRelease / unsuppressRelease ──────────────────────────────────────
+
+describe("release suppression", () => {
+  let originalFetch: typeof globalThis.fetch;
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+  });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it("suppressRelease POSTs to /v1/releases/:id/suppress with reason", async () => {
+    const calls = captureFetch(200, { suppressed: true });
+    const result = await client.suppressRelease("rel_1", "spam");
+    expect(calls[0].url).toContain("/v1/releases/rel_1/suppress");
+    expect(calls[0].init?.method).toBe("POST");
+    const body = JSON.parse(calls[0].init!.body as string);
+    expect(body.reason).toBe("spam");
+    expect(result).toBe(true);
+  });
+
+  it("unsuppressRelease POSTs to /v1/releases/:id/unsuppress", async () => {
+    const calls = captureFetch(200, { unsuppressed: true });
+    const result = await client.unsuppressRelease("rel_1");
+    expect(calls[0].url).toContain("/v1/releases/rel_1/unsuppress");
+    expect(calls[0].init?.method).toBe("POST");
+    expect(result).toBe(true);
+  });
+});
+
+// ── follows ──────────────────────────────────────────────────────────────────
+
+describe("follows", () => {
+  let originalFetch: typeof globalThis.fetch;
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+  });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it("addFollow POSTs to /v1/me/follows with targetType+targetId", async () => {
+    const calls = captureFetch(201, { ok: true, action: "created" });
+    await client.addFollow("org", "org_x");
+    expect(calls[0].url).toContain("/v1/me/follows");
+    expect(calls[0].init?.method).toBe("POST");
+    const body = JSON.parse(calls[0].init!.body as string);
+    expect(body.targetType).toBe("org");
+    expect(body.targetId).toBe("org_x");
+  });
+
+  it("removeFollow DELETEs /v1/me/follows/:type/:id", async () => {
+    const calls = captureFetch(200, { ok: true, action: "removed" });
+    await client.removeFollow("org", "org_x");
+    expect(calls[0].url).toContain("/v1/me/follows/org/org_x");
+    expect(calls[0].init?.method).toBe("DELETE");
+  });
+
+  it("listMyFollows GETs /v1/me/follows and unwraps envelope", async () => {
+    const calls = captureFetch(200, {
+      follows: [{ id: "f_1", targetType: "org", targetId: "org_x" }],
+    });
+    const result = await client.listMyFollows();
+    expect(calls[0].url).toContain("/v1/me/follows");
+    expect(Array.isArray(result)).toBe(true);
+    expect(result[0].targetType).toBe("org");
+  });
+});
