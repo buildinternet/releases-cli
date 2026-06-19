@@ -18,6 +18,7 @@ import {
   rotateMyWebhookSecret,
   testMyWebhook,
   updateMyWebhook,
+  type UpdateMyWebhookInput,
   type UserWebhookListItem,
   type UserWebhookSubscription,
 } from "../../api/me-webhooks.js";
@@ -49,6 +50,13 @@ function subscriptionTitle(sub: UserWebhookListItem | UserWebhookSubscription): 
   return sub.id;
 }
 
+function parseReleaseTypeOpt(value: string | undefined): "feature" | "rollup" | undefined {
+  if (!value) return undefined;
+  if (value === "feature" || value === "rollup") return value;
+  logger.error("--type must be feature or rollup.");
+  process.exit(1);
+}
+
 function parseLimit(value: string): number {
   const n = parseInt(value, 10);
   if (Number.isNaN(n) || n === 0) return 20;
@@ -59,14 +67,22 @@ function printSubscription(sub: UserWebhookSubscription | UserWebhookListItem): 
   logger.info(`${chalk.bold(sub.id)}  ${statusLabel(sub.enabled)}  ${scopeLabel(sub)}`);
   logger.info(`  url:     ${sub.url}`);
   if (sub.scope === "org") {
+    const product =
+      "productSlug" in sub && sub.productSlug
+        ? sub.productSlug
+        : sub.productId
+          ? sub.productId
+          : chalk.dim("(all products)");
     const source =
       "sourceSlug" in sub && sub.sourceSlug
         ? sub.sourceSlug
         : sub.sourceId
           ? sub.sourceId
           : chalk.dim("(all org sources)");
+    logger.info(`  product: ${product}`);
     logger.info(`  source:  ${source}`);
   }
+  if (sub.releaseType) logger.info(`  type:    ${sub.releaseType}`);
   if (sub.description) logger.info(`  desc:    ${sub.description}`);
   logger.info(`  secret:  v${sub.secretVersion}${chalk.dim(`  · created ${sub.createdAt}`)}`);
   logger.info(`  health:  ${sub.deliveryHealthSummary}`);
@@ -158,6 +174,8 @@ export function registerWebhookManageCommands(webhook: Command): void {
     .option("--scope <scope>", "org (default) or follows", "org")
     .option("--org <slug>", "Org slug or id (required for org scope)")
     .option("--source <slug>", "Limit to one source (org scope only)")
+    .option("--product <slug>", "Limit to one product (org scope only)")
+    .option("--type <kind>", "Limit to release type: feature or rollup")
     .option("--description <text>", "Human-readable label")
     .option("--json", "Output JSON")
     .action(
@@ -166,17 +184,20 @@ export function registerWebhookManageCommands(webhook: Command): void {
         scope: string;
         org?: string;
         source?: string;
+        product?: string;
+        type?: string;
         description?: string;
         json?: boolean;
       }) => {
         requireAuth();
         const scope = opts.scope === "follows" ? "follows" : "org";
+        const releaseType = parseReleaseTypeOpt(opts.type);
         if (scope === "org" && !opts.org) {
           logger.error("--org is required for org-scoped webhooks.");
           process.exit(1);
         }
-        if (scope === "follows" && (opts.org || opts.source)) {
-          logger.error("follows-scoped webhooks must not include --org or --source.");
+        if (scope === "follows" && (opts.org || opts.source || opts.product)) {
+          logger.error("follows-scoped webhooks must not include --org, --source, or --product.");
           process.exit(1);
         }
         const result = await createMyWebhook({
@@ -186,8 +207,10 @@ export function registerWebhookManageCommands(webhook: Command): void {
             ? {
                 orgSlug: opts.org,
                 ...(opts.source ? { sourceSlug: opts.source } : {}),
+                ...(opts.product ? { productSlug: opts.product } : {}),
               }
             : {}),
+          ...(releaseType ? { releaseType } : {}),
           description: opts.description,
         });
         if (opts.json) return writeJson(result);
@@ -235,9 +258,15 @@ export function registerWebhookManageCommands(webhook: Command): void {
 
   webhook
     .command("edit <id>")
-    .description("Update a subscription's url / description / enabled state")
+    .description("Update a subscription's url / description / enabled state / filters")
     .option("--url <url>", "New HTTPS delivery URL (does not rotate the signing key)")
     .option("--description <text>", "New description")
+    .option("--source <slug>", "Org scope: limit to this source slug")
+    .option("--product <slug>", "Org scope: limit to this product slug")
+    .option("--type <kind>", "Limit to release type: feature or rollup")
+    .option("--clear-source", "Org scope: remove source filter")
+    .option("--clear-product", "Org scope: remove product filter")
+    .option("--clear-type", "Remove release-type filter")
     .option("--enable", "Enable the subscription (resets the failure counter)")
     .option("--disable", "Disable the subscription")
     .option("--json", "Output JSON")
@@ -247,6 +276,12 @@ export function registerWebhookManageCommands(webhook: Command): void {
         opts: {
           url?: string;
           description?: string;
+          source?: string;
+          product?: string;
+          type?: string;
+          clearSource?: boolean;
+          clearProduct?: boolean;
+          clearType?: boolean;
           enable?: boolean;
           disable?: boolean;
           json?: boolean;
@@ -257,13 +292,34 @@ export function registerWebhookManageCommands(webhook: Command): void {
           logger.error("Pass at most one of --enable / --disable.");
           process.exit(1);
         }
-        const fields: { url?: string; description?: string; enabled?: boolean } = {};
+        if (opts.clearSource && opts.source) {
+          logger.error("Pass at most one of --source / --clear-source.");
+          process.exit(1);
+        }
+        if (opts.clearProduct && opts.product) {
+          logger.error("Pass at most one of --product / --clear-product.");
+          process.exit(1);
+        }
+        if (opts.clearType && opts.type) {
+          logger.error("Pass at most one of --type / --clear-type.");
+          process.exit(1);
+        }
+        const fields: UpdateMyWebhookInput = {};
         if (opts.url !== undefined) fields.url = opts.url;
         if (opts.description !== undefined) fields.description = opts.description;
         if (opts.enable) fields.enabled = true;
         if (opts.disable) fields.enabled = false;
+        if (opts.source) fields.sourceSlug = opts.source;
+        if (opts.clearSource) fields.sourceId = null;
+        if (opts.product) fields.productSlug = opts.product;
+        if (opts.clearProduct) fields.productId = null;
+        if (opts.clearType) fields.releaseType = null;
+        else if (opts.type !== undefined)
+          fields.releaseType = parseReleaseTypeOpt(opts.type) ?? null;
         if (Object.keys(fields).length === 0) {
-          logger.error("Nothing to change. Pass --url, --description, --enable, or --disable.");
+          logger.error(
+            "Nothing to change. Pass --url, --description, filter flags, --enable, or --disable.",
+          );
           process.exit(1);
         }
         const updated = await updateMyWebhook(id, fields);
