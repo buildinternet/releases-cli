@@ -1,5 +1,7 @@
 # @buildinternet/releases-darwin-arm64
 
+## 0.63.0
+
 ## 0.62.1
 
 ## 0.62.0

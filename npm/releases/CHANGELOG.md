@@ -1,5 +1,20 @@
 # @buildinternet/releases
 
+## 0.63.0
+
+### Minor Changes
+
+- 767f32f: Add bulk release delete and suppress to `releases admin release`. Multiple positional `rel_…` IDs or `--file` (one ID per line, `-` for stdin) route through `DELETE /v1/releases/batch` and `POST /v1/releases/batch-suppress`; a single ID keeps the existing per-row endpoints. `scripts/bulk-suppress.ts` now uses the batch API grouped by reason instead of one HTTP call per release. Pairs with buildinternet/releases#1654.
+
+### Patch Changes
+
+- 728f826: Wrap `apiFetch` transport errors (DNS failure, connection refused, abort) with endpoint context. The thrown message now includes the HTTP verb and path (`API request failed on GET /v1/…: ECONNREFUSED`), matching the existing HTTP-error message shape. The original error is preserved via `cause`.
+- 728f826: Return `undefined` from `getMonthlySummary` on a GET 404 instead of throwing `TypeError: Cannot read properties of null`. The function's declared return type is `Promise<ReleaseSummary | undefined>`; the null guard (`rows?.[0]`) now honors that contract.
+- 88192e9: Show a one-line account nudge ("Create a free account for personalized feeds and higher rate limits — run `releases login`") on the bare `releases` landing screen when no credential is configured. TTY-only and self-resolving once signed in, mirroring the completion notice.
+- 728f826: Constrain API-derived trace IDs (`session.sessionId`, workflow `instanceId`) to a single safe path segment before writing trace files, so a malicious or tampered API response can't traverse out of the trace directory (`../`, separators, absolute paths). Fails closed: an unusable id throws rather than writing to an unexpected location.
+- 61afcc3: Internal refactor: split `src/api/client.ts` into per-domain modules (admin, collections, follows, orgs, products, releases, sources, webhooks) behind a re-export barrel. No user-visible changes.
+- 728f826: Restrict credential file ACLs on Windows using `icacls` after write so the token file is readable only by the current user. Soft-fails silently if `icacls` is unavailable, leaving login functional. Unix behavior unchanged.
+
 ## 0.62.1
 
 ### Patch Changes
