@@ -264,8 +264,8 @@ registerFollowsCommands(program);
 registerAgentContextCommand(program);
 registerCompletionCommand(program);
 registerSkillsCommand(program);
-// Subscriber-facing `webhook verify` — local signature check, no auth. The
-// admin webhook CRUD lives under `admin` (registerWebhookAdminCommand).
+// `webhook {list,add,…}` — self-serve `/v1/me/webhooks` (auth required).
+// `webhook verify` — local signature check, no auth. Admin CRUD under `admin webhook`.
 registerWebhookCommand(program);
 
 const admin = program

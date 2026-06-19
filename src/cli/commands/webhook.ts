@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import { readContentArg } from "../../lib/input.js";
+import { registerWebhookManageCommands } from "./webhook-manage.js";
 
 // Web Crypto only — no node:crypto dependency.
 const enc = new TextEncoder();
@@ -100,8 +101,10 @@ interface VerifyOpts {
 export function registerWebhookCommand(parent: Command): void {
   const webhook = parent
     .command("webhook")
-    .description("Webhook utilities")
+    .description("Manage your webhook subscriptions and verify signatures")
     .showSuggestionAfterError(true);
+
+  registerWebhookManageCommands(webhook);
 
   webhook
     .command("verify")

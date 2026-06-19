@@ -62,6 +62,24 @@ Two commands built for agents specifically:
 - There is **no** `summary` or `compare` command in this CLI, and **no** AI summarization tools on the hosted MCP (`summarize_changes` / `compare_products` do not exist). To summarize or compare, read each entity with `releases get` / `releases tail` (or `--json`) and synthesize the answer yourself.
 - Don't reach for `admin` commands to do reads — every read above is keyless. `admin` is only for registry maintenance and requires a key (below).
 
+## Signed-in user commands (`releases login`)
+
+After `releases login` (device flow) or with a stored `relu_` key, you can manage your own account state — no admin key required:
+
+```bash
+releases follow vercel              # follow an org or product
+releases following                # list follows
+releases feed                     # personalized release timeline
+
+releases webhook list             # your outbound webhook subscriptions
+releases webhook add --scope follows --url https://your.app/hook
+releases webhook add --org vercel --url https://your.app/hook
+releases webhook test <id>        # enqueue a signed test delivery
+releases webhook verify --key …   # local HMAC check (no auth)
+```
+
+Org-scoped webhooks: up to 10 per account (`--org`, optional `--source`). Follows-scoped: one webhook that tracks your current follow graph (real-time sibling to `feed` + digest email). Signing keys are shown once on `add` / `rotate-secret`. Operator/admin webhooks (`releases admin webhook …`) are a separate root-key surface.
+
 ## Admin surface (invite-only — reads never need it)
 
 `releases admin <noun> <verb>` manages the registry (create/update sources, orgs, products; fetch; discovery; policies). It requires `RELEASES_API_KEY`, and **keys are not self-serve** — there's no public signup. Admin commands fail fast at startup without a key, so don't retry them unauthenticated, and don't fall back to them for read tasks. If a user asks how to get a key, tell them access is currently invite-only and point them at the project repo; don't invent a signup URL. Full operator reference: **[references/admin.md](references/admin.md)**.

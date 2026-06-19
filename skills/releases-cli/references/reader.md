@@ -159,6 +159,24 @@ releases submit https://acme.dev/changelog --dry-run --json # preview the payloa
 
 `--note` carries extra context (product name, GitHub repo, feed quirks); `--contact` is an optional email to notify once it's reviewed. With no URL argument in an interactive terminal, `submit` prompts for the URL (and the optional note/contact); otherwise pass it inline or pipe via stdin. Index pages, changelogs, GitHub releases, and feed URLs are all ideal.
 
+## Signed-in account commands (`releases login`)
+
+These act on **your** account via `/v1/me/*` — sign in first (`releases login` or `RELEASES_API_KEY`):
+
+```bash
+releases follow vercel
+releases following
+releases feed
+
+releases webhook list
+releases webhook add --scope follows --url https://your.app/hook
+releases webhook add --org vercel --url https://your.app/hook
+releases webhook test <id>
+releases webhook verify --key <hex> --signature … --timestamp … --body-file -
+```
+
+`webhook verify` is local (no auth). Admin webhooks (`releases admin webhook …`) are a separate root-key operator surface.
+
 ## Agent self-discovery
 
 ```bash
