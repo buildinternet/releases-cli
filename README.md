@@ -9,7 +9,7 @@
 
 The changelog & release-notes registry for developers and AI agents — a lean HTTP client for [releases.sh](https://releases.sh). Search and browse release notes from GitHub, RSS/Atom/JSON feeds, and product changelog pages, with no local infrastructure.
 
-The CLI talks to the hosted registry at `api.releases.sh`. **Search and browse work out of the box — no account or config.** Sign in with `releases login` to follow orgs and products and get a personalized feed; it mints a personal **read-only** API key (and earns you higher rate limits as those roll out). Write/admin access (`releases admin …`) is a separate, closed beta — open an issue for early access.
+The CLI talks to the hosted registry at `api.releases.sh`. **Search and browse work out of the box — no account or config.** Sign in with `releases login` to follow orgs and products, get a personalized feed, and manage outbound webhooks; it mints a personal **read-only** API key (and earns you higher rate limits as those roll out). Write/admin access (`releases admin …`) is a separate, closed beta — open an issue for early access.
 
 ## Install
 
@@ -54,6 +54,20 @@ releases unfollow vercel
 
 Following an organization includes all of its products.
 
+### Outbound webhooks
+
+Receive signed `release.created` POSTs in real time — for everything you follow or a single org:
+
+```bash
+releases webhook add --scope follows --url https://your.app/hook
+releases webhook add --org vercel --url https://your.app/hook --description "prod"
+releases webhook list
+releases webhook test <id>
+releases webhook verify --key … --signature … --timestamp … --body-file capture.json
+```
+
+Org-scoped: up to 10 (`--org`, optional `--source`). Follows-scoped: one webhook (`--scope follows`) that tracks your current follow graph. Signing keys are shown once on `add` / `rotate-secret`. You can also manage webhooks in the browser at [releases.sh/account/notifications](https://releases.sh/account/notifications). Operator/admin webhooks (`releases admin webhook …`) are a separate root-key surface.
+
 ### Contribute to the registry
 
 Neither needs an account or API key:
@@ -89,7 +103,7 @@ releases skills install        # or, without the CLI: npx skills add buildintern
 
 ## Authentication
 
-Search and browse need no auth. Signing in is what powers the personal touches — **following orgs/products and your customized feed** — and mints a personal **read-only** key (it can't write or administer anything; it just identifies you, and unlocks higher rate limits as those land). The easiest way in is your browser — nothing to copy or paste:
+Search and browse need no auth. Signing in powers the personal surfaces — **follows, feed, and outbound webhooks** — and mints a personal **read-only** key (it can't write to the catalog or run `admin` commands; it identifies you for `/v1/me/*` account routes). The easiest way in is your browser — nothing to copy or paste:
 
 ```bash
 releases login              # opens your browser to approve, then saves the key
