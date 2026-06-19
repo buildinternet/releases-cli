@@ -1,5 +1,15 @@
 # @buildinternet/releases
 
+## 0.64.0
+
+### Minor Changes
+
+- f874edd: Add user-facing `releases webhook` commands for self-serve `/v1/me/webhooks`: `list`, `add`, `show`, `edit`, `remove`, `test`, `rotate-secret`, and `deliveries`. Requires `releases login` (or `RELEASES_API_KEY`). Supports org-scoped (`--org`, optional `--source`) and follows-scoped (`--scope follows`) subscriptions. `webhook verify` remains a local, no-auth signature check. Closes buildinternet/releases-cli#320.
+
+### Patch Changes
+
+- 1dfac19: Add `--product`, `--type`, and `--clear-*` filter flags to `releases webhook add` and `webhook edit`, matching per-event filters on `POST/PATCH /v1/me/webhooks`. Companion to buildinternet/releases#1683.
+
 ## 0.63.0
 
 ### Minor Changes
