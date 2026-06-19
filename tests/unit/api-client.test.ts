@@ -1358,6 +1358,28 @@ describe("release suppression", () => {
     expect(calls[0].init?.method).toBe("POST");
     expect(result).toBe(true);
   });
+
+  it("deleteReleasesBatch DELETEs /v1/releases/batch with releaseIds", async () => {
+    const calls = captureFetch(200, { deleted: 2 });
+    const result = await client.deleteReleasesBatch(["rel_1", "rel_2"]);
+    expect(calls[0].url).toContain("/v1/releases/batch");
+    expect(calls[0].init?.method).toBe("DELETE");
+    const body = JSON.parse(calls[0].init!.body as string);
+    expect(body.releaseIds).toEqual(["rel_1", "rel_2"]);
+    expect(result.deleted).toBe(2);
+  });
+
+  it("batchSuppressReleases POSTs /v1/releases/batch-suppress", async () => {
+    const calls = captureFetch(200, { updated: 3 });
+    const result = await client.batchSuppressReleases(["rel_1", "rel_2", "rel_3"], true, "spam");
+    expect(calls[0].url).toContain("/v1/releases/batch-suppress");
+    expect(calls[0].init?.method).toBe("POST");
+    const body = JSON.parse(calls[0].init!.body as string);
+    expect(body.releaseIds).toEqual(["rel_1", "rel_2", "rel_3"]);
+    expect(body.suppressed).toBe(true);
+    expect(body.reason).toBe("spam");
+    expect(result.updated).toBe(3);
+  });
 });
 
 // ── follows ──────────────────────────────────────────────────────────────────

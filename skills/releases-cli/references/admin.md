@@ -264,8 +264,13 @@ releases admin product adopt nextjs --into vercel   # convert an org into a prod
 releases admin release get rel_abc123
 releases admin release update rel_abc123 --title "Fixed title" --version "v2.0.1"
 releases admin release delete rel_abc123
+releases admin release delete rel_a rel_b rel_c              # bulk hard-delete
+releases admin release delete --file ids.txt                 # one rel_… per line (- for stdin)
 releases admin release suppress rel_abc123 --reason "promotional content"
+releases admin release suppress rel_a rel_b --reason "noise"   # bulk suppress
+releases admin release suppress --file ids.txt --reason spam
 releases admin release unsuppress rel_abc123
+releases admin release unsuppress rel_a rel_b                # bulk unsuppress
 ```
 
 Suppressed releases are hidden from all read paths (search, latest, stats, API) but preserved for audit.

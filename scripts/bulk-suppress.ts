@@ -1,20 +1,19 @@
 #!/usr/bin/env bun
 // One-off operator script: bulk-suppress releases listed as NDJSON on stdin.
 // Each line: {"id": "rel_…", "reason": "…"}.
-// Runs with bounded concurrency to be polite to the API.
 //
 // Usage:
-//   cat suppressions.ndjson | bun scripts/bulk-suppress.ts [--concurrency 8]
+//   cat suppressions.ndjson | bun scripts/bulk-suppress.ts [--chunk 500]
 
-import { suppressRelease } from "../src/api/releases.ts";
+import { batchSuppressReleases } from "../src/api/releases.ts";
 
-const CONCURRENCY = (() => {
-  const idx = process.argv.indexOf("--concurrency");
+const CHUNK = (() => {
+  const idx = process.argv.indexOf("--chunk");
   if (idx !== -1 && process.argv[idx + 1]) {
     const n = Number(process.argv[idx + 1]);
-    if (Number.isFinite(n) && n > 0 && n <= 32) return n;
+    if (Number.isFinite(n) && n > 0 && n <= 5000) return Math.floor(n);
   }
-  return 8;
+  return 500;
 })();
 
 const stdin = await new Response(Bun.stdin.stream()).text();
@@ -23,36 +22,38 @@ const rows = stdin
   .filter((l) => l.trim())
   .map((l) => JSON.parse(l) as { id: string; reason?: string });
 
-console.error(`Suppressing ${rows.length} releases (concurrency=${CONCURRENCY})…`);
+console.error(`Suppressing ${rows.length} releases (chunk=${CHUNK})…`);
 
-let ok = 0;
-let fail = 0;
-const errors: Array<{ id: string; err: string }> = [];
+const byReason = new Map<string | undefined, string[]>();
+for (const row of rows) {
+  const list = byReason.get(row.reason) ?? [];
+  list.push(row.id);
+  byReason.set(row.reason, list);
+}
 
-async function worker(queue: typeof rows) {
-  while (queue.length > 0) {
-    const row = queue.shift();
-    if (!row) break;
+let updated = 0;
+const errors: Array<{ ids: string[]; err: string }> = [];
+
+for (const [reason, ids] of byReason) {
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const slice = ids.slice(i, i + CHUNK);
     try {
-      // oxlint-disable-next-line no-await-in-loop -- worker drains shared queue; concurrency comes from running N workers in parallel
-      await suppressRelease(row.id, row.reason);
-      ok++;
+      // oxlint-disable-next-line no-await-in-loop -- bounded chunk writes under API bind budget
+      const result = await batchSuppressReleases(slice, true, reason);
+      updated += result.updated;
     } catch (err) {
-      fail++;
-      errors.push({ id: row.id, err: err instanceof Error ? err.message : String(err) });
-    }
-    if ((ok + fail) % 25 === 0) {
-      console.error(`  progress: ok=${ok} fail=${fail}`);
+      errors.push({
+        ids: slice,
+        err: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 }
 
-const queue = [...rows];
-await Promise.all(Array.from({ length: CONCURRENCY }, () => worker(queue)));
-
-console.error(`DONE. ok=${ok} fail=${fail}`);
+console.error(`DONE. updated=${updated} requested=${rows.length} errors=${errors.length}`);
 if (errors.length) {
-  console.error("Errors (first 5):");
-  for (const e of errors.slice(0, 5)) console.error(`  ${e.id}: ${e.err}`);
+  console.error("Errors (first chunk):");
+  const e = errors[0];
+  console.error(`  ${e.ids.length} ids: ${e.err}`);
 }
-process.exit(fail > 0 ? 1 : 0);
+process.exit(errors.length > 0 ? 1 : 0);
