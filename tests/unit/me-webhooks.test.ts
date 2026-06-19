@@ -71,6 +71,38 @@ describe("me-webhooks client wire contract", () => {
     expect(calls[0]!.body).toEqual({ url: "https://ex.com/o", orgSlug: "vercel" });
   });
 
+  it("createMyWebhook POSTs org filters and releaseType", async () => {
+    responder = () => json({ id: "whk_7", signingKey: "ghi", scope: "org" });
+    await client.createMyWebhook({
+      url: "https://ex.com/f",
+      orgSlug: "vercel",
+      productSlug: "next-js",
+      sourceSlug: "changelog",
+      releaseType: "feature",
+    });
+    expect(calls[0]!.body).toEqual({
+      url: "https://ex.com/f",
+      orgSlug: "vercel",
+      productSlug: "next-js",
+      sourceSlug: "changelog",
+      releaseType: "feature",
+    });
+  });
+
+  it("updateMyWebhook PATCHes filter fields", async () => {
+    responder = () => json({ id: "whk_8", releaseType: "rollup" });
+    await client.updateMyWebhook("whk_8", {
+      productSlug: "next-js",
+      releaseType: "rollup",
+      sourceId: null,
+    });
+    expect(calls[0]!.body).toEqual({
+      productSlug: "next-js",
+      releaseType: "rollup",
+      sourceId: null,
+    });
+  });
+
   it("updateMyWebhook PATCHes enabled", async () => {
     responder = () => json({ id: "whk_4", enabled: false });
     await client.updateMyWebhook("whk_4", { enabled: false });

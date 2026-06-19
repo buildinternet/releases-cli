@@ -78,7 +78,7 @@ releases webhook test <id>        # enqueue a signed test delivery
 releases webhook verify --key …   # local HMAC check (no auth)
 ```
 
-Org-scoped webhooks: up to 10 per account (`--org`, optional `--source`). Follows-scoped: one webhook that tracks your current follow graph (real-time sibling to `feed` + digest email). Signing keys are shown once on `add` / `rotate-secret`. Operator/admin webhooks (`releases admin webhook …`) are a separate root-key surface.
+Org-scoped webhooks: up to 10 per account (`--org`, optional `--source`, `--product`, `--type feature|rollup`). Follows-scoped: one webhook that tracks your current follow graph (real-time sibling to `feed` + digest email); optional `--type` narrows delivery. `webhook edit` can update filters (`--clear-source`, `--clear-product`, `--clear-type`). Signing keys are shown once on `add` / `rotate-secret`. Operator/admin webhooks (`releases admin webhook …`) are a separate root-key surface.
 
 ## Admin surface (invite-only — reads never need it)
 

@@ -171,6 +171,8 @@ releases feed
 releases webhook list
 releases webhook add --scope follows --url https://your.app/hook
 releases webhook add --org vercel --url https://your.app/hook
+releases webhook add --org vercel --product next-js --type feature --url https://your.app/hook
+releases webhook edit <id> --type rollup
 releases webhook test <id>
 releases webhook verify --key <hex> --signature … --timestamp … --body-file -
 ```

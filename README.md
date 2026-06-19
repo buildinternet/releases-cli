@@ -66,7 +66,7 @@ releases webhook test <id>
 releases webhook verify --key … --signature … --timestamp … --body-file capture.json
 ```
 
-Org-scoped: up to 10 (`--org`, optional `--source`). Follows-scoped: one webhook (`--scope follows`) that tracks your current follow graph. Signing keys are shown once on `add` / `rotate-secret`. You can also manage webhooks in the browser at [releases.sh/account/notifications](https://releases.sh/account/notifications). Operator/admin webhooks (`releases admin webhook …`) are a separate root-key surface.
+Org-scoped: up to 10 (`--org`, optional `--source`, `--product`, `--type feature|rollup`). Follows-scoped: one webhook (`--scope follows`) that tracks your current follow graph; optional `--type` narrows delivery. Signing keys are shown once on `add` / `rotate-secret`. You can also manage webhooks in the browser at [releases.sh/account/notifications](https://releases.sh/account/notifications). Operator/admin webhooks (`releases admin webhook …`) are a separate root-key surface.
 
 ### Contribute to the registry
 

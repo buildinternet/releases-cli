@@ -6,6 +6,7 @@ import type { WebhookDeliveryRow } from "./webhooks.js";
  * `@buildinternet/releases-api-types` (follows the admin `webhooks.ts` pattern).
  */
 export type UserWebhookScope = "org" | "follows";
+export type UserWebhookReleaseTypeFilter = "feature" | "rollup";
 
 export type WebhookDeliveryHealth =
   | "never_delivered"
@@ -22,6 +23,8 @@ export interface UserWebhookSubscription {
   orgId: string | null;
   url: string;
   sourceId: string | null;
+  productId: string | null;
+  releaseType: UserWebhookReleaseTypeFilter | null;
   enabled: boolean;
   description: string | null;
   secretVersion: number;
@@ -41,6 +44,8 @@ export interface UserWebhookListItem extends Omit<UserWebhookSubscription, "user
   orgName: string | null;
   sourceSlug: string | null;
   sourceName: string | null;
+  productSlug: string | null;
+  productName: string | null;
 }
 
 export interface CreateUserWebhookResponse extends UserWebhookListItem {
@@ -54,6 +59,9 @@ export interface CreateUserWebhookInput {
   orgId?: string;
   sourceSlug?: string;
   sourceId?: string;
+  productSlug?: string;
+  productId?: string;
+  releaseType?: UserWebhookReleaseTypeFilter;
   description?: string | null;
 }
 
@@ -83,9 +91,20 @@ export async function getMyWebhook(id: string): Promise<UserWebhookSubscription 
   return apiFetch<UserWebhookSubscription | null>(`/v1/me/webhooks/${encodeURIComponent(id)}`);
 }
 
+export type UpdateMyWebhookInput = {
+  url?: string;
+  description?: string | null;
+  enabled?: boolean;
+  sourceSlug?: string;
+  sourceId?: string | null;
+  productSlug?: string;
+  productId?: string | null;
+  releaseType?: UserWebhookReleaseTypeFilter | null;
+};
+
 export async function updateMyWebhook(
   id: string,
-  fields: { url?: string; description?: string | null; enabled?: boolean },
+  fields: UpdateMyWebhookInput,
 ): Promise<UserWebhookSubscription> {
   return apiFetch<UserWebhookSubscription>(`/v1/me/webhooks/${encodeURIComponent(id)}`, {
     method: "PATCH",
