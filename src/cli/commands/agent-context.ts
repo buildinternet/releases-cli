@@ -60,6 +60,10 @@ const STDIN_FLAGS: Array<{ pathSuffix: string[]; flagName: string }> = [
   { pathSuffix: ["overview", "update"], flagName: "--content-file" },
   // releases admin overview-write --content-file <path> (deprecated alias)
   { pathSuffix: ["overview-write"], flagName: "--content-file" },
+  // releases admin release {delete,suppress,unsuppress} --file <path>
+  { pathSuffix: ["delete"], flagName: "--file" },
+  { pathSuffix: ["suppress"], flagName: "--file" },
+  { pathSuffix: ["unsuppress"], flagName: "--file" },
 ];
 
 // ---------------------------------------------------------------------------

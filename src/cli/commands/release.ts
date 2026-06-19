@@ -6,6 +6,8 @@ import {
   unsuppressRelease,
   getRelease,
   deleteRelease,
+  deleteReleasesBatch,
+  batchSuppressReleases,
   updateRelease,
   deleteReleasesForSource,
 } from "../../api/releases.js";
@@ -13,9 +15,36 @@ import { findSource } from "../../api/sources.js";
 import { stripAnsi } from "../../lib/sanitize.js";
 import { humanDate } from "../../lib/release-display.js";
 import { normalizeReleaseId } from "@buildinternet/releases-core/id";
+import { readContentArg } from "../../lib/input.js";
 import { writeJson, writeJsonLine } from "../../lib/output.js";
 import { warnDeprecatedAlias } from "../../lib/deprecated-alias.js";
 import { logger } from "@releases/lib/logger";
+
+async function collectReleaseIds(positional: string[], file?: string): Promise<string[]> {
+  if (file && positional.length > 0) {
+    console.error("Error: pass release IDs as arguments or --file, not both\n");
+    process.exit(1);
+  }
+
+  const ids: string[] = [];
+  for (const raw of positional) ids.push(normalizeReleaseId(raw));
+
+  if (file) {
+    const raw = await readContentArg(file);
+    for (const line of raw.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      ids.push(normalizeReleaseId(trimmed));
+    }
+  }
+
+  const unique = [...new Set(ids)];
+  if (unique.length === 0) {
+    console.error("Error: provide at least one release ID, or --file\n");
+    process.exit(1);
+  }
+  return unique;
+}
 
 function releaseNotFound(id: string): never {
   console.error(chalk.red(`Release not found: ${id}`));
@@ -181,8 +210,9 @@ export function registerReleaseCommand(program: Command) {
 
   release
     .command("delete")
-    .description("Delete a release by ID, or all releases for a source")
-    .argument("[id]", "Release ID to delete")
+    .description("Delete release(s) by ID, or all releases for a source")
+    .argument("[ids...]", "Release ID(s) to delete (rel_…)")
+    .option("--file <path>", "File with one release ID per line (use - for stdin)")
     .option("--source <identifier>", "Delete all releases for a source (src_… or slug)")
     .option(
       "--hard",
@@ -192,12 +222,21 @@ export function registerReleaseCommand(program: Command) {
     .option("--json", "Output as JSON")
     .action(
       async (
-        rawId: string | undefined,
-        opts: { source?: string; hard?: boolean; json?: boolean; dryRun?: boolean },
+        rawIds: string[],
+        opts: {
+          file?: string;
+          source?: string;
+          hard?: boolean;
+          json?: boolean;
+          dryRun?: boolean;
+        },
       ) => {
-        const id = rawId ? normalizeReleaseId(rawId) : undefined;
-        if (!id && !opts.source) {
-          console.error("Error: provide a release ID or --source\n");
+        if (opts.source && (rawIds.length > 0 || opts.file)) {
+          console.error("Error: --source cannot be combined with release IDs or --file\n");
+          process.exit(1);
+        }
+        if (rawIds.length === 0 && !opts.file && !opts.source) {
+          console.error("Error: provide a release ID, --file, or --source\n");
           process.exit(1);
         }
 
@@ -210,32 +249,38 @@ export function registerReleaseCommand(program: Command) {
           }
         }
 
-        if (id) {
+        if (!opts.source) {
+          const ids = await collectReleaseIds(rawIds, opts.file);
+
           if (opts.dryRun) {
-            const existing = await getRelease(id);
-            if (!existing) releaseNotFound(id);
-            if (opts.json) {
-              console.log(
-                JSON.stringify(
-                  { wouldDelete: 1, releases: [{ id, title: existing.title }] },
-                  null,
-                  2,
-                ),
-              );
-            } else {
-              console.log(chalk.yellow(`[dry-run] Would delete 1 release(s)`));
-              console.log(`  ${id}  ${stripAnsi(existing.title)}`);
+            if (opts.json) await writeJson({ wouldDelete: ids.length, releaseIds: ids });
+            else {
+              console.log(chalk.yellow(`[dry-run] Would delete ${ids.length} release(s)`));
+              for (const id of ids) console.log(`  ${id}`);
             }
             return;
           }
 
-          const deleted = await deleteRelease(id);
-          if (!deleted) {
-            console.error(chalk.red("No matching releases found."));
-            process.exit(1);
+          if (ids.length === 1) {
+            const deleted = await deleteRelease(ids[0]);
+            if (!deleted) {
+              console.error(chalk.red("No matching releases found."));
+              process.exit(1);
+            }
+            if (opts.json) await writeJson({ deleted: 1 });
+            else console.log(chalk.green("Deleted 1 release."));
+            return;
           }
-          if (opts.json) await writeJson({ deleted: 1 });
-          else console.log(chalk.green(`Deleted 1 release.`));
+
+          const result = await deleteReleasesBatch(ids);
+          if (opts.json) await writeJson(result);
+          else {
+            console.log(
+              chalk.green(
+                `Deleted ${result.deleted} release${result.deleted === 1 ? "" : "s"} (requested ${ids.length}).`,
+              ),
+            );
+          }
           return;
         }
 
@@ -318,54 +363,97 @@ export function registerReleaseCommand(program: Command) {
 
   release
     .command("suppress")
-    .description("Suppress a release from appearing in queries and search results")
-    .argument("<id>", "Release ID to suppress")
+    .description("Suppress release(s) from appearing in queries and search results")
+    .argument("[ids...]", "Release ID(s) to suppress (rel_…)")
+    .option("--file <path>", "File with one release ID per line (use - for stdin)")
     .option("--reason <reason>", "Reason for suppression")
     .option("--dry-run", "Show what would be suppressed without writing")
     .option("--json", "Output as JSON")
-    .action(async (rawId: string, opts: { reason?: string; dryRun?: boolean; json?: boolean }) => {
-      const id = normalizeReleaseId(rawId);
-      if (opts.dryRun) {
-        if (opts.json)
+    .action(
+      async (
+        rawIds: string[],
+        opts: { file?: string; reason?: string; dryRun?: boolean; json?: boolean },
+      ) => {
+        const ids = await collectReleaseIds(rawIds, opts.file);
+
+        if (opts.dryRun) {
+          if (opts.json)
+            await writeJson({
+              releaseIds: ids,
+              suppressed: true,
+              reason: opts.reason ?? null,
+              dryRun: true,
+            });
+          else {
+            console.log(
+              chalk.yellow(
+                `[dry-run] Would suppress ${ids.length} release(s)${opts.reason ? ` (${opts.reason})` : ""}`,
+              ),
+            );
+            for (const id of ids) console.log(`  ${id}`);
+          }
+          return;
+        }
+
+        if (ids.length === 1) {
+          const found = await suppressRelease(ids[0], opts.reason);
+          if (!found) releaseNotFound(ids[0]);
+          if (opts.json)
+            await writeJsonLine({ id: ids[0], suppressed: true, reason: opts.reason ?? null });
+          else
+            console.log(
+              chalk.green(`Suppressed release ${ids[0]}${opts.reason ? ` (${opts.reason})` : ""}`),
+            );
+          return;
+        }
+
+        const result = await batchSuppressReleases(ids, true, opts.reason);
+        if (opts.json) await writeJson({ ...result, releaseIds: ids, suppressed: true });
+        else {
           console.log(
-            JSON.stringify({ id, suppressed: true, reason: opts.reason ?? null, dryRun: true }),
-          );
-        else
-          console.log(
-            chalk.yellow(
-              `[dry-run] Would suppress release ${id}${opts.reason ? ` (${opts.reason})` : ""}`,
+            chalk.green(
+              `Suppressed ${result.updated} release${result.updated === 1 ? "" : "s"} (requested ${ids.length})${opts.reason ? ` (${opts.reason})` : ""}.`,
             ),
           );
-        return;
-      }
-
-      const found = await suppressRelease(id, opts.reason);
-      if (!found) releaseNotFound(id);
-
-      if (opts.json) await writeJsonLine({ id, suppressed: true, reason: opts.reason ?? null });
-      else
-        console.log(
-          chalk.green(`Suppressed release ${id}${opts.reason ? ` (${opts.reason})` : ""}`),
-        );
-    });
+        }
+      },
+    );
 
   release
     .command("unsuppress")
-    .description("Restore a suppressed release")
-    .argument("<id>", "Release ID to unsuppress")
+    .description("Restore suppressed release(s)")
+    .argument("[ids...]", "Release ID(s) to unsuppress (rel_…)")
+    .option("--file <path>", "File with one release ID per line (use - for stdin)")
     .option("--dry-run", "Show what would be unsuppressed without writing")
     .option("--json", "Output as JSON")
-    .action(async (rawId: string, opts: { dryRun?: boolean; json?: boolean }) => {
-      const id = normalizeReleaseId(rawId);
+    .action(async (rawIds: string[], opts: { file?: string; dryRun?: boolean; json?: boolean }) => {
+      const ids = await collectReleaseIds(rawIds, opts.file);
+
       if (opts.dryRun) {
-        if (opts.json) console.log(JSON.stringify({ id, suppressed: false, dryRun: true }));
-        else console.log(chalk.yellow(`[dry-run] Would unsuppress release ${id}`));
+        if (opts.json) await writeJson({ releaseIds: ids, suppressed: false, dryRun: true });
+        else {
+          console.log(chalk.yellow(`[dry-run] Would unsuppress ${ids.length} release(s)`));
+          for (const id of ids) console.log(`  ${id}`);
+        }
         return;
       }
-      const found = await unsuppressRelease(id);
-      if (!found) releaseNotFound(id);
 
-      if (opts.json) await writeJsonLine({ id, suppressed: false });
-      else console.log(chalk.green(`Unsuppressed release ${id}`));
+      if (ids.length === 1) {
+        const found = await unsuppressRelease(ids[0]);
+        if (!found) releaseNotFound(ids[0]);
+        if (opts.json) await writeJsonLine({ id: ids[0], suppressed: false });
+        else console.log(chalk.green(`Unsuppressed release ${ids[0]}`));
+        return;
+      }
+
+      const result = await batchSuppressReleases(ids, false);
+      if (opts.json) await writeJson({ ...result, releaseIds: ids, suppressed: false });
+      else {
+        console.log(
+          chalk.green(
+            `Unsuppressed ${result.updated} release${result.updated === 1 ? "" : "s"} (requested ${ids.length}).`,
+          ),
+        );
+      }
     });
 }

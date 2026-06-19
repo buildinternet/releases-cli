@@ -51,6 +51,24 @@ export async function unsuppressRelease(releaseId: string): Promise<boolean> {
   return result?.unsuppressed ?? false;
 }
 
+export async function deleteReleasesBatch(releaseIds: string[]): Promise<{ deleted: number }> {
+  return apiFetch<{ deleted: number }>(`/v1/releases/batch`, {
+    method: "DELETE",
+    body: JSON.stringify({ releaseIds }),
+  });
+}
+
+export async function batchSuppressReleases(
+  releaseIds: string[],
+  suppressed: boolean,
+  reason?: string,
+): Promise<{ updated: number }> {
+  return apiFetch<{ updated: number }>(`/v1/releases/batch-suppress`, {
+    method: "POST",
+    body: JSON.stringify({ releaseIds, suppressed, ...(reason !== undefined ? { reason } : {}) }),
+  });
+}
+
 // ── Latest releases ──
 
 export async function getLatestReleases(opts: {
