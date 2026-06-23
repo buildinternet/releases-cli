@@ -8,6 +8,7 @@ import type {
 import { getApiUrl } from "../../lib/mode.js";
 import { getSessionToken, clearSessionToken } from "../../lib/session.js";
 import { writeJson } from "../../lib/output.js";
+import { markDryRun } from "../../lib/dry-run.js";
 import { renderTable } from "../render/table.js";
 import { promptConfirm, defaultPromptReader } from "../../lib/confirm.js";
 
@@ -89,42 +90,57 @@ export function registerKeysCommand(program: Command): void {
     .requiredOption("--name <name>", "Label for the key")
     .option("--expires-in-days <n>", "Expiry in days (1-365)", parseExpiresInDays)
     .option("--json", "Output as JSON")
-    .action(async (opts: { name: string; expiresInDays?: number; json?: boolean }) => {
-      const apiUrl = getApiUrl();
-      const body: Record<string, unknown> = { name: opts.name, scope: "read" };
-      // parseExpiresInDays guarantees a valid integer or commander exits before
-      // this runs; the Number.isInteger guard is belt-and-suspenders so a NaN/null
-      // can never be serialized into the request body.
-      if (opts.expiresInDays !== undefined && Number.isInteger(opts.expiresInDays)) {
-        body.expiresInDays = opts.expiresInDays;
-      }
-      const res = await keysRequest(
-        apiUrl,
-        "/v1/api-keys",
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(body),
-        },
-        liveDeps(),
-      );
-      if (!res.ok) {
-        console.error(
-          chalk.red(await errMessage(res, `Failed to create key (HTTP ${res.status})`)),
+    .option("--dry-run", "Show what would be created without minting a key")
+    .action(
+      async (opts: { name: string; expiresInDays?: number; json?: boolean; dryRun?: boolean }) => {
+        const apiUrl = getApiUrl();
+        const body: Record<string, unknown> = { name: opts.name, scope: "read" };
+        // parseExpiresInDays guarantees a valid integer or commander exits before
+        // this runs; the Number.isInteger guard is belt-and-suspenders so a NaN/null
+        // can never be serialized into the request body.
+        if (opts.expiresInDays !== undefined && Number.isInteger(opts.expiresInDays)) {
+          body.expiresInDays = opts.expiresInDays;
+        }
+        if (opts.dryRun) {
+          if (opts.json) {
+            await writeJson(markDryRun({ wouldCreate: body }));
+            return;
+          }
+          const expiresHint =
+            opts.expiresInDays !== undefined ? ` (expires in ${opts.expiresInDays}d)` : "";
+          console.log(
+            chalk.yellow(`[dry-run] Would create read-only API key "${opts.name}"${expiresHint}.`),
+          );
+          return;
+        }
+        const res = await keysRequest(
+          apiUrl,
+          "/v1/api-keys",
+          {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(body),
+          },
+          liveDeps(),
         );
-        process.exit(1);
-      }
-      const created = (await res.json()) as CreatedUserApiKey;
-      if (opts.json) {
-        await writeJson(created);
-        return;
-      }
-      console.log(
-        chalk.green("API key created (read-only). Store it now — it won't be shown again:"),
-      );
-      console.log(`\n  ${chalk.bold(created.key)}\n`);
-      console.log(chalk.dim(`  id: ${created.id}  scope: ${created.scope}`));
-    });
+        if (!res.ok) {
+          console.error(
+            chalk.red(await errMessage(res, `Failed to create key (HTTP ${res.status})`)),
+          );
+          process.exit(1);
+        }
+        const created = (await res.json()) as CreatedUserApiKey;
+        if (opts.json) {
+          await writeJson(created);
+          return;
+        }
+        console.log(
+          chalk.green("API key created (read-only). Store it now — it won't be shown again:"),
+        );
+        console.log(`\n  ${chalk.bold(created.key)}\n`);
+        console.log(chalk.dim(`  id: ${created.id}  scope: ${created.scope}`));
+      },
+    );
 
   keys
     .command("list")
@@ -174,7 +190,12 @@ export function registerKeysCommand(program: Command): void {
     .command("revoke <id>")
     .description("Revoke (delete) an API key by id")
     .option("--yes", "Skip the confirmation prompt")
-    .action(async (id: string, opts: { yes?: boolean }) => {
+    .option("--dry-run", "Show what would be revoked without deleting")
+    .action(async (id: string, opts: { yes?: boolean; dryRun?: boolean }) => {
+      if (opts.dryRun) {
+        console.log(chalk.yellow(`[dry-run] Would revoke API key ${id}.`));
+        return;
+      }
       if (!opts.yes) {
         const ok = await promptConfirm(
           `Type the key id to confirm revoke (${id}): `,

@@ -9,6 +9,7 @@ import { isValidKind, KIND_VALUES, type Kind } from "@buildinternet/releases-cor
 import { SOURCE_TYPES, SOURCE_DISCOVERY } from "@buildinternet/releases-core/source-enums";
 import { logger } from "@releases/lib/logger";
 import { writeJson } from "../../lib/output.js";
+import { markDryRun } from "../../lib/dry-run.js";
 import { readContentArg } from "../../lib/input.js";
 import { parseMetadataSetFlag } from "../../lib/flags.js";
 import { buildNoticePatch } from "../../lib/notice.js";
@@ -369,13 +370,15 @@ export async function updateSourceAction(
 
   if (opts.dryRun) {
     if (opts.json)
-      await writeJson({
-        wouldUpdate: source.slug,
-        name: source.name,
-        updates,
-        metaUpdates,
-        changes,
-      });
+      await writeJson(
+        markDryRun({
+          wouldUpdate: source.slug,
+          name: source.name,
+          updates,
+          metaUpdates,
+          changes,
+        }),
+      );
     else {
       logger.warn(`[dry-run] Would update ${source.name} (${source.slug}):`);
       for (const change of changes) logger.warn(`  ${change}`);

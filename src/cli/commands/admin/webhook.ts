@@ -11,6 +11,7 @@ import { Command } from "commander";
 import chalk from "chalk";
 import { logger } from "@releases/lib/logger";
 import { writeJson } from "../../../lib/output.js";
+import { markDryRun } from "../../../lib/dry-run.js";
 import { findOrg } from "../../../api/orgs.js";
 import { findSource } from "../../../api/sources.js";
 import {
@@ -109,6 +110,7 @@ export function registerWebhookAdminCommand(program: Command) {
     .option("--source <slug>", "Limit to one source (slug or src_ id); default = all org sources")
     .option("--description <text>", "Human-readable label")
     .option("--json", "Output JSON")
+    .option("--dry-run", "Resolve org/source and show what would be created, without writing")
     .action(
       async (opts: {
         org: string;
@@ -116,9 +118,20 @@ export function registerWebhookAdminCommand(program: Command) {
         source?: string;
         description?: string;
         json?: boolean;
+        dryRun?: boolean;
       }) => {
         const orgId = await resolveOrgId(opts.org);
         const sourceId = opts.source ? await resolveSourceId(opts.source) : undefined;
+        if (opts.dryRun) {
+          const plan = { orgId, url: opts.url, sourceId, description: opts.description };
+          if (opts.json) return writeJson(markDryRun({ wouldCreate: plan }));
+          logger.info(
+            chalk.yellow(
+              `[dry-run] Would create webhook subscription → ${opts.url} (org ${orgId}${sourceId ? `, source ${sourceId}` : ", all org sources"}).`,
+            ),
+          );
+          return;
+        }
         const result = await createWebhookSubscription({
           orgId,
           url: opts.url,
@@ -219,6 +232,7 @@ export function registerWebhookAdminCommand(program: Command) {
     .option("--enable", "Enable the subscription (resets the failure counter)")
     .option("--disable", "Disable the subscription")
     .option("--json", "Output JSON")
+    .option("--dry-run", "Show what would change without writing")
     .action(
       async (
         id: string,
@@ -228,6 +242,7 @@ export function registerWebhookAdminCommand(program: Command) {
           enable?: boolean;
           disable?: boolean;
           json?: boolean;
+          dryRun?: boolean;
         },
       ) => {
         if (opts.enable && opts.disable) {
@@ -243,6 +258,12 @@ export function registerWebhookAdminCommand(program: Command) {
           logger.error("Nothing to change. Pass --url, --description, --enable, or --disable.");
           process.exit(1);
         }
+        if (opts.dryRun) {
+          if (opts.json) return writeJson(markDryRun({ wouldUpdate: id, fields }));
+          logger.info(chalk.yellow(`[dry-run] Would update subscription ${id}:`));
+          for (const [k, v] of Object.entries(fields)) logger.info(`  ${k} → ${String(v)}`);
+          return;
+        }
         const updated = await updateWebhookSubscription(id, fields);
         if (opts.json) return writeJson(updated);
         printSubscription(updated);
@@ -253,7 +274,13 @@ export function registerWebhookAdminCommand(program: Command) {
     .command("remove <id>")
     .description("Hard-delete a subscription")
     .option("--json", "Output JSON")
-    .action(async (id: string, opts: { json?: boolean }) => {
+    .option("--dry-run", "Show what would be deleted without deleting")
+    .action(async (id: string, opts: { json?: boolean; dryRun?: boolean }) => {
+      if (opts.dryRun) {
+        if (opts.json) return writeJson(markDryRun({ wouldDelete: id }));
+        logger.info(chalk.yellow(`[dry-run] Would delete subscription ${id}.`));
+        return;
+      }
       await deleteWebhookSubscription(id);
       if (opts.json) return writeJson({ id, deleted: true });
       logger.info(`${id}: ${chalk.red("deleted")}`);
@@ -263,7 +290,13 @@ export function registerWebhookAdminCommand(program: Command) {
     .command("test <id>")
     .description("Enqueue a synthetic release.created event to the subscription URL")
     .option("--json", "Output JSON")
-    .action(async (id: string, opts: { json?: boolean }) => {
+    .option("--dry-run", "Show what would be enqueued without sending")
+    .action(async (id: string, opts: { json?: boolean; dryRun?: boolean }) => {
+      if (opts.dryRun) {
+        if (opts.json) return writeJson(markDryRun({ wouldTest: id }));
+        logger.info(chalk.yellow(`[dry-run] Would enqueue a synthetic test event → ${id}.`));
+        return;
+      }
       const result = await testWebhookSubscription(id);
       if (opts.json) return writeJson(result);
       logger.info(`${chalk.green("enqueued")} test event ${chalk.dim(result.eventId)} → ${id}`);
@@ -273,7 +306,13 @@ export function registerWebhookAdminCommand(program: Command) {
     .command("rotate-secret <id>")
     .description("Rotate the signing key (new key shown once; old key invalidated)")
     .option("--json", "Output JSON")
-    .action(async (id: string, opts: { json?: boolean }) => {
+    .option("--dry-run", "Show what would be rotated without invalidating the current key")
+    .action(async (id: string, opts: { json?: boolean; dryRun?: boolean }) => {
+      if (opts.dryRun) {
+        if (opts.json) return writeJson(markDryRun({ wouldRotate: id }));
+        logger.info(chalk.yellow(`[dry-run] Would rotate the signing key for ${id}.`));
+        return;
+      }
       const result = await rotateWebhookSecret(id);
       if (opts.json) return writeJson(result);
       logger.info(

@@ -34,6 +34,7 @@ import { isValidCategory, CATEGORIES } from "@buildinternet/releases-core/catego
 import { SOURCE_DISCOVERY } from "@buildinternet/releases-core/source-enums";
 import { timeAgo } from "@buildinternet/releases-core/dates";
 import { writeJson } from "../../lib/output.js";
+import { markDryRun } from "../../lib/dry-run.js";
 import {
   DEFAULT_PAGE_SIZE,
   computePagination,
@@ -84,14 +85,16 @@ async function orgCreateAction(name: string, opts: OrgCreateOpts): Promise<void>
     if (opts.dryRun) {
       const tagList = parseTagList(opts.tags);
       if (opts.json)
-        await writeJson({
-          wouldCreate: false,
-          existed: true,
-          slug: existing.slug,
-          name: existing.name,
-          tagsToAdd: opts.strict ? [] : tagList,
-          strictWouldFail: !!opts.strict,
-        });
+        await writeJson(
+          markDryRun({
+            wouldCreate: false,
+            existed: true,
+            slug: existing.slug,
+            name: existing.name,
+            tagsToAdd: opts.strict ? [] : tagList,
+            strictWouldFail: !!opts.strict,
+          }),
+        );
       else if (opts.strict)
         logger.warn(`[dry-run] Organization "${slug}" already exists; --strict would exit 1.`);
       else
@@ -123,7 +126,7 @@ async function orgCreateAction(name: string, opts: OrgCreateOpts): Promise<void>
       category: opts.category ?? null,
       tagsToAdd: tagList,
     };
-    if (opts.json) await writeJson(plan);
+    if (opts.json) await writeJson(markDryRun(plan));
     else
       logger.warn(
         `[dry-run] Would create organization: ${name} (${slug})${tagList.length ? ` with tags: ${tagList.join(", ")}` : ""}`,
@@ -337,7 +340,8 @@ async function orgUpdateAction(identifier: string, opts: OrgUpdateOpts): Promise
   }
 
   if (opts.dryRun) {
-    if (opts.json) await writeJson({ wouldUpdate: found.slug, name: found.name, updates });
+    if (opts.json)
+      await writeJson(markDryRun({ wouldUpdate: found.slug, name: found.name, updates }));
     else {
       logger.warn(`[dry-run] Would update organization: ${found.name} (${found.slug})`);
       for (const [k, v] of Object.entries(updates))
@@ -384,7 +388,7 @@ export async function orgDeleteAction(identifier: string, opts: OrgDeleteOpts): 
 
   if (opts.dryRun) {
     if (opts.json)
-      await writeJson({ wouldRemove: found.slug, name: found.name, hard: !!opts.hard });
+      await writeJson(markDryRun({ wouldRemove: found.slug, name: found.name, hard: !!opts.hard }));
     else
       logger.warn(
         `[dry-run] Would ${opts.hard ? "hard-delete" : "delete"} organization: ${found.name} (${found.slug})`,
@@ -849,10 +853,12 @@ Examples:
 
         if (opts.dryRun) {
           if (opts.json)
-            await writeJson({
-              wouldLink: { platform: opts.platform, handle: opts.handle },
-              org: found.slug,
-            });
+            await writeJson(
+              markDryRun({
+                wouldLink: { platform: opts.platform, handle: opts.handle },
+                org: found.slug,
+              }),
+            );
           else
             console.log(
               chalk.yellow(`[dry-run] Would link ${opts.platform}/${opts.handle} to ${found.name}`),
@@ -886,10 +892,12 @@ Examples:
 
         if (opts.dryRun) {
           if (opts.json)
-            await writeJson({
-              wouldUnlink: { platform: opts.platform, handle: opts.handle },
-              org: found.slug,
-            });
+            await writeJson(
+              markDryRun({
+                wouldUnlink: { platform: opts.platform, handle: opts.handle },
+                org: found.slug,
+              }),
+            );
           else
             console.log(
               chalk.yellow(

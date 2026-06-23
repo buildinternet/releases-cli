@@ -25,6 +25,7 @@ import { isValidCategory, CATEGORIES } from "@buildinternet/releases-core/catego
 import { isValidKind, KIND_VALUES, type Kind } from "@buildinternet/releases-core/kinds";
 import { logger } from "@releases/lib/logger";
 import { writeJson } from "../../lib/output.js";
+import { markDryRun } from "../../lib/dry-run.js";
 import {
   computePagination,
   DEFAULT_PAGE_SIZE,
@@ -120,7 +121,7 @@ async function productCreateAction(name: string, opts: ProductCreateOpts): Promi
       kind: kind ?? null,
       tagsToAdd: tagList,
     };
-    if (opts.json) await writeJson(plan);
+    if (opts.json) await writeJson(markDryRun(plan));
     else
       console.log(
         chalk.yellow(
@@ -224,7 +225,8 @@ async function productUpdateAction(slug: string, opts: ProductUpdateOpts): Promi
   }
 
   if (opts.dryRun) {
-    if (opts.json) await writeJson({ wouldUpdate: found.slug, name: found.name, updates });
+    if (opts.json)
+      await writeJson(markDryRun({ wouldUpdate: found.slug, name: found.name, updates }));
     else {
       console.log(chalk.yellow(`[dry-run] Would update product: ${found.name} (${found.slug})`));
       for (const [k, v] of Object.entries(updates))
@@ -249,7 +251,7 @@ async function productDeleteAction(slug: string, opts: ProductDeleteOpts): Promi
   }
 
   if (opts.dryRun) {
-    if (opts.json) await writeJson({ wouldRemove: found.slug, name: found.name });
+    if (opts.json) await writeJson(markDryRun({ wouldRemove: found.slug, name: found.name }));
     else console.log(chalk.yellow(`[dry-run] Would delete product: ${found.name} (${found.slug})`));
     return;
   }
@@ -609,7 +611,7 @@ Examples:
             };
 
             if (opts.json) {
-              await writeJson(plan);
+              await writeJson(markDryRun(plan));
             } else {
               console.log(
                 chalk.yellow(
@@ -666,7 +668,7 @@ Examples:
           };
 
           if (opts.json) {
-            await writeJson(plan);
+            await writeJson(markDryRun(plan));
           } else {
             console.log(
               chalk.yellow(

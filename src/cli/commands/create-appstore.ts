@@ -3,6 +3,7 @@ import chalk from "chalk";
 import { createAppStoreSource } from "../../api/sources.js";
 import { logger } from "@releases/lib/logger";
 import { writeJson } from "../../lib/output.js";
+import { markDryRun } from "../../lib/dry-run.js";
 
 const TRACK_ID_RE = /^\d+$/;
 const VALID_PLATFORMS = ["ios", "macos"] as const;
@@ -93,7 +94,7 @@ export async function createAppStoreAction(
       Object.entries(params).filter(([, v]) => v !== undefined && v !== null),
     );
     if (opts.json) {
-      await writeJson({ wouldPost: "/v1/sources/appstore", body });
+      await writeJson(markDryRun({ wouldPost: "/v1/sources/appstore", body }));
     } else {
       logger.info(chalk.yellow("[dry-run] Would POST /v1/sources/appstore"));
       for (const [k, v] of Object.entries(body)) logger.info(`  ${k}: ${v}`);

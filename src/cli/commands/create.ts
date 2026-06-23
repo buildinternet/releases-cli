@@ -7,6 +7,7 @@ import { toSlug } from "@buildinternet/releases-core/slug";
 import { SOURCE_TYPES, type SourceType } from "@buildinternet/releases-core/source-enums";
 import { logger } from "@releases/lib/logger";
 import { writeJson } from "../../lib/output.js";
+import { markDryRun } from "../../lib/dry-run.js";
 import { readContentArg } from "../../lib/input.js";
 import { parseMetadataSetFlag, parseTagList } from "../../lib/flags.js";
 import { isAppStoreUrl, isAppStoreCoordinate } from "./create-appstore.js";
@@ -427,7 +428,7 @@ export async function createSourceAction(
       }
     }
 
-    if (opts.json) await writeJson(results);
+    if (opts.json) await writeJson(opts.dryRun ? results.map(markDryRun) : results);
     if (hasError) process.exit(1);
     return;
   }
@@ -471,7 +472,7 @@ export async function createSourceAction(
   }
 
   if (opts.json) {
-    await writeJson(result);
+    await writeJson(opts.dryRun ? markDryRun(result) : result);
   } else {
     const orgLabel = result.org ? ` [org: ${result.org}]` : "";
     const typeLabel = !opts.type ? ` (auto-detected: ${result.type})` : "";

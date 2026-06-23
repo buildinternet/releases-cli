@@ -4,6 +4,7 @@ import { addIgnoredUrl } from "../../api/orgs.js";
 import { findSourcesBySlugs, deleteSources } from "../../api/sources.js";
 import { logger } from "@releases/lib/logger";
 import { writeJson } from "../../lib/output.js";
+import { markDryRun } from "../../lib/dry-run.js";
 
 export type DeleteSourceOpts = {
   ignore?: boolean;
@@ -37,7 +38,7 @@ export async function deleteSourceAction(slugs: string[], opts: DeleteSourceOpts
     });
 
     if (opts.json) {
-      await writeJson(dryResults);
+      await writeJson(dryResults.map(markDryRun));
     } else {
       for (const r of dryResults) {
         if (r.status === "not_found") console.error(chalk.red(`Source not found: ${r.slug}`));
