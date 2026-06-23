@@ -8,11 +8,13 @@ import type {
 import type { OrgCatalogResponse, OrgDependentsResponse } from "./types.js";
 import type { SetOrgAvatarResponse } from "@buildinternet/releases-api-types";
 import { apiFetch, suggestEntities } from "./core.js";
+import { assertCleanIdentifier } from "../lib/validate-input.js";
 import { type ListResponse } from "@buildinternet/releases-core/cli-contracts";
 
 // ── Org queries ──
 
 export async function findOrg(identifier: string): Promise<Organization | null> {
+  assertCleanIdentifier(identifier, "org");
   return apiFetch<Organization | null>(`/v1/orgs/${encodeURIComponent(identifier)}`);
 }
 

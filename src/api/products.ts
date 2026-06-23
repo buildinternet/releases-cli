@@ -1,6 +1,7 @@
 import type { Product } from "@buildinternet/releases-core/schema";
 import type { Kind } from "@buildinternet/releases-core/kinds";
 import { apiFetch } from "./core.js";
+import { assertCleanIdentifier } from "../lib/validate-input.js";
 import { computePagination, type ListResponse } from "@buildinternet/releases-core/cli-contracts";
 
 // ── Product queries ──
@@ -28,6 +29,7 @@ export async function createProduct(
 async function resolveProductTarget(
   identifier: string,
 ): Promise<{ pathSegment: string; productId: string } | null> {
+  assertCleanIdentifier(identifier, "product");
   if (identifier.startsWith("prod_")) {
     return {
       pathSegment: `/v1/products/${encodeURIComponent(identifier)}`,

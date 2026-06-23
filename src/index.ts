@@ -8,6 +8,16 @@ import { checkForSkillsUpdate } from "./lib/skills-update-check.js";
 import { maybeShowCompletionHint } from "./cli/completion/hint.js";
 import { AmbiguousSourceError } from "./api/sources.js";
 import { formatAmbiguousSourceError } from "./cli/suggest.js";
+import { ApiError, InvalidInputError, toErrorPayload } from "./lib/errors.js";
+import { writeJson } from "./lib/output.js";
+
+/** Whether the invocation requested machine-readable output. `--json` is a
+ * boolean flag across every command, so a presence check on argv is reliable
+ * and lets the top-level handler emit a structured error without threading the
+ * parsed option down through every command. */
+function wantsJson(args: string[]): boolean {
+  return args.includes("--json");
+}
 
 const LEGACY_COMMAND_ALIASES: Record<string, string[]> = {
   add: ["admin", "source", "add"],
@@ -121,6 +131,20 @@ try {
   // slug gets the guard, not just fetch/fetch-log/update.
   if (err instanceof AmbiguousSourceError) {
     process.stderr.write(formatAmbiguousSourceError(err) + "\n");
+    process.exit(1);
+  }
+  // When the caller asked for JSON, a thrown error should still be a parseable
+  // payload on stdout — not an unstructured stderr dump that forces the agent
+  // to string-match. Exit non-zero so the failure is still detectable by code.
+  if (wantsJson(argv)) {
+    await writeJson(toErrorPayload(err));
+    process.exit(1);
+  }
+  // Known, expected error types get a clean one-line stderr message (no stack
+  // trace) for humans too. Unexpected errors still re-throw so genuine internal
+  // bugs surface their stack.
+  if (err instanceof ApiError || err instanceof InvalidInputError) {
+    logger.error(err.message);
     process.exit(1);
   }
   throw err;

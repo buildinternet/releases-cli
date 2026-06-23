@@ -25,6 +25,7 @@ import type {
   OverviewManifestResponse,
 } from "@buildinternet/releases-api-types";
 import { apiFetch, SCOPE_RESOURCE } from "./core.js";
+import { assertCleanIdentifier } from "../lib/validate-input.js";
 import { type ListResponse } from "@buildinternet/releases-core/cli-contracts";
 import { findBlockedUrl, findIgnoredUrl } from "./orgs.js";
 import type { Organization } from "@buildinternet/releases-core/schema";
@@ -96,6 +97,7 @@ export async function listSourcesBySlug(slug: string): Promise<SourceWithOrg[]> 
 async function resolveSourceTarget(
   identifier: string,
 ): Promise<{ pathSegment: string; sourceId: string } | null> {
+  assertCleanIdentifier(identifier, "source");
   if (identifier.startsWith("src_")) {
     return { pathSegment: `/v1/sources/${encodeURIComponent(identifier)}`, sourceId: identifier };
   }
