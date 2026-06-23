@@ -7,7 +7,8 @@ import { toSlug } from "@buildinternet/releases-core/slug";
 import { SOURCE_TYPES, type SourceType } from "@buildinternet/releases-core/source-enums";
 import { logger } from "@releases/lib/logger";
 import { writeJson } from "../../lib/output.js";
-import { readContentArg } from "../../lib/input.js";
+import { readContentArg, readJsonInputArg } from "../../lib/input.js";
+import { CliError } from "../../lib/errors.js";
 import { parseMetadataSetFlag, parseTagList } from "../../lib/flags.js";
 import { isAppStoreUrl, isAppStoreCoordinate } from "./create-appstore.js";
 import { isVideoUrl } from "./create-video.js";
@@ -345,16 +346,100 @@ export type CreateSourceOpts = {
   metadataSet?: string[];
   primary?: boolean;
   batch?: string;
+  /** Raw single-source JSON body (literal, `@file`, or `-` for stdin) → CreateSourceInput. */
+  input?: string;
   json?: boolean;
   strict?: boolean;
   dryRun?: boolean;
 };
+
+/**
+ * Render the outcome of a single `createSingleSource` call. Shared by the
+ * flag-driven path and the `--input` raw-payload path so both emit the same
+ * structured `--json` / human output. Exits non-zero on `status: "error"`.
+ */
+async function renderSingleCreateResult(
+  result: CreateSourceResult,
+  opts: Pick<CreateSourceOpts, "json">,
+  typeWasExplicit: boolean,
+): Promise<void> {
+  if (result.status === "error") {
+    if (opts.json) await writeJson(result);
+    else logger.error(chalk.red(result.error!));
+    process.exit(1);
+  }
+
+  if (result.status === "ignored") {
+    if (opts.json) await writeJson(result);
+    return;
+  }
+
+  if (opts.json) {
+    await writeJson(result);
+    return;
+  }
+
+  const orgLabel = result.org ? ` [org: ${result.org}]` : "";
+  const typeLabel = typeWasExplicit ? "" : ` (auto-detected: ${result.type})`;
+  if (result.status === "would-add") {
+    logger.info(
+      chalk.yellow(
+        `[dry-run] Would create source: ${result.name} (${result.slug})${typeLabel}${orgLabel}`,
+      ),
+    );
+  } else if (result.existed) {
+    logger.info(
+      chalk.yellow(
+        `Source already exists: ${result.name} (${result.slug})${typeLabel}${orgLabel} — returning existing`,
+      ),
+    );
+  } else {
+    logger.info(
+      chalk.green(`Source created: ${result.name} (${result.slug})${typeLabel}${orgLabel}`),
+    );
+  }
+}
 
 /** Shared action for both the canonical `create` command and the deprecated `add` alias. */
 export async function createSourceAction(
   name: string | undefined,
   opts: CreateSourceOpts,
 ): Promise<void> {
+  if (opts.batch && opts.input !== undefined) {
+    throw new CliError(
+      "--batch and --input are mutually exclusive (--input takes a single source).",
+    );
+  }
+
+  if (opts.input !== undefined) {
+    const body = await readJsonInputArg(opts.input);
+    if (Array.isArray(body)) {
+      throw new CliError(
+        "--input takes a single source object; use --batch for an array of sources.",
+      );
+    }
+    if (body === null || typeof body !== "object") {
+      throw new CliError(
+        "--input must be a JSON object describing one source (at least name and url).",
+      );
+    }
+    const entry = body as Partial<CreateSourceInput>;
+    if (!entry.name || !entry.url) {
+      throw new CliError('--input is missing the required "name" or "url" field.');
+    }
+    // Body provides the content; --strict/--dry-run stay execution modifiers
+    // from the CLI flags (override anything the body tried to set).
+    const result = await createSingleSource({
+      ...entry,
+      name: entry.name,
+      url: entry.url,
+      strict: opts.strict,
+      dryRun: opts.dryRun,
+    });
+    await renderSingleCreateResult(result, opts, entry.type !== undefined);
+    return;
+  }
+
   if (opts.batch) {
     const raw = await readContentArg(opts.batch);
 
@@ -459,40 +544,7 @@ export async function createSourceAction(
     dryRun: opts.dryRun,
   });
 
-  if (result.status === "error") {
-    if (opts.json) await writeJson(result);
-    else logger.error(chalk.red(result.error!));
-    process.exit(1);
-  }
-
-  if (result.status === "ignored") {
-    if (opts.json) await writeJson(result);
-    return;
-  }
-
-  if (opts.json) {
-    await writeJson(result);
-  } else {
-    const orgLabel = result.org ? ` [org: ${result.org}]` : "";
-    const typeLabel = !opts.type ? ` (auto-detected: ${result.type})` : "";
-    if (result.status === "would-add") {
-      logger.info(
-        chalk.yellow(
-          `[dry-run] Would create source: ${result.name} (${result.slug})${typeLabel}${orgLabel}`,
-        ),
-      );
-    } else if (result.existed) {
-      logger.info(
-        chalk.yellow(
-          `Source already exists: ${result.name} (${result.slug})${typeLabel}${orgLabel} — returning existing`,
-        ),
-      );
-    } else {
-      logger.info(
-        chalk.green(`Source created: ${result.name} (${result.slug})${typeLabel}${orgLabel}`),
-      );
-    }
-  }
+  await renderSingleCreateResult(result, opts, opts.type !== undefined);
 }
 
 function attachCreateOptions(cmd: Command): Command {
@@ -530,6 +582,13 @@ function attachCreateOptions(cmd: Command): Command {
       "Mark as the org's primary changelog source (sets isPrimary on create — no follow-up `source update --primary` needed)",
     )
     .option("--batch <file>", "JSON file with sources to add (use - for stdin)")
+    .option(
+      "--input <json>",
+      "Raw JSON body for ONE source (mirrors the --batch element shape: name, url, " +
+        "type, slug, org, product, feedUrl, keywordAllow, metadataSet, primary). Pass a literal " +
+        "JSON string, @<path> for a file, or - for stdin. Lets an agent send the payload directly " +
+        "instead of reverse-mapping it onto flags. Mutually exclusive with --batch; --strict/--dry-run still apply.",
+    )
     .option("--json", "Output as JSON")
     .option("--strict", "Exit 1 if the source URL already exists (default: return existing)")
     .option("--dry-run", "Show what would be created without writing");
@@ -551,7 +610,10 @@ Examples:
     --feed-url https://discord.com/blog/rss.xml --keyword-allow changelog,patch-notes
   releases admin source create "Acme" --url https://acme.dev/changelog \\
     --metadata-set marketingFilter=true --metadata-set feedContentDepth=summary-only
-  releases admin source create --batch sources.json`,
+  releases admin source create --batch sources.json
+  releases admin source create --input '{"name":"Astro","url":"https://astro.build/blog","type":"scrape"}'
+  releases admin source create --input @source.json
+  echo '{"name":"Astro","url":"https://astro.build/blog"}' | releases admin source create --input -`,
       ),
   ).action(createSourceAction);
 }
