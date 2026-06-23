@@ -424,8 +424,17 @@ export async function createSourceAction(
       );
     }
     const entry = body as Partial<CreateSourceInput>;
-    if (!entry.name || !entry.url) {
-      throw new CliError('--input is missing the required "name" or "url" field.');
+    // Validate the type, not just truthiness: the field is *typed* string, but a
+    // JSON body can carry anything (`{"name": 123}` is valid JSON), and a
+    // non-string would otherwise reach createSingleSource and misbehave in
+    // toSlug()/downstream string ops instead of failing with a clean message.
+    if (
+      typeof entry.name !== "string" ||
+      entry.name.length === 0 ||
+      typeof entry.url !== "string" ||
+      entry.url.length === 0
+    ) {
+      throw new CliError('--input requires non-empty string "name" and "url" fields.');
     }
     // Body provides the content; --strict/--dry-run stay execution modifiers
     // from the CLI flags (override anything the body tried to set).

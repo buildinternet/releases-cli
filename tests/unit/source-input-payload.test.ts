@@ -103,6 +103,18 @@ describe("source create --input", () => {
     expect((err as CliError).message).toMatch(/name.*url|url.*name|required/);
   });
 
+  // JSON is permissive — `{"name": 123}` is valid JSON — so the field type is
+  // validated, not just truthiness; a non-string would otherwise reach
+  // createSingleSource and misbehave instead of failing cleanly.
+  it("rejects a non-string name/url with a CliError (no POST)", async () => {
+    const err = await createSourceAction(undefined, {
+      input: '{"name":123,"url":"https://a.dev"}',
+    }).catch((e) => e);
+    expect(err).toBeInstanceOf(CliError);
+    expect((err as CliError).message).toMatch(/string/);
+    expect(postBody).toBeNull();
+  });
+
   it("rejects --batch + --input together with a CliError", async () => {
     const err = await createSourceAction(undefined, {
       input: '{"name":"Astro","url":"https://astro.build/blog"}',

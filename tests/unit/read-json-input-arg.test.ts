@@ -32,6 +32,20 @@ describe("readJsonInputArg", () => {
     });
   });
 
+  it("reads and parses the body from stdin when value is '-'", async () => {
+    const originalStdinText = Bun.stdin.text;
+    (Bun.stdin as { text: () => Promise<string> }).text = async () =>
+      '{"name":"FromStdin","url":"https://example.com/changelog"}';
+    try {
+      expect(await readJsonInputArg("-")).toEqual({
+        name: "FromStdin",
+        url: "https://example.com/changelog",
+      });
+    } finally {
+      (Bun.stdin as { text: () => Promise<string> }).text = originalStdinText;
+    }
+  });
+
   // A literal JSON value never begins with `@`, so the file sigil is unambiguous.
   it("does not treat a leading-brace literal as a path", async () => {
     expect(await readJsonInputArg('{"@weird":"ok"}')).toEqual({ "@weird": "ok" });
