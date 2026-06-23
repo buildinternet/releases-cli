@@ -66,6 +66,16 @@ Mark the org's primary changelog in one step with `--primary` (sets `isPrimary` 
 releases admin source create "Vitest" --url https://github.com/vitest-dev/vitest --org vitest --primary
 ```
 
+#### Raw JSON payload (`--input`)
+
+Instead of reverse-mapping a payload onto individual flags, send one source as a JSON body with `--input`. The body mirrors the `--batch` element shape (`name`, `url`, `type`, `slug`, `org`, `product`, `feedUrl`, `keywordAllow`, `metadataSet`, `primary`) and runs the same dedup / metadata-packing / validation as the flag path — it is **not** forwarded raw to the API. Pass a literal JSON string, `@<path>` for a file, or `-` for stdin; `--strict`/`--dry-run`/`--json` still apply. Mutually exclusive with `--batch` (use `--batch` for an array).
+
+```bash
+releases admin source create --input '{"name":"Astro","url":"https://astro.build/blog","type":"scrape"}'
+releases admin source create --input @source.json
+echo '{"name":"Astro","url":"https://astro.build/blog"}' | releases admin source create --input -
+```
+
 Evaluate without adding:
 
 ```bash
@@ -124,6 +134,13 @@ releases admin source update my-blog --slug new-slug --confirm-slug-change
 ```
 
 Slug renames require `--confirm-slug-change` because they break existing web links.
+
+Send a batch of field updates as one JSON body with `--input` instead of stacking flags. Keys mirror the flags (`name`, `url`, `type`, `org`, `product`, `kind`, `priority`, `discovery`, `primary`, …); a nested `metadata` object sets source-metadata keys directly (a `null` value deletes a key — the ergonomic equivalent of repeated `--metadata-set`/`--metadata-unset`). Accepts a literal JSON string, `@<path>`, or `-` for stdin. The body wins over any flags; `--json`/`--dry-run` still apply.
+
+```bash
+releases admin source update src_abc123 --input '{"kind":"sdk","priority":"low","metadata":{"crawlEnabled":true}}'
+releases admin source update src_abc123 --input @patch.json
+```
 
 `--kind` sets the source's taxonomy. In **release feeds** and **search release hits**, a source with no kind of its own inherits its parent product's kind — so filtering by `kind=sdk` returns content from any source that's either marked SDK or sits under an SDK product. In **catalog listings** and **source lists** (`releases list`, `admin product list`, `search` catalog hits), the filter matches the row's *own* kind field directly with no inheritance — so the same `kind=sdk` filter only returns rows explicitly classified as SDK.
 
