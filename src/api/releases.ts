@@ -10,11 +10,15 @@ import { apiFetch, toLatestRelease } from "./core.js";
 import type { LatestReleaseWire } from "./core.js";
 import { logger } from "@releases/lib/logger";
 import { findProduct } from "./products.js";
+import { assertCleanIdentifier } from "../lib/validate-input.js";
 
 // ── Release CRUD ──
 
 export async function getRelease(id: string): Promise<ReleaseWithSource | null> {
-  return apiFetch<ReleaseWithSource | null>(`/v1/releases/${id}`);
+  // `id` is interpolated unencoded below, so harden it: a hallucinated
+  // `../../…` would otherwise traverse the API path.
+  assertCleanIdentifier(id, "release id");
+  return apiFetch<ReleaseWithSource | null>(`/v1/releases/${encodeURIComponent(id)}`);
 }
 
 export async function deleteRelease(id: string): Promise<boolean> {

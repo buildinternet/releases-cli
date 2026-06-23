@@ -46,6 +46,7 @@ Two commands built for agents specifically:
 - **`--json` everywhere** for stable output. Release readers (`get`, `search`, `tail`) return a **slim** shape by default (core fields + markdown-stripped `excerpt` + `contentTokens` hint, plus `media[]` with R2 `r2Url` when present and a `contentTruncated` flag) to save tokens; pass `--full` for the complete payload. (`list` is the inverse: verbose by default — and carries a per-source `Releases` count column — `--compact` for less.)
 - **`tail`/`latest` row cap:** `--count` (alias `--limit`, clamped `1–100`) sets how many releases to return. Only the `--product` feed is cursor-paginated (`--cursor <token>`); the org-wide/global feeds are count-capped, so `--cursor` without `--product` errors.
 - **Piped output is bare TSV** (no headers/color/truncation), so `releases list | cut -f2` works without parsing ANSI — but note release rows repeat the title across several columns, so check the layout or just use `--json` before slicing by column number. `COLUMNS=<n>` overrides detected width.
+- **Errors are structured under `--json`.** When a command run with `--json` fails, it prints a parseable `{ "error": { "kind", "message", "status?", "method?", "path?", "field?" } }` to stdout (not a stderr text dump) and exits non-zero — so you can branch on `kind` (`"api"` / `"invalid_input"` / `"error"`) instead of string-matching. Identifiers are also validated before any request: control characters, `..` traversal, `%`/`?`/`#`, and whitespace are rejected with an `invalid_input` error.
 
 ### Reading a tracked changelog
 
