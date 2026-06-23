@@ -1,5 +1,5 @@
 ---
-"@buildinternet/releases": minor
+"@buildinternet/releases": patch
 ---
 
 Agent-DX hardening: structured `--json` errors and input validation.

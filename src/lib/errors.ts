@@ -28,6 +28,16 @@ export class ApiError extends Error {
   }
 }
 
+/** An expected, user-facing CLI failure (e.g. an unreadable file). Printed as a
+ * clean one-line message in human mode and serialized as `kind: "error"` under
+ * `--json` — distinct from an unexpected internal error, which keeps its stack. */
+export class CliError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CliError";
+  }
+}
+
 /** A user-supplied identifier or path that failed input hardening (control
  * characters, traversal, embedded query/fragment, percent-encoding). Thrown
  * before any network or filesystem access. */

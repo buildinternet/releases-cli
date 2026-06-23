@@ -8,7 +8,7 @@ import { checkForSkillsUpdate } from "./lib/skills-update-check.js";
 import { maybeShowCompletionHint } from "./cli/completion/hint.js";
 import { AmbiguousSourceError } from "./api/sources.js";
 import { formatAmbiguousSourceError } from "./cli/suggest.js";
-import { ApiError, InvalidInputError, toErrorPayload } from "./lib/errors.js";
+import { ApiError, InvalidInputError, CliError, toErrorPayload } from "./lib/errors.js";
 import { writeJson } from "./lib/output.js";
 
 /** Whether the invocation requested machine-readable output. `--json` is a
@@ -143,7 +143,7 @@ try {
   // Known, expected error types get a clean one-line stderr message (no stack
   // trace) for humans too. Unexpected errors still re-throw so genuine internal
   // bugs surface their stack.
-  if (err instanceof ApiError || err instanceof InvalidInputError) {
+  if (err instanceof ApiError || err instanceof InvalidInputError || err instanceof CliError) {
     logger.error(err.message);
     process.exit(1);
   }
