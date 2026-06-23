@@ -168,6 +168,22 @@ describe("gap commands gain --dry-run (no mutating request fires)", () => {
     expect(mutatingMethods).toHaveLength(0);
   });
 
+  it("follow --dry-run (no --json) keeps stdout empty — status goes to stderr", async () => {
+    const out = await captureStdout(() =>
+      run(registerFollowsCommands, ["follow", "acme", "--dry-run"]),
+    );
+    expect(out).toBe("");
+    expect(mutatingMethods).toHaveLength(0);
+  });
+
+  it("keys create --dry-run (no --json) keeps stdout empty — status goes to stderr", async () => {
+    const out = await captureStdout(() =>
+      run(registerKeysCommand, ["keys", "create", "--name", "ci", "--dry-run"]),
+    );
+    expect(out).toBe("");
+    expect(mutatingMethods).toHaveLength(0);
+  });
+
   it("admin webhook add --dry-run --json previews without POSTing", async () => {
     const out = await captureStdout(() =>
       run(registerWebhookAdminCommand, [

@@ -9,6 +9,7 @@ import { getApiUrl } from "../../lib/mode.js";
 import { getSessionToken, clearSessionToken } from "../../lib/session.js";
 import { writeJson } from "../../lib/output.js";
 import { markDryRun } from "../../lib/dry-run.js";
+import { logger } from "@releases/lib/logger";
 import { renderTable } from "../render/table.js";
 import { promptConfirm, defaultPromptReader } from "../../lib/confirm.js";
 
@@ -108,9 +109,7 @@ export function registerKeysCommand(program: Command): void {
           }
           const expiresHint =
             opts.expiresInDays !== undefined ? ` (expires in ${opts.expiresInDays}d)` : "";
-          console.log(
-            chalk.yellow(`[dry-run] Would create read-only API key "${opts.name}"${expiresHint}.`),
-          );
+          logger.warn(`[dry-run] Would create read-only API key "${opts.name}"${expiresHint}.`);
           return;
         }
         const res = await keysRequest(
@@ -193,7 +192,7 @@ export function registerKeysCommand(program: Command): void {
     .option("--dry-run", "Show what would be revoked without deleting")
     .action(async (id: string, opts: { yes?: boolean; dryRun?: boolean }) => {
       if (opts.dryRun) {
-        console.log(chalk.yellow(`[dry-run] Would revoke API key ${id}.`));
+        logger.warn(`[dry-run] Would revoke API key ${id}.`);
         return;
       }
       if (!opts.yes) {

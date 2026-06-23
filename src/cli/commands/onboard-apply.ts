@@ -40,8 +40,20 @@ interface PlanResult {
 
 /**
  * Pure preview of what `applySource` would do for one discovered source — no DB
- * writes. Mirrors `applySource`'s approval branching so `--dry-run` reports the
- * same outcomes the real run would take.
+ * writes and no network probes. Mirrors every branch of `applySource` that is
+ * knowable up front: approval state + whether an owning org resolved.
+ *
+ *   approved === false  → would-ignore (org present) / would-skip (no org)
+ *   approved !== true    → would-skip (no approval)
+ *   approved === true    → would-add
+ *
+ * It deliberately does NOT predict `applySource`'s runtime-only outcomes — a
+ * create that hits a UNIQUE/409 conflict (→ `skipped`) or any write that throws
+ * (→ `error`). Those depend on live backend state and failures a dry-run can't
+ * observe without performing the very writes it's meant to avoid; a client-side
+ * existence probe would only approximate the backend's org-scoped uniqueness and
+ * could mislead. So the preview reports intent; real conflicts and failures
+ * surface on the actual run.
  */
 function planSource(source: AgentDiscoveredSource, orgId?: string): PlanResult {
   const { url, slug } = source;

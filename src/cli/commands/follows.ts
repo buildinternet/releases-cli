@@ -11,6 +11,7 @@ import {
 } from "../../api/follows.js";
 import { writeJson } from "../../lib/output.js";
 import { markDryRun } from "../../lib/dry-run.js";
+import { logger } from "@releases/lib/logger";
 import { renderTable } from "../render/table.js";
 import { renderReleaseRows } from "../render/releases-table.js";
 
@@ -68,10 +69,7 @@ export function registerFollowsCommands(program: Command): void {
       if (!target) targetNotFound(entity);
       if (opts.dryRun) {
         if (opts.json) await writeJson(markDryRun({ wouldFollow: target }));
-        else
-          console.log(
-            chalk.yellow(`[dry-run] Would follow ${target.label} (${target.targetType}).`),
-          );
+        else logger.warn(`[dry-run] Would follow ${target.label} (${target.targetType}).`);
         return;
       }
       const res = await addFollow(target.targetType, target.targetId);
@@ -93,10 +91,7 @@ export function registerFollowsCommands(program: Command): void {
       if (!target) targetNotFound(entity);
       if (opts.dryRun) {
         if (opts.json) await writeJson(markDryRun({ wouldUnfollow: target }));
-        else
-          console.log(
-            chalk.yellow(`[dry-run] Would unfollow ${target.label} (${target.targetType}).`),
-          );
+        else logger.warn(`[dry-run] Would unfollow ${target.label} (${target.targetType}).`);
         return;
       }
       const res = await removeFollow(target.targetType, target.targetId);
