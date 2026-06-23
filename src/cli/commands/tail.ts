@@ -15,6 +15,7 @@ import { renderReleaseRows } from "../render/releases-table.js";
 import { slimLatest } from "../render/release-json.js";
 import { logger } from "@releases/lib/logger";
 import { writeJson, writeJsonLine } from "../../lib/output.js";
+import { applyFieldMask, parseFieldsFlag, projectFields } from "../../lib/fields.js";
 import { parseTimeWindowFlag } from "../../lib/flags.js";
 
 function renderStreamLine(row: LatestRelease): string {
@@ -76,6 +77,11 @@ export function registerTailCommand(program: Command) {
     .option("--interval <seconds>", "Poll interval in seconds when following (min 5)", "60")
     .option("--json", "Output as JSON")
     .option("--full", "With --json, return the complete unprojected payload")
+    .option(
+      "--fields <list>",
+      "With --json, project each row to a comma-separated field mask " +
+        "(dot-notation for nested keys, e.g. id,version,source.slug). Composes with --full.",
+    )
     .addHelpText(
       "after",
       `
@@ -107,6 +113,7 @@ Examples:
           interval: string;
           json?: boolean;
           full?: boolean;
+          fields?: string;
         },
       ) => {
         // `--limit` is an alias for `--count` (#304 — `--limit` is the form
@@ -123,6 +130,8 @@ Examples:
         const count = Math.min(parsedCount, MAX_COUNT);
         const intervalSeconds = Math.max(5, parseInt(opts.interval, 10) || 60);
         if (opts.full && !opts.json) logger.warn("--full only affects --json output; ignoring.");
+        if (opts.fields && !opts.json)
+          logger.warn("--fields only affects --json output; ignoring.");
         // Validate locally; the API resolves relative shorthand server-side.
         const since = parseTimeWindowFlag("since", opts.since);
         const until = parseTimeWindowFlag("until", opts.until);
@@ -202,7 +211,12 @@ Examples:
         const rows = await fetchPage();
 
         if (opts.json) {
-          await writeJson(rows.map((row) => slimLatest(row, opts.full === true)));
+          await writeJson(
+            applyFieldMask(
+              rows.map((row) => slimLatest(row, opts.full === true)),
+              opts.fields,
+            ),
+          );
         } else if (rows.length === 0) {
           console.log(chalk.yellow("No releases found."));
         } else if (opts.follow) {
@@ -271,9 +285,14 @@ Examples:
           );
           const ordered = novel.toReversed();
           if (opts.json) {
-            // Preserve stream ordering; writes must land in order.
-            // eslint-disable-next-line no-await-in-loop
-            for (const row of ordered) await writeJsonLine(slimLatest(row, opts.full === true));
+            // Preserve stream ordering; writes must land in order. Project per
+            // row (no per-row warn — streaming) when a --fields mask is set.
+            const maskFields = opts.fields ? parseFieldsFlag(opts.fields) : null;
+            for (const row of ordered) {
+              const slim = slimLatest(row, opts.full === true);
+              // eslint-disable-next-line no-await-in-loop
+              await writeJsonLine(maskFields ? projectFields(slim, maskFields).projected : slim);
+            }
           } else {
             for (const row of ordered) console.log(renderStreamLine(row));
           }

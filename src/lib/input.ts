@@ -27,3 +27,38 @@ export async function readContentArg(pathOrDash: string): Promise<string> {
     );
   }
 }
+
+/**
+ * Read and parse a raw JSON body from a `--input` flag (the agent-ergonomic
+ * raw-payload path, #324 item 3). Lets an agent send the request shape directly
+ * instead of reverse-mapping it onto a dozen bespoke `--name/--url/--type/…`
+ * flags.
+ *
+ * Three forms, disambiguated without a mode flag:
+ *   - a literal JSON string (`--input '{"name":"…"}'`) — the common agent case;
+ *   - `@<path>` — read the body from a file (hardened against `..` traversal via
+ *     `readContentArg`);
+ *   - `-` — read the body from stdin.
+ *
+ * A literal JSON value never begins with `@`, so the `@`-prefix file sigil is
+ * unambiguous against an inline object/array/scalar. A parse failure throws a
+ * `CliError`, so it surfaces as the structured `{ error }` payload under
+ * `--json` rather than an unstructured crash.
+ */
+export async function readJsonInputArg(value: string): Promise<unknown> {
+  let raw: string;
+  if (value === "-") {
+    raw = await Bun.stdin.text();
+  } else if (value.startsWith("@")) {
+    raw = await readContentArg(value.slice(1));
+  } else {
+    raw = value;
+  }
+  try {
+    return JSON.parse(raw);
+  } catch (err) {
+    throw new CliError(
+      `--input is not valid JSON: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}

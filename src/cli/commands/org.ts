@@ -35,6 +35,7 @@ import { SOURCE_DISCOVERY } from "@buildinternet/releases-core/source-enums";
 import { timeAgo } from "@buildinternet/releases-core/dates";
 import { writeJson } from "../../lib/output.js";
 import { markDryRun } from "../../lib/dry-run.js";
+import { handlePageAll } from "../../lib/paginate.js";
 import {
   DEFAULT_PAGE_SIZE,
   computePagination,
@@ -534,6 +535,10 @@ export function registerOrgCommand(program: Command) {
     .option("--json", "Output as JSON")
     .option("--limit <n>", `Limit the number of results (default ${DEFAULT_PAGE_SIZE})`)
     .option("--page <n>", "Page number for paginated results")
+    .option(
+      "--page-all",
+      "Stream every page as newline-delimited JSON (one org per line, --json only)",
+    )
     .action(
       async (opts: {
         query?: string;
@@ -542,6 +547,7 @@ export function registerOrgCommand(program: Command) {
         json?: boolean;
         limit?: string;
         page?: string;
+        pageAll?: boolean;
       }) => {
         const parsedLimit = opts.limit === undefined ? undefined : Number(opts.limit);
         if (parsedLimit !== undefined && (!Number.isInteger(parsedLimit) || parsedLimit <= 0)) {
@@ -557,6 +563,22 @@ export function registerOrgCommand(program: Command) {
           process.exit(1);
         }
         const page = parsedPage;
+
+        // --page-all: stream every page as NDJSON (one org per line). Returns
+        // true only when it handled the request (--json); otherwise falls through.
+        if (
+          await handlePageAll(opts, async (p) => {
+            const { items, pagination } = await listOrgs({
+              query: opts.query,
+              platform: opts.platform,
+              includeEmpty: opts.includeEmpty,
+              limit: pageSize,
+              page: p,
+            });
+            return { items, hasMore: pagination.hasMore };
+          })
+        )
+          return;
 
         const { items: pageItems, pagination } = await listOrgs({
           query: opts.query,

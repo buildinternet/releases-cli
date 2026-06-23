@@ -75,9 +75,12 @@ releases list --kind sdk               # filter by taxonomy (platform|sdk|mobile
 releases list --json                   # machine-readable output
 releases list --json --compact         # lightweight JSON (id, slug, name, type, org, date)
 releases list --json --limit 20 --page 2  # pagination (server-side)
+releases list --json --page-all        # stream every page as NDJSON (one source per line)
 ```
 
 The text table carries a per-source **`Releases`** count column (a dim `—` when unknown), so you can answer "how many releases does this source have?" without a follow-up call; the `--json` rows expose the same value as `releaseCount`.
+
+`--page-all` walks every page for you and streams the result as newline-delimited JSON — one source per line — so you can grab the full list in one command instead of looping `--page`. It's `--json`-only (warns and falls through to the table otherwise) and can't be combined with `--page`; `--limit` still tunes the per-request page size. The same flag is on `releases org list` and `releases admin product list`. Pipe it straight to `jq -c` or any stream parser.
 
 Aliased as `releases admin source list` for discoverability within admin workflows.
 

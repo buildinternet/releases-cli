@@ -10,7 +10,8 @@ import { SOURCE_TYPES, SOURCE_DISCOVERY } from "@buildinternet/releases-core/sou
 import { logger } from "@releases/lib/logger";
 import { writeJson } from "../../lib/output.js";
 import { markDryRun } from "../../lib/dry-run.js";
-import { readContentArg } from "../../lib/input.js";
+import { readContentArg, readJsonInputArg } from "../../lib/input.js";
+import { CliError } from "../../lib/errors.js";
 import { parseMetadataSetFlag } from "../../lib/flags.js";
 import { buildNoticePatch } from "../../lib/notice.js";
 
@@ -52,6 +53,14 @@ export type UpdateSourceOpts = {
   dryRun?: boolean;
   metadataSet?: string[];
   metadataUnset?: string[];
+  /** Raw JSON body (literal, `@file`, or `-` for stdin) → these update fields. */
+  input?: string;
+  /**
+   * Convenience metadata patch from a `--input` body: each entry sets a source
+   * `metadata` key directly (a JSON `null` value deletes it). Distinct from the
+   * `metadataSet`/`metadataUnset` string-token flags, which it complements.
+   */
+  metadata?: Record<string, unknown>;
 };
 
 // Match the API worker cap (CHANGELOG_MAX_FILES) so we fail fast instead of
@@ -88,6 +97,27 @@ export async function updateSourceAction(
   identifier: string,
   opts: UpdateSourceOpts,
 ): Promise<void> {
+  // Raw-payload path (#324 item 3): a `--input` JSON body provides the field
+  // updates directly, so an agent doesn't have to reverse-map onto a dozen
+  // bespoke flags. The body merges over the CLI flags (body wins); `--json` and
+  // `--dry-run` stay execution modifiers from the CLI and are never read from
+  // the body. A nested `metadata` object is the ergonomic equivalent of repeated
+  // `--metadata-set`/`--metadata-unset` (a `null` value deletes the key).
+  if (opts.input !== undefined) {
+    const body = await readJsonInputArg(opts.input);
+    if (Array.isArray(body) || body === null || typeof body !== "object") {
+      throw new CliError("--input must be a JSON object mapping update fields.");
+    }
+    const { metadata, json: _json, dryRun: _dryRun, ...fields } = body as Record<string, unknown>;
+    opts = { ...opts, ...(fields as UpdateSourceOpts) };
+    if (metadata !== undefined) {
+      if (Array.isArray(metadata) || metadata === null || typeof metadata !== "object") {
+        throw new CliError('--input "metadata" must be a JSON object of key/value pairs.');
+      }
+      opts.metadata = metadata as Record<string, unknown>;
+    }
+  }
+
   // Validate enumerated options before any network call so errors surface fast.
   if (
     opts.discovery !== undefined &&
@@ -357,6 +387,31 @@ export async function updateSourceAction(
     }
   }
 
+  // `--input` metadata object: set each key directly (values keep their JSON
+  // type — no key=value coercion), with a `null` value deleting the key
+  // (`updateSourceMeta` treats `undefined` as delete). Runs after the token
+  // flags so an explicit object wins on a colliding key.
+  if (opts.metadata) {
+    for (const [key, value] of Object.entries(opts.metadata)) {
+      if (key.trim() === "" || key.includes(".") || key.includes("[")) {
+        logger.error(
+          `Invalid metadata key "${key}": keys must be non-empty and may not contain "." or "[".`,
+        );
+        process.exit(2);
+      }
+      if (value === null) {
+        metaUpdates[key] = undefined;
+        changes.push(`metadata.${key} removed`);
+      } else {
+        metaUpdates[key] = value;
+        const preview = JSON.stringify(value);
+        changes.push(
+          `metadata.${key} → ${preview.length > 60 ? preview.slice(0, 60) + "..." : preview}`,
+        );
+      }
+    }
+  }
+
   const noticePatch = buildNoticePatch(opts, logger);
   if (noticePatch !== null) {
     updates.notice = noticePatch.notice;
@@ -495,6 +550,13 @@ export function attachUpdateOptions(cmd: Command): Command {
       "Optional link label for the notice pointer (max 60 chars)",
     )
     .option("--clear-notice", "Remove the notice from this source")
+    .option(
+      "--input <json>",
+      "Raw JSON body of field updates (keys mirror the flags: name, url, type, org, " +
+        'product, kind, priority, discovery, primary, …). A nested "metadata" object sets ' +
+        "source metadata keys directly (a null value deletes a key). Pass a literal JSON string, " +
+        "@<path> for a file, or - for stdin. The body wins over flags; --json/--dry-run still apply.",
+    )
     .option("--json", "Output as JSON")
     .option("--dry-run", "Show what would change without writing");
 }
@@ -514,7 +576,9 @@ Examples:
     --metadata-set crawlIncludePathPrefix=/docs/latest/operate/rs/release-notes/
   releases admin source update docker-compose-release-notes \\
     --metadata-set githubUrl=https://github.com/docker/compose
-  releases admin source update some-source --metadata-unset legacyFlag`,
+  releases admin source update some-source --metadata-unset legacyFlag
+  releases admin source update src_abc123 --input '{"kind":"sdk","priority":"low","metadata":{"crawlEnabled":true}}'
+  releases admin source update src_abc123 --input @patch.json`,
     )
     .action(updateSourceAction);
 }
