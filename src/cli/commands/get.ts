@@ -93,6 +93,12 @@ async function notFound(identifier: string, kind: string, opts: GetEntityOpts): 
 export async function getEntityAction(identifier: string, opts: GetEntityOpts): Promise<void> {
   const type = getEntityType(identifier);
 
+  // --full/--fields only shape --json output. Warn once here, before routing,
+  // so the notice fires for every entity kind (release/source/org/product),
+  // not just whichever branch happened to carry the check.
+  if (opts.full && !opts.json) logger.warn("--full only affects --json output; ignoring.");
+  if (opts.fields && !opts.json) logger.warn("--fields only affects --json output; ignoring.");
+
   if (type === "release" || (type === "unknown" && isLikelyBareId(identifier))) {
     return getRelease_(normalizeReleaseId(identifier), opts);
   }
@@ -118,9 +124,6 @@ async function getRelease_(id: string, opts: GetEntityOpts) {
   const rel = result;
   const contentChars = rel.content?.length ?? 0;
   const contentTokens = rel.content ? countTokensSafe(rel.content) : 0;
-
-  if (opts.full && !opts.json) logger.warn("--full only affects --json output; ignoring.");
-  if (opts.fields && !opts.json) logger.warn("--fields only affects --json output; ignoring.");
 
   if (opts.json) {
     // Slim by default (drops storage/pipeline internals + redundant title

@@ -1,10 +1,11 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "bun:test";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, spyOn } from "bun:test";
 import {
   parseFieldsFlag,
   projectFields,
   unmatchedFields,
   applyFieldMask,
 } from "../../src/lib/fields.js";
+import { logger } from "@releases/lib/logger";
 
 describe("parseFieldsFlag", () => {
   it("splits, trims, and dedupes", () => {
@@ -137,5 +138,26 @@ describe("get --fields integration", () => {
       version: "2.0.0",
       source: { slug: "acme-changelog" },
     });
+  });
+
+  // The `--fields`-without-`--json` warning lives in getEntityAction, before
+  // routing, so it fires for every entity kind — not just the release branch.
+  it("warns about --fields without --json on a non-release path", async () => {
+    const warnSpy = spyOn(logger, "warn").mockImplementation(() => {});
+    const exitSpy = spyOn(process, "exit").mockImplementation(((code?: number) => {
+      throw new Error(`process.exit(${code ?? 0})`);
+    }) as never);
+    try {
+      const { getEntityAction } = await import("../../src/cli/commands/get.js");
+      // "vercel" routes through the org/product/source resolvers (all 404 here)
+      // → notFound → process.exit; the warning must already have fired upstream.
+      await expect(getEntityAction("vercel", { fields: "id" })).rejects.toThrow(/process\.exit/);
+      expect(warnSpy.mock.calls.some((c) => String(c[0]).includes("--fields only affects"))).toBe(
+        true,
+      );
+    } finally {
+      warnSpy.mockRestore();
+      exitSpy.mockRestore();
+    }
   });
 });
