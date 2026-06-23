@@ -25,6 +25,7 @@ import { isValidCategory, CATEGORIES } from "@buildinternet/releases-core/catego
 import { isValidKind, KIND_VALUES, type Kind } from "@buildinternet/releases-core/kinds";
 import { logger } from "@releases/lib/logger";
 import { writeJson } from "../../lib/output.js";
+import { handlePageAll } from "../../lib/paginate.js";
 import {
   computePagination,
   DEFAULT_PAGE_SIZE,
@@ -279,18 +280,23 @@ export function registerProductCommand(program: Command) {
     )
     .option("--limit <n>", `Limit the number of results (default ${DEFAULT_PAGE_SIZE})`)
     .option("--page <n>", "Page number for paginated results")
+    .option(
+      "--page-all",
+      "Stream every page as newline-delimited JSON (one product per line, --json only)",
+    )
     .addHelpText(
       "after",
       `
 Examples:
   releases admin product list vercel          Products under one org
   releases admin product list --kind sdk      Every SDK product across all orgs
-  releases admin product list --json          All products as JSON (for audits)`,
+  releases admin product list --json          All products as JSON (for audits)
+  releases admin product list --json --page-all   Stream every product as NDJSON`,
     )
     .action(
       async (
         orgIdentifier: string | undefined,
-        opts: { json?: boolean; kind?: string; limit?: string; page?: string },
+        opts: { json?: boolean; kind?: string; limit?: string; page?: string; pageAll?: boolean },
       ) => {
         if (opts.kind !== undefined && !isValidKind(opts.kind)) {
           logger.error(`Invalid kind "${opts.kind}". Must be one of: ${KIND_VALUES.join(", ")}`);
@@ -322,6 +328,21 @@ Examples:
             process.exit(1);
           }
         }
+
+        // --page-all: stream every page as NDJSON (one product per line). Returns
+        // true only when it handled the request (--json); otherwise falls through.
+        if (
+          await handlePageAll(opts, async (p) => {
+            const { items, pagination } = await listProducts({
+              orgId: org?.id,
+              kind,
+              limit: pageSize,
+              page: p,
+            });
+            return { items, hasMore: pagination.hasMore };
+          })
+        )
+          return;
 
         const { items: productList, pagination } = await listProducts({
           orgId: org?.id,

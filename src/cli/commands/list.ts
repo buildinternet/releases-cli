@@ -2,9 +2,11 @@ import { Command } from "commander";
 import chalk from "chalk";
 import { renderTable } from "../render/table.js";
 import { listSourcesWithOrg, findSource } from "../../api/sources.js";
+import type { SourceWithOrg } from "../../api/types.js";
 import { sourceNotFound } from "../suggest.js";
 import { stripAnsi } from "../../lib/sanitize.js";
 import { writeJson } from "../../lib/output.js";
+import { handlePageAll } from "../../lib/paginate.js";
 import { logger } from "@releases/lib/logger";
 import {
   DEFAULT_PAGE_SIZE,
@@ -41,6 +43,10 @@ export function registerListCommand(program: Command, registerOpts?: { alias?: s
     .option("--limit <n>", `Limit the number of results (default ${DEFAULT_PAGE_SIZE})`)
     .option("--page <n>", "Page number for paginated results")
     .option("--flat", "Legacy: return a bare array instead of the paginated envelope (--json only)")
+    .option(
+      "--page-all",
+      "Stream every page as newline-delimited JSON (one source per line, --json only)",
+    )
     .addHelpText(
       "after",
       `
@@ -66,6 +72,7 @@ Examples:
           limit?: string;
           page?: string;
           flat?: boolean;
+          pageAll?: boolean;
         },
       ) => {
         if (opts.kind !== undefined && !isValidKind(opts.kind)) {
@@ -121,7 +128,7 @@ Examples:
           return;
         }
 
-        const { items: pageItems, pagination: apiPagination } = await listSourcesWithOrg({
+        const filters = {
           orgSlug: opts.org,
           productSlug: opts.product,
           category: opts.category,
@@ -129,6 +136,51 @@ Examples:
           hasFeed: opts.hasFeed,
           query: opts.query,
           includeHidden: opts.includeDisabled,
+        };
+
+        // Shared row → JSON mapper for both the single-page envelope and the
+        // --page-all NDJSON stream, so they project an identical shape.
+        const toJson = (row: SourceWithOrg): Record<string, unknown> => {
+          const parsedMeta = parseMetadataObject(row.metadata);
+          const method = getFetchMethod(row.type, parsedMeta);
+          if (opts.compact) {
+            return {
+              id: row.id,
+              slug: row.slug,
+              name: row.name,
+              type: row.type,
+              method,
+              orgName: row.orgName ?? null,
+              productName: row.productName ?? null,
+              releaseCount: row.releaseCount,
+              latestDate: row.latestDate ?? null,
+              lastFetchedAt: row.lastFetchedAt ?? null,
+            };
+          }
+          return { ...row, method, metadata: parsedMeta ?? row.metadata };
+        };
+
+        // --page-all: stream every page as NDJSON (one source per line). Returns
+        // true only when it handled the request (--json); otherwise falls through.
+        if (
+          await handlePageAll(
+            opts,
+            async (p) => {
+              const { items, pagination } = await listSourcesWithOrg({
+                ...filters,
+                limit: pageSize,
+                page: p,
+                envelope: true,
+              });
+              return { items, hasMore: pagination.hasMore };
+            },
+            toJson,
+          )
+        )
+          return;
+
+        const { items: pageItems, pagination: apiPagination } = await listSourcesWithOrg({
+          ...filters,
           limit: pageSize,
           page,
           envelope: true,
@@ -140,29 +192,7 @@ Examples:
         }
 
         if (opts.json) {
-          const items: Record<string, unknown>[] = pageItems.map((row) => {
-            const parsedMeta = parseMetadataObject(row.metadata);
-            const method = getFetchMethod(row.type, parsedMeta);
-            if (opts.compact) {
-              return {
-                id: row.id,
-                slug: row.slug,
-                name: row.name,
-                type: row.type,
-                method,
-                orgName: row.orgName ?? null,
-                productName: row.productName ?? null,
-                releaseCount: row.releaseCount,
-                latestDate: row.latestDate ?? null,
-                lastFetchedAt: row.lastFetchedAt ?? null,
-              };
-            }
-            return {
-              ...row,
-              method,
-              metadata: parsedMeta ?? row.metadata,
-            };
-          });
+          const items: Record<string, unknown>[] = pageItems.map(toJson);
 
           const warnTruncated = !explicitLimit && apiPagination.hasMore;
 
