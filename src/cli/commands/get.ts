@@ -15,6 +15,7 @@ import { humanDate } from "../../lib/release-display.js";
 import { getEntityType, normalizeReleaseId, isLikelyBareId } from "@buildinternet/releases-core/id";
 import { countTokensSafe } from "@buildinternet/releases-core/tokens";
 import { writeJson } from "../../lib/output.js";
+import { applyFieldMask } from "../../lib/fields.js";
 import { formatNotice, type EntityWithNotice } from "../../lib/notice.js";
 
 /** Format a payload-size annotation like `3.2K chars (~800 tokens)` so agents
@@ -29,7 +30,7 @@ function formatSize(text: string): string {
   return `${charsFmt} chars (~${tokens.toLocaleString()} tokens)`;
 }
 
-export type GetEntityOpts = { json?: boolean; full?: boolean };
+export type GetEntityOpts = { json?: boolean; full?: boolean; fields?: string };
 
 /**
  * Default count for the "Latest releases" preview embedded in get responses.
@@ -119,14 +120,18 @@ async function getRelease_(id: string, opts: GetEntityOpts) {
   const contentTokens = rel.content ? countTokensSafe(rel.content) : 0;
 
   if (opts.full && !opts.json) logger.warn("--full only affects --json output; ignoring.");
+  if (opts.fields && !opts.json) logger.warn("--fields only affects --json output; ignoring.");
 
   if (opts.json) {
     // Slim by default (drops storage/pipeline internals + redundant title
     // variants); --full returns the complete unprojected payload. Computed
     // size annotations land on both shapes so agents can decide whether to
-    // pull the body. #215.
+    // pull the body. #215. `--fields` then post-filters the chosen shape.
     await writeJson(
-      slimReleaseDetail(rel, { contentChars, contentTokens, full: opts.full === true }),
+      applyFieldMask(
+        slimReleaseDetail(rel, { contentChars, contentTokens, full: opts.full === true }),
+        opts.fields,
+      ),
     );
     return;
   }
@@ -234,13 +239,18 @@ async function renderSource(rawSource: unknown, opts: GetEntityOpts) {
       : "active";
 
   if (opts.json) {
-    await writeJson({
-      ...source,
-      status,
-      org: org ? { id: org.id, slug: org.slug, name: org.name } : null,
-      product: product ? { id: product.id, slug: product.slug, name: product.name } : null,
-      latestReleases: latest,
-    });
+    await writeJson(
+      applyFieldMask(
+        {
+          ...source,
+          status,
+          org: org ? { id: org.id, slug: org.slug, name: org.name } : null,
+          product: product ? { id: product.id, slug: product.slug, name: product.name } : null,
+          latestReleases: latest,
+        },
+        opts.fields,
+      ),
+    );
     return;
   }
 
@@ -315,7 +325,9 @@ async function renderOrg(
   ]);
 
   if (opts.json) {
-    await writeJson({ ...org, releases, collections, sources, products, tags });
+    await writeJson(
+      applyFieldMask({ ...org, releases, collections, sources, products, tags }, opts.fields),
+    );
     return;
   }
 
@@ -421,14 +433,19 @@ async function renderProduct(
   const sourceCount = sourceCountRow?.sourceCount ?? productSources.length;
 
   if (opts.json) {
-    await writeJson({
-      ...product,
-      orgSlug: org?.slug ?? null,
-      sources: productSources,
-      sourceCount,
-      tags,
-      releases,
-    });
+    await writeJson(
+      applyFieldMask(
+        {
+          ...product,
+          orgSlug: org?.slug ?? null,
+          sources: productSources,
+          sourceCount,
+          tags,
+          releases,
+        },
+        opts.fields,
+      ),
+    );
     return;
   }
 
@@ -487,5 +504,10 @@ export function registerGetCommand(program: Command) {
     .argument("<identifier>", "ID (rel_/src_/org_/prod_) or slug")
     .option("--json", "Output as JSON")
     .option("--full", "With --json on a release, return the complete unprojected payload")
+    .option(
+      "--fields <list>",
+      "With --json, project the output down to a comma-separated field mask " +
+        "(dot-notation for nested keys, e.g. id,version,source.slug). Composes with --full.",
+    )
     .action(getEntityAction);
 }

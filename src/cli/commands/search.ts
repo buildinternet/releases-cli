@@ -6,6 +6,7 @@ import { logger } from "@releases/lib/logger";
 import { isValidKind, KIND_VALUES, type Kind } from "@buildinternet/releases-core/kinds";
 import type { LookupResultPayload, UnifiedSearchResponse } from "../../api/types.js";
 import { writeJson } from "../../lib/output.js";
+import { parseFieldsFlag, projectFields, unmatchedFields } from "../../lib/fields.js";
 import { parseTimeWindowFlag } from "../../lib/flags.js";
 import { renderReleaseRows } from "../render/releases-table.js";
 import { slimSearchHit } from "../render/release-json.js";
@@ -139,6 +140,11 @@ export function registerSearchCommand(program: Command) {
     )
     .option("--json", "Output as JSON")
     .option("--full", "With --json, return complete unprojected release hits")
+    .option(
+      "--fields <list>",
+      "With --json, project each hit (releases/catalog/collections) to a comma-separated " +
+        "field mask (dot-notation for nested keys, e.g. id,source.slug). Composes with --full.",
+    )
     .addHelpText(
       "after",
       `
@@ -164,10 +170,13 @@ Examples:
           until?: string;
           json?: boolean;
           full?: boolean;
+          fields?: string;
         },
       ) => {
         const limit = parseInt(opts.limit, 10);
         if (opts.full && !opts.json) logger.warn("--full only affects --json output; ignoring.");
+        if (opts.fields && !opts.json)
+          logger.warn("--fields only affects --json output; ignoring.");
 
         let mode: SearchMode | undefined;
         try {
@@ -290,6 +299,27 @@ Examples:
           if (productEcho.productStatus !== undefined)
             filtered.productStatus = productEcho.productStatus;
           if (response.lookup != null) filtered.lookup = response.lookup;
+          if (opts.fields !== undefined) {
+            // Project the entity hit arrays (releases/catalog/collections) by the
+            // mask; the wrapper metadata (query/mode/degraded/…) is preserved. A
+            // field that resolves in none of the arrays gets one stderr warning.
+            const maskFields = parseFieldsFlag(opts.fields);
+            if (maskFields.length > 0) {
+              const matched = new Set<string>();
+              for (const key of ["releases", "catalog", "collections"] as const) {
+                if (Array.isArray(filtered[key])) {
+                  const res = projectFields(filtered[key], maskFields);
+                  filtered[key] = res.projected;
+                  res.matched.forEach((m) => matched.add(m));
+                }
+              }
+              const missing = unmatchedFields(maskFields, matched);
+              if (missing.length > 0)
+                logger.warn(
+                  `--fields: ignored unknown field${missing.length > 1 ? "s" : ""}: ${missing.join(", ")}`,
+                );
+            }
+          }
           await writeJson(filtered);
           return;
         }
