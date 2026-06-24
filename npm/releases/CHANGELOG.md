@@ -1,5 +1,47 @@
 # @buildinternet/releases
 
+## 0.65.0
+
+### Minor Changes
+
+- 5d70021: Agent-DX: uniform `dryRun: true` marker on every dry-run output, and `--dry-run` for the mutations that lacked it.
+  - Every `--json` dry-run payload now carries a uniform `dryRun: true` marker (via the new `markDryRun` helper in `src/lib/dry-run.ts`), additively — each command keeps its existing preview fields (`status: "would-add"`, `wouldUpdate`, `wouldRemove`, `wouldPost`, …). An agent can now detect "this was a preview, not a write" without per-command knowledge.
+  - Added `--dry-run` to the mutations that previously had none: `follow`/`unfollow`, `keys create`/`keys revoke`, `admin webhook add`/`edit`/`remove`/`test`/`rotate-secret`, and `admin onboard apply` (per-source would-action preview, no writes).
+  - `admin release delete --source` and `import` gained a `--json` dry-run body where they previously printed only text.
+
+- e806807: Agent-DX: `--fields` projection mask on the reader commands.
+
+  `--fields id,version,source.slug` post-filters `--json` output down to a comma-separated mask (dot-notation for nested keys), so an agent can pull exactly the leaves it needs and spend fewer tokens.
+  - Available on `get` (release/source/org/product), `search`, and `tail`/`latest`.
+  - It's a post-projection over whatever shape the reader produced, so it **composes with `--full`** (mask the full payload) and reuses the slim vocabulary by default — no new field names to learn.
+  - Dot-notation walks plain objects only (request an array-valued field like `media` whole). A field that resolves nowhere is dropped with one stderr warning; `--fields` without `--json` warns and is ignored, matching `--full`.
+  - Generic backend in `src/lib/fields.ts` (`projectFields`/`applyFieldMask`), reusable for future readers.
+
+- 292b1c8: Agent-DX: `--page-all` streams every page of a list reader as NDJSON.
+
+  `releases list --json --page-all` (and `org list` / `admin product list`) walks every page itself and emits one source/org/product per line as newline-delimited JSON, instead of returning a single `{ items, pagination }` page the caller has to paginate by hand.
+  - One agent command consumes a whole result set — no `--page`/`--limit` bookkeeping, no truncation warning to react to.
+  - NDJSON keeps memory flat and lets a consumer (`jq -c`, a stream parser) process rows as they arrive rather than buffering one giant array.
+  - `--json`-only, like `--full`/`--fields`: without `--json` it warns and falls through to the normal table. `--page-all` together with `--page` is rejected (they contradict). `--limit` still sets the per-request page size as a round-trip tuning knob.
+  - Shared backend in `src/lib/paginate.ts` (`streamAllPages`), reusable for future page-based readers.
+
+- 403738a: Agent-DX: raw JSON payloads for source mutations via `--input`.
+
+  `releases admin source create` and `releases admin source update` now accept a `--input <json>` body, so an agent can send the request shape directly instead of reverse-mapping it onto a dozen bespoke flags. Pass a literal JSON string, `@<path>` for a file, or `-` for stdin.
+  - The body maps to the **CLI input shape**, not the raw API — dedup, org-resolution, metadata-packing, and validation still run. `create --input` mirrors a `--batch` element (`name`/`url`/`type`/`org`/`metadataSet`/…); `update --input` maps to the update fields plus a convenience `metadata` object (each key set directly, a JSON `null` value deletes it).
+  - `--strict`/`--dry-run`/`--json` remain execution modifiers from the flags (the body never sets them). On `create`, `--input` is mutually exclusive with `--batch`.
+  - Invalid JSON and shape errors throw `CliError`, so they serialize to the structured `{ error }` payload under `--json`.
+
+### Patch Changes
+
+- 624370c: Agent-DX hardening: structured `--json` errors and input validation.
+  - When `--json` is set, thrown errors now emit a parseable `{ error: { kind, message, status?, method?, path?, field? } }` payload on stdout (with a non-zero exit) instead of an unstructured stderr dump. Without `--json`, known error types (API + invalid-input) print a clean one-line message rather than a stack trace.
+  - User-supplied identifiers are validated before any network call — control characters, `..` traversal, `%` percent-encoding, embedded `?`/`#`, whitespace, and backslashes are rejected at the entity resolvers (`findOrg`/`findProduct`/`findSource`/`getRelease`). `apiFetch` gains a control-character backstop, and file-reading flags reject `..` traversal.
+
+- c0c91f1: Fix: streaming output (`--page-all`, `tail -f --json`) now exits cleanly when a reader closes the pipe early (`… | head`).
+
+  Piping NDJSON streaming output into a consumer that closes stdout before EOF — e.g. `releases list --json --page-all | head` or `… | jq | head` — caused the CLI to hang indefinitely. On the early close the next stdout write raises EPIPE, which Bun surfaces as an `'error'` event (rather than crashing); with no handler, the writer was left awaiting a `'drain'` that can never fire. A startup `process.stdout.on("error", …)` handler now treats a broken pipe as a clean `exit(0)`, so `| head` terminates immediately. Full consumption (to EOF, to a file, `| wc -l`) is unaffected.
+
 ## 0.64.0
 
 ### Minor Changes
