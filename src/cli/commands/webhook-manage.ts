@@ -83,6 +83,7 @@ function printSubscription(sub: UserWebhookSubscription | UserWebhookListItem): 
     logger.info(`  source:  ${source}`);
   }
   if (sub.releaseType) logger.info(`  type:    ${sub.releaseType}`);
+  if (sub.format === "slack") logger.info(`  format:  slack (Slack Block Kit, unsigned)`);
   if (sub.description) logger.info(`  desc:    ${sub.description}`);
   logger.info(`  secret:  v${sub.secretVersion}${chalk.dim(`  · created ${sub.createdAt}`)}`);
   logger.info(`  health:  ${sub.deliveryHealthSummary}`);

@@ -37,6 +37,7 @@ export interface UserWebhookSubscription {
   failureStreakStartedAt: string | null;
   deliveryHealth: WebhookDeliveryHealth;
   deliveryHealthSummary: string;
+  format?: "json" | "slack";
 }
 
 export interface UserWebhookListItem extends Omit<UserWebhookSubscription, "userId"> {
