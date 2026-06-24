@@ -1,5 +1,7 @@
 # @buildinternet/releases-linux-x64
 
+## 0.66.0
+
 ## 0.65.0
 
 ## 0.64.0
