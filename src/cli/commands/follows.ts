@@ -10,6 +10,8 @@ import {
   getMyFeed,
 } from "../../api/follows.js";
 import { writeJson } from "../../lib/output.js";
+import { markDryRun } from "../../lib/dry-run.js";
+import { logger } from "@releases/lib/logger";
 import { renderTable } from "../render/table.js";
 import { renderReleaseRows } from "../render/releases-table.js";
 
@@ -60,10 +62,16 @@ export function registerFollowsCommands(program: Command): void {
     .command("follow <entity>")
     .description("Follow an organization or product (shows up in `releases feed`)")
     .option("--json", "Output as JSON")
-    .action(async (entity: string, opts: { json?: boolean }) => {
+    .option("--dry-run", "Resolve the target and show what would be followed, without writing")
+    .action(async (entity: string, opts: { json?: boolean; dryRun?: boolean }) => {
       requireAuth();
       const target = await resolveFollowTarget(entity);
       if (!target) targetNotFound(entity);
+      if (opts.dryRun) {
+        if (opts.json) await writeJson(markDryRun({ wouldFollow: target }));
+        else logger.warn(`[dry-run] Would follow ${target.label} (${target.targetType}).`);
+        return;
+      }
       const res = await addFollow(target.targetType, target.targetId);
       if (opts.json) {
         await writeJson({ ...res, target });
@@ -76,10 +84,16 @@ export function registerFollowsCommands(program: Command): void {
     .command("unfollow <entity>")
     .description("Stop following an organization or product")
     .option("--json", "Output as JSON")
-    .action(async (entity: string, opts: { json?: boolean }) => {
+    .option("--dry-run", "Resolve the target and show what would be unfollowed, without writing")
+    .action(async (entity: string, opts: { json?: boolean; dryRun?: boolean }) => {
       requireAuth();
       const target = await resolveFollowTarget(entity);
       if (!target) targetNotFound(entity);
+      if (opts.dryRun) {
+        if (opts.json) await writeJson(markDryRun({ wouldUnfollow: target }));
+        else logger.warn(`[dry-run] Would unfollow ${target.label} (${target.targetType}).`);
+        return;
+      }
       const res = await removeFollow(target.targetType, target.targetId);
       if (opts.json) {
         await writeJson({ ...res, target });

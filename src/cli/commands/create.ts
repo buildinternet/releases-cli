@@ -7,6 +7,7 @@ import { toSlug } from "@buildinternet/releases-core/slug";
 import { SOURCE_TYPES, type SourceType } from "@buildinternet/releases-core/source-enums";
 import { logger } from "@releases/lib/logger";
 import { writeJson } from "../../lib/output.js";
+import { markDryRun } from "../../lib/dry-run.js";
 import { readContentArg, readJsonInputArg } from "../../lib/input.js";
 import { CliError } from "../../lib/errors.js";
 import { parseMetadataSetFlag, parseTagList } from "../../lib/flags.js";
@@ -360,7 +361,7 @@ export type CreateSourceOpts = {
  */
 async function renderSingleCreateResult(
   result: CreateSourceResult,
-  opts: Pick<CreateSourceOpts, "json">,
+  opts: Pick<CreateSourceOpts, "json" | "dryRun">,
   typeWasExplicit: boolean,
 ): Promise<void> {
   if (result.status === "error") {
@@ -375,7 +376,7 @@ async function renderSingleCreateResult(
   }
 
   if (opts.json) {
-    await writeJson(result);
+    await writeJson(opts.dryRun ? markDryRun(result) : result);
     return;
   }
 
@@ -521,7 +522,7 @@ export async function createSourceAction(
       }
     }
 
-    if (opts.json) await writeJson(results);
+    if (opts.json) await writeJson(opts.dryRun ? results.map(markDryRun) : results);
     if (hasError) process.exit(1);
     return;
   }

@@ -5,6 +5,7 @@ import { logger } from "@releases/lib/logger";
 import { isGitHubUrl } from "./add.js";
 import { isValidCategory } from "@buildinternet/releases-core/categories";
 import { writeJson } from "../../lib/output.js";
+import { markDryRun } from "../../lib/dry-run.js";
 import { readContentArg } from "../../lib/input.js";
 import {
   findOrg,
@@ -581,7 +582,7 @@ Examples:
         }
 
         if (opts.json) {
-          await writeJson(report);
+          await writeJson(opts.dryRun ? markDryRun(report) : report);
         } else {
           console.log("");
           const prefix = opts.dryRun ? "[dry-run] " : "";

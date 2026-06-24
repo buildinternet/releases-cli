@@ -18,6 +18,7 @@ import { normalizeReleaseId } from "@buildinternet/releases-core/id";
 import { readContentArg } from "../../lib/input.js";
 import { writeJson, writeJsonLine } from "../../lib/output.js";
 import { warnDeprecatedAlias } from "../../lib/deprecated-alias.js";
+import { markDryRun } from "../../lib/dry-run.js";
 import { logger } from "@releases/lib/logger";
 
 async function collectReleaseIds(positional: string[], file?: string): Promise<string[]> {
@@ -171,7 +172,7 @@ async function releaseUpdateAction(rawId: string, opts: ReleaseUpdateOpts): Prom
   }
 
   if (opts.dryRun) {
-    if (opts.json) await writeJson({ wouldUpdate: id, updates, changes });
+    if (opts.json) await writeJson(markDryRun({ wouldUpdate: id, updates, changes }));
     else {
       console.log(chalk.yellow(`[dry-run] Would update release ${id}:`));
       for (const change of changes) console.log(`  ${change}`);
@@ -253,7 +254,8 @@ export function registerReleaseCommand(program: Command) {
           const ids = await collectReleaseIds(rawIds, opts.file);
 
           if (opts.dryRun) {
-            if (opts.json) await writeJson({ wouldDelete: ids.length, releaseIds: ids });
+            if (opts.json)
+              await writeJson(markDryRun({ wouldDelete: ids.length, releaseIds: ids }));
             else {
               console.log(chalk.yellow(`[dry-run] Would delete ${ids.length} release(s)`));
               for (const id of ids) console.log(`  ${id}`);
@@ -286,11 +288,19 @@ export function registerReleaseCommand(program: Command) {
 
         if (resolvedSource) {
           if (opts.dryRun) {
-            console.log(
-              chalk.yellow(
-                `[dry-run] Would ${opts.hard ? "hard-delete" : "suppress"} all releases for source: ${resolvedSource.slug}`,
-              ),
-            );
+            if (opts.json)
+              await writeJson(
+                markDryRun({
+                  wouldDelete: resolvedSource.slug,
+                  hard: opts.hard ?? false,
+                }),
+              );
+            else
+              console.log(
+                chalk.yellow(
+                  `[dry-run] Would ${opts.hard ? "hard-delete" : "suppress"} all releases for source: ${resolvedSource.slug}`,
+                ),
+              );
             return;
           }
           let result: Awaited<ReturnType<typeof deleteReleasesForSource>>;

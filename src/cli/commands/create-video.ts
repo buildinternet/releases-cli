@@ -4,6 +4,7 @@ import { findProduct } from "../../api/products.js";
 import { createVideoSource } from "../../api/sources.js";
 import { logger } from "@releases/lib/logger";
 import { writeJson } from "../../lib/output.js";
+import { markDryRun } from "../../lib/dry-run.js";
 
 /**
  * True when `value` points at a supported video host. YouTube only today
@@ -87,7 +88,7 @@ export async function createVideoAction(url: string, opts: CreateVideoOpts): Pro
     if (orgSlug) preview.orgSlug = orgSlug;
     if (opts.product) preview.product = opts.product;
     if (opts.json) {
-      await writeJson({ wouldPost: "/v1/sources/video", body: preview });
+      await writeJson(markDryRun({ wouldPost: "/v1/sources/video", body: preview }));
     } else {
       logger.info(chalk.yellow("[dry-run] Would POST /v1/sources/video"));
       for (const [k, v] of Object.entries(preview)) logger.info(`  ${k}: ${v}`);

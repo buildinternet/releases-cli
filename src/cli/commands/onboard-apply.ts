@@ -5,6 +5,7 @@ import { addIgnoredUrl, findOrg } from "../../api/orgs.js";
 import { findProduct, createProduct } from "../../api/products.js";
 import { createSource } from "../../api/sources.js";
 import { writeJson } from "../../lib/output.js";
+import { markDryRun } from "../../lib/dry-run.js";
 import type { Product } from "@buildinternet/releases-core/schema";
 
 interface AgentDiscoveredSource {
@@ -29,6 +30,38 @@ interface ApplyResult {
   url: string;
   action: "added" | "ignored" | "skipped" | "error";
   error?: string;
+}
+
+interface PlanResult {
+  slug: string;
+  url: string;
+  action: "would-add" | "would-ignore" | "would-skip";
+}
+
+/**
+ * Pure preview of what `applySource` would do for one discovered source — no DB
+ * writes and no network probes. Mirrors every branch of `applySource` that is
+ * knowable up front: approval state + whether an owning org resolved.
+ *
+ *   approved === false  → would-ignore (org present) / would-skip (no org)
+ *   approved !== true    → would-skip (no approval)
+ *   approved === true    → would-add
+ *
+ * It deliberately does NOT predict `applySource`'s runtime-only outcomes — a
+ * create that hits a UNIQUE/409 conflict (→ `skipped`) or any write that throws
+ * (→ `error`). Those depend on live backend state and failures a dry-run can't
+ * observe without performing the very writes it's meant to avoid; a client-side
+ * existence probe would only approximate the backend's org-scoped uniqueness and
+ * could mislead. So the preview reports intent; real conflicts and failures
+ * surface on the actual run.
+ */
+function planSource(source: AgentDiscoveredSource, orgId?: string): PlanResult {
+  const { url, slug } = source;
+  if (source.approved === false) {
+    return { slug, url, action: orgId ? "would-ignore" : "would-skip" };
+  }
+  if (source.approved !== true) return { slug, url, action: "would-skip" };
+  return { slug, url, action: "would-add" };
 }
 
 async function applySource(
@@ -105,7 +138,8 @@ export function registerOnboardApplyCommand(onboardCmd: Command) {
     .description("Apply discovery results from a state file to the database")
     .argument("<state-file>", "Path to a DiscoveryState JSON file (or - for stdin)")
     .option("--json", "Output results as JSON")
-    .action(async (stateFile: string, opts: { json?: boolean }) => {
+    .option("--dry-run", "Preview the apply (per-source would-actions) without writing")
+    .action(async (stateFile: string, opts: { json?: boolean; dryRun?: boolean }) => {
       const raw = stateFile === "-" ? await Bun.stdin.text() : await Bun.file(stateFile).text();
 
       let state: DiscoveryState;
@@ -124,6 +158,32 @@ export function registerOnboardApplyCommand(onboardCmd: Command) {
       const org = await findOrg(state.product);
       const orgId = org?.id;
       const orgSlug = org?.slug;
+
+      // Dry-run: preview every source's would-action with no writes — branch
+      // BEFORE the productIdMap build below, which calls createProduct().
+      if (opts.dryRun) {
+        const plans = state.sources.map((s) => planSource(s, orgId));
+        if (opts.json) {
+          await writeJson(plans.map(markDryRun));
+        } else {
+          for (const p of plans) {
+            const color =
+              p.action === "would-add"
+                ? chalk.green
+                : p.action === "would-ignore"
+                  ? chalk.yellow
+                  : chalk.gray;
+            logger.info(color(`[dry-run] ${p.action}: ${p.slug} (${p.url})`));
+          }
+          const add = plans.filter((p) => p.action === "would-add").length;
+          const ignore = plans.filter((p) => p.action === "would-ignore").length;
+          const skip = plans.filter((p) => p.action === "would-skip").length;
+          logger.info(
+            chalk.bold(`\n[dry-run] Would apply: ${add} added, ${ignore} ignored, ${skip} skipped`),
+          );
+        }
+        return;
+      }
 
       // Build a productSlug → productId map by looking up or creating each
       // distinct product tagged across the discovered sources. Sequential to

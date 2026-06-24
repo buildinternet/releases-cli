@@ -76,13 +76,19 @@ describe("source create --input", () => {
     expect(meta.marketingFilter).toBe(true); // coerced like the flag path
   });
 
-  it("does not POST on --dry-run (execution modifier wins over the body)", async () => {
+  it("does not POST on --dry-run and stamps dryRun: true on the --json preview", async () => {
+    let out = "";
+    process.stdout.write = ((chunk: unknown) => {
+      out += String(chunk);
+      return true;
+    }) as typeof process.stdout.write;
     await createSourceAction(undefined, {
       input: '{"name":"Astro","url":"https://astro.build/blog","type":"scrape"}',
       dryRun: true,
       json: true,
     });
     expect(postBody).toBeNull();
+    expect(JSON.parse(out).dryRun).toBe(true);
   });
 
   // Validation errors THROW CliError (rather than process.exit) so they reach
