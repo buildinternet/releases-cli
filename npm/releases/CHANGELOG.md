@@ -1,5 +1,11 @@
 # @buildinternet/releases
 
+## 0.66.0
+
+### Minor Changes
+
+- 26e14ad: Add `--format slack` to `releases webhook add`/`edit` to deliver releases as formatted Slack messages via a Slack incoming webhook URL.
+
 ## 0.65.0
 
 ### Minor Changes
