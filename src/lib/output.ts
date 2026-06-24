@@ -25,3 +25,17 @@ export async function writeJsonLine(value: unknown): Promise<void> {
     await new Promise<void>((resolve) => process.stdout.once("drain", resolve));
   }
 }
+
+/**
+ * Process-level handler for a broken stdout pipe. When a downstream reader
+ * closes the pipe early — `… | head`, `… | jq | head` — the next stdout write
+ * raises EPIPE. Bun surfaces it as an `'error'` event rather than crashing, so
+ * without a handler the streaming writers above (`--page-all`, `tail -f --json`)
+ * hang forever on a `'drain'` that can never fire. Treat a broken pipe as a
+ * clean exit (the consumer read all it wanted); rethrow anything else. Wire up
+ * once at startup, before any output: `process.stdout.on("error", handleStdoutPipeError)`.
+ */
+export function handleStdoutPipeError(err: NodeJS.ErrnoException): void {
+  if (err.code === "EPIPE") process.exit(0);
+  throw err;
+}

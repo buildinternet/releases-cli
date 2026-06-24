@@ -9,7 +9,11 @@ import { maybeShowCompletionHint } from "./cli/completion/hint.js";
 import { AmbiguousSourceError } from "./api/sources.js";
 import { formatAmbiguousSourceError } from "./cli/suggest.js";
 import { ApiError, InvalidInputError, CliError, toErrorPayload } from "./lib/errors.js";
-import { writeJson } from "./lib/output.js";
+import { writeJson, handleStdoutPipeError } from "./lib/output.js";
+
+// Exit cleanly when a downstream reader closes the pipe early (`… | head`),
+// rather than hanging in a streaming writer. Registered before any output.
+process.stdout.on("error", handleStdoutPipeError);
 
 /** Whether the invocation requested machine-readable output. `--json` is a
  * boolean flag across every command, so a presence check on argv is reliable
