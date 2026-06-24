@@ -37,6 +37,7 @@ export interface UserWebhookSubscription {
   failureStreakStartedAt: string | null;
   deliveryHealth: WebhookDeliveryHealth;
   deliveryHealthSummary: string;
+  format?: "json" | "slack";
 }
 
 export interface UserWebhookListItem extends Omit<UserWebhookSubscription, "userId"> {
@@ -49,7 +50,8 @@ export interface UserWebhookListItem extends Omit<UserWebhookSubscription, "user
 }
 
 export interface CreateUserWebhookResponse extends UserWebhookListItem {
-  signingKey: string;
+  /** Present for json-format webhooks; absent for slack-format (the URL is the secret). */
+  signingKey?: string;
 }
 
 export interface CreateUserWebhookInput {
@@ -63,6 +65,7 @@ export interface CreateUserWebhookInput {
   productId?: string;
   releaseType?: UserWebhookReleaseTypeFilter;
   description?: string | null;
+  format?: "json" | "slack";
 }
 
 /** List the signed-in user's webhook subscriptions. */
@@ -100,6 +103,7 @@ export type UpdateMyWebhookInput = {
   productSlug?: string;
   productId?: string | null;
   releaseType?: UserWebhookReleaseTypeFilter | null;
+  format?: "json" | "slack";
 };
 
 export async function updateMyWebhook(

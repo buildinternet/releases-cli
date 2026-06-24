@@ -57,6 +57,13 @@ function parseReleaseTypeOpt(value: string | undefined): "feature" | "rollup" | 
   process.exit(1);
 }
 
+function parseFormatOpt(format: string | undefined): "json" | "slack" {
+  if (!format || format === "json") return "json";
+  if (format === "slack") return "slack";
+  logger.error("--format must be 'json' or 'slack'.");
+  process.exit(1);
+}
+
 function parseLimit(value: string): number {
   const n = parseInt(value, 10);
   if (Number.isNaN(n) || n === 0) return 20;
@@ -83,6 +90,7 @@ function printSubscription(sub: UserWebhookSubscription | UserWebhookListItem): 
     logger.info(`  source:  ${source}`);
   }
   if (sub.releaseType) logger.info(`  type:    ${sub.releaseType}`);
+  if (sub.format === "slack") logger.info(`  format:  slack (Slack Block Kit, unsigned)`);
   if (sub.description) logger.info(`  desc:    ${sub.description}`);
   logger.info(`  secret:  v${sub.secretVersion}${chalk.dim(`  · created ${sub.createdAt}`)}`);
   logger.info(`  health:  ${sub.deliveryHealthSummary}`);
@@ -177,6 +185,7 @@ export function registerWebhookManageCommands(webhook: Command): void {
     .option("--product <slug>", "Limit to one product (org scope only)")
     .option("--type <kind>", "Limit to release type: feature or rollup")
     .option("--description <text>", "Human-readable label")
+    .option("--format <format>", "Delivery format: json (default) or slack")
     .option("--json", "Output JSON")
     .action(
       async (opts: {
@@ -187,9 +196,11 @@ export function registerWebhookManageCommands(webhook: Command): void {
         product?: string;
         type?: string;
         description?: string;
+        format?: string;
         json?: boolean;
       }) => {
         requireAuth();
+        const format = parseFormatOpt(opts.format);
         const scope = opts.scope === "follows" ? "follows" : "org";
         const releaseType = parseReleaseTypeOpt(opts.type);
         if (scope === "org" && !opts.org) {
@@ -203,6 +214,7 @@ export function registerWebhookManageCommands(webhook: Command): void {
         const result = await createMyWebhook({
           url: opts.url,
           scope,
+          format,
           ...(scope === "org"
             ? {
                 orgSlug: opts.org,
@@ -215,12 +227,17 @@ export function registerWebhookManageCommands(webhook: Command): void {
         });
         if (opts.json) return writeJson(result);
         printSubscription(result);
-        logger.info("");
-        logger.info(chalk.bold("Signing key (shown once — store it now):"));
-        logger.info(`  ${chalk.green(result.signingKey)}`);
-        logger.info(
-          chalk.dim("  Re-derive only via `webhook rotate-secret` (invalidates the old key)."),
-        );
+        if (result.signingKey) {
+          logger.info("");
+          logger.info(chalk.bold("Signing key (shown once — store it now):"));
+          logger.info(`  ${chalk.green(result.signingKey)}`);
+          logger.info(
+            chalk.dim("  Re-derive only via `webhook rotate-secret` (invalidates the old key)."),
+          );
+        } else {
+          logger.info("");
+          logger.info(chalk.dim("  Slack webhook — no signing key (the URL is the secret)."));
+        }
       },
     );
 
@@ -269,6 +286,7 @@ export function registerWebhookManageCommands(webhook: Command): void {
     .option("--clear-type", "Remove release-type filter")
     .option("--enable", "Enable the subscription (resets the failure counter)")
     .option("--disable", "Disable the subscription")
+    .option("--format <format>", "Change delivery format: json or slack")
     .option("--json", "Output JSON")
     .action(
       async (
@@ -284,6 +302,7 @@ export function registerWebhookManageCommands(webhook: Command): void {
           clearType?: boolean;
           enable?: boolean;
           disable?: boolean;
+          format?: string;
           json?: boolean;
         },
       ) => {
@@ -316,9 +335,10 @@ export function registerWebhookManageCommands(webhook: Command): void {
         if (opts.clearType) fields.releaseType = null;
         else if (opts.type !== undefined)
           fields.releaseType = parseReleaseTypeOpt(opts.type) ?? null;
+        if (opts.format) fields.format = parseFormatOpt(opts.format);
         if (Object.keys(fields).length === 0) {
           logger.error(
-            "Nothing to change. Pass --url, --description, filter flags, --enable, or --disable.",
+            "Nothing to change. Pass --url, --description, --format, filter flags, --enable, or --disable.",
           );
           process.exit(1);
         }
