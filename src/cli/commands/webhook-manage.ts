@@ -177,6 +177,7 @@ export function registerWebhookManageCommands(webhook: Command): void {
     .option("--product <slug>", "Limit to one product (org scope only)")
     .option("--type <kind>", "Limit to release type: feature or rollup")
     .option("--description <text>", "Human-readable label")
+    .option("--format <format>", "Delivery format: json (default) or slack")
     .option("--json", "Output JSON")
     .action(
       async (opts: {
@@ -187,9 +188,15 @@ export function registerWebhookManageCommands(webhook: Command): void {
         product?: string;
         type?: string;
         description?: string;
+        format?: string;
         json?: boolean;
       }) => {
         requireAuth();
+        if (opts.format && opts.format !== "json" && opts.format !== "slack") {
+          logger.error("--format must be 'json' or 'slack'.");
+          process.exit(1);
+        }
+        const format = opts.format === "slack" ? "slack" : "json";
         const scope = opts.scope === "follows" ? "follows" : "org";
         const releaseType = parseReleaseTypeOpt(opts.type);
         if (scope === "org" && !opts.org) {
@@ -203,6 +210,7 @@ export function registerWebhookManageCommands(webhook: Command): void {
         const result = await createMyWebhook({
           url: opts.url,
           scope,
+          format,
           ...(scope === "org"
             ? {
                 orgSlug: opts.org,
@@ -215,12 +223,17 @@ export function registerWebhookManageCommands(webhook: Command): void {
         });
         if (opts.json) return writeJson(result);
         printSubscription(result);
-        logger.info("");
-        logger.info(chalk.bold("Signing key (shown once — store it now):"));
-        logger.info(`  ${chalk.green(result.signingKey)}`);
-        logger.info(
-          chalk.dim("  Re-derive only via `webhook rotate-secret` (invalidates the old key)."),
-        );
+        if (result.signingKey) {
+          logger.info("");
+          logger.info(chalk.bold("Signing key (shown once — store it now):"));
+          logger.info(`  ${chalk.green(result.signingKey)}`);
+          logger.info(
+            chalk.dim("  Re-derive only via `webhook rotate-secret` (invalidates the old key)."),
+          );
+        } else {
+          logger.info("");
+          logger.info(chalk.dim("  Slack webhook — no signing key (the URL is the secret)."));
+        }
       },
     );
 
@@ -269,6 +282,7 @@ export function registerWebhookManageCommands(webhook: Command): void {
     .option("--clear-type", "Remove release-type filter")
     .option("--enable", "Enable the subscription (resets the failure counter)")
     .option("--disable", "Disable the subscription")
+    .option("--format <format>", "Change delivery format: json or slack")
     .option("--json", "Output JSON")
     .action(
       async (
@@ -284,6 +298,7 @@ export function registerWebhookManageCommands(webhook: Command): void {
           clearType?: boolean;
           enable?: boolean;
           disable?: boolean;
+          format?: string;
           json?: boolean;
         },
       ) => {
@@ -304,6 +319,10 @@ export function registerWebhookManageCommands(webhook: Command): void {
           logger.error("Pass at most one of --type / --clear-type.");
           process.exit(1);
         }
+        if (opts.format && opts.format !== "json" && opts.format !== "slack") {
+          logger.error("--format must be 'json' or 'slack'.");
+          process.exit(1);
+        }
         const fields: UpdateMyWebhookInput = {};
         if (opts.url !== undefined) fields.url = opts.url;
         if (opts.description !== undefined) fields.description = opts.description;
@@ -316,9 +335,10 @@ export function registerWebhookManageCommands(webhook: Command): void {
         if (opts.clearType) fields.releaseType = null;
         else if (opts.type !== undefined)
           fields.releaseType = parseReleaseTypeOpt(opts.type) ?? null;
+        if (opts.format) fields.format = opts.format as "json" | "slack";
         if (Object.keys(fields).length === 0) {
           logger.error(
-            "Nothing to change. Pass --url, --description, filter flags, --enable, or --disable.",
+            "Nothing to change. Pass --url, --description, --format, filter flags, --enable, or --disable.",
           );
           process.exit(1);
         }
