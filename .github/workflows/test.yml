@@ -48,7 +48,7 @@ jobs:
       - name: Oxlint
         run: bun run lint
 
-      - name: Prettier
+      - name: Oxfmt
         run: bun run format:check
 
   test:
