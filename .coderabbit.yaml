@@ -1,0 +1,14 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+knowledge_base:
+  linked_repositories:
+    - repository: buildinternet/releases
+      instructions: >-
+        The Releases backend monorepo and source of truth for this CLI: the
+        Cloudflare API worker + D1, the remote MCP server, the web frontend, and
+        the published packages this CLI depends on —
+        @buildinternet/releases-core (DB schema + shared helpers),
+        @buildinternet/releases-api-types (wire protocol), and
+        @buildinternet/releases-lib. The wire protocol, shared schema, and CLI
+        contracts are defined there and land before this CLI adopts them on a
+        version bump. Consider this repo when reviewing changes that depend on or
+        assume server/API/wire behavior.
