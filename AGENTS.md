@@ -15,8 +15,9 @@ This repo is the public, client-only CLI for the Releases registry. It talks to 
 ```bash
 bun src/index.ts <command>    # run from source
 bun run build                 # compile binary to dist/releases
-bun run typecheck             # tsc --noEmit
-bun test                      # bun test
+bun run check                 # oxlint (lint + type-check) + oxfmt check — CI gate
+bun run lint                  # oxlint only (`typecheck` is an alias)
+bun test                      # bun test (not part of check)
 ```
 
 ## Architecture
