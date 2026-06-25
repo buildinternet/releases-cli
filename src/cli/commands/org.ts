@@ -772,9 +772,7 @@ Examples:
     .action(async (identifier: string, opts: { from: string; json?: boolean }) => {
       const target = await findOrg(identifier);
       if (!target) {
-        orgNotFound(identifier);
-        process.exitCode = 1;
-        return;
+        return orgNotFound(identifier);
       }
 
       let sourceUrl: string;
