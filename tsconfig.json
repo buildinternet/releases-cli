@@ -10,7 +10,7 @@
     "noEmit": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "types": ["bun"],
+    "types": ["bun", "node"],
     "paths": {
       "@releases/lib/*": ["./packages/lib/src/*"]
     }
