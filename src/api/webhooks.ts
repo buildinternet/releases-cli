@@ -1,4 +1,7 @@
+import type { WebhookDeliveryRow } from "@buildinternet/releases-api-types";
 import { apiFetch } from "./core.js";
+
+export type { WebhookDeliveryRow };
 
 /**
  * A webhook subscription as returned by the read paths. Defined locally rather
@@ -32,18 +35,6 @@ export interface CreateWebhookSubscriptionInput {
   url: string;
   sourceId?: string | null;
   description?: string | null;
-}
-
-/** One Analytics Engine delivery-attempt row from `GET /v1/webhooks/:id/deliveries`. */
-export interface WebhookDeliveryRow {
-  timestamp?: string;
-  event_id?: string;
-  error_message?: string | null;
-  error_code?: string | null;
-  outcome?: string;
-  http_status?: number;
-  latency_ms?: number;
-  attempt?: number;
 }
 
 /** Register a webhook subscription. The `signingKey` is shown once and never again. */

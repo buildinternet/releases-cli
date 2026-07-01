@@ -82,6 +82,7 @@ function renderDeliveries(rows: WebhookDeliveryRow[]): string {
   return renderTable({
     head: [
       { label: "Time", noTruncate: true },
+      { label: "Format" },
       { label: "Outcome" },
       { label: "HTTP" },
       { label: "Latency" },
@@ -90,6 +91,7 @@ function renderDeliveries(rows: WebhookDeliveryRow[]): string {
     ],
     rows: rows.map((r) => [
       r.timestamp ?? chalk.dim("—"),
+      r.format?.trim() || chalk.dim("—"),
       r.outcome ?? chalk.dim("—"),
       r.http_status != null ? String(r.http_status) : chalk.dim("—"),
       r.latency_ms != null ? `${r.latency_ms}ms` : chalk.dim("—"),
