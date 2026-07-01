@@ -1,5 +1,5 @@
+import type { UserWebhookFormat, WebhookDeliveryRow } from "@buildinternet/releases-api-types";
 import { apiFetch } from "./core.js";
-import type { WebhookDeliveryRow } from "./webhooks.js";
 
 /**
  * Self-serve `/v1/me/webhooks` wire shapes. Defined locally until they ship in
@@ -37,7 +37,7 @@ export interface UserWebhookSubscription {
   failureStreakStartedAt: string | null;
   deliveryHealth: WebhookDeliveryHealth;
   deliveryHealthSummary: string;
-  format?: "json" | "slack";
+  format?: UserWebhookFormat;
 }
 
 export interface UserWebhookListItem extends Omit<UserWebhookSubscription, "userId"> {
@@ -65,7 +65,7 @@ export interface CreateUserWebhookInput {
   productId?: string;
   releaseType?: UserWebhookReleaseTypeFilter;
   description?: string | null;
-  format?: "json" | "slack";
+  format?: UserWebhookFormat;
 }
 
 /** List the signed-in user's webhook subscriptions. */
@@ -103,7 +103,7 @@ export type UpdateMyWebhookInput = {
   productSlug?: string;
   productId?: string | null;
   releaseType?: UserWebhookReleaseTypeFilter | null;
-  format?: "json" | "slack";
+  format?: UserWebhookFormat;
 };
 
 export async function updateMyWebhook(

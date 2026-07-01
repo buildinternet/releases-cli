@@ -8,6 +8,7 @@ import chalk from "chalk";
 import { logger } from "@releases/lib/logger";
 import { isAuthenticated } from "../../lib/mode.js";
 import { writeJson } from "../../lib/output.js";
+import type { UserWebhookFormat } from "@buildinternet/releases-api-types";
 import type { WebhookDeliveryRow } from "../../api/webhooks.js";
 import {
   createMyWebhook,
@@ -57,7 +58,7 @@ function parseReleaseTypeOpt(value: string | undefined): "feature" | "rollup" | 
   process.exit(1);
 }
 
-function parseFormatOpt(format: string | undefined): "json" | "slack" {
+function parseFormatOpt(format: string | undefined): UserWebhookFormat {
   if (!format || format === "json") return "json";
   if (format === "slack") return "slack";
   logger.error("--format must be 'json' or 'slack'.");
@@ -114,6 +115,7 @@ function renderDeliveries(rows: WebhookDeliveryRow[]): string {
   return renderTable({
     head: [
       { label: "Time", noTruncate: true },
+      { label: "Format" },
       { label: "Outcome" },
       { label: "HTTP" },
       { label: "Latency" },
@@ -122,6 +124,7 @@ function renderDeliveries(rows: WebhookDeliveryRow[]): string {
     ],
     rows: rows.map((r) => [
       r.timestamp ?? chalk.dim("—"),
+      r.format?.trim() || chalk.dim("—"),
       r.outcome ?? chalk.dim("—"),
       r.http_status != null ? String(r.http_status) : chalk.dim("—"),
       r.latency_ms != null ? `${r.latency_ms}ms` : chalk.dim("—"),
