@@ -626,7 +626,12 @@ async function overviewPlanAction(opts: OverviewPlanOpts): Promise<void> {
     if (r.action) acc[r.action] = (acc[r.action] ?? 0) + 1;
     return acc;
   }, {});
-  const parts = ["missing", "refresh", "skip"].map((a) => `${a}: ${byAction[a] ?? 0}`).join(" · ");
+  // `opted_out` = autoGenerateContent is off, so the batch skips the org
+  // regardless of staleness (buildinternet/releases#1795). Surfaced here so it
+  // isn't silently absent from the tally.
+  const parts = ["missing", "refresh", "skip", "opted_out"]
+    .map((a) => `${a}: ${byAction[a] ?? 0}`)
+    .join(" · ");
   console.log(chalk.dim(`\n${rows.length} org(s) — ${parts}`));
 }
 
@@ -795,9 +800,11 @@ Examples:
   releases admin overview plan --stale-days 14 --missing --has-activity --json
   releases admin overview plan --json
 
-Adds per-row \`action\` (missing | refresh | skip) and \`needsFetch\` (true when
-the org has active sources but the most recent release is more than 7 days
-old — orchestrator should poll-and-fetch first).`,
+Adds per-row \`action\` (missing | refresh | skip | opted_out) and \`needsFetch\`
+(true when the org has active sources but the most recent release is more than
+7 days old — orchestrator should poll-and-fetch first). \`opted_out\` means the
+org has auto-generate content off, so the batch skips it regardless of
+staleness — flip it on with \`releases admin org update <org> --auto-generate-content\`.`,
     )
     .action(overviewPlanAction);
 
