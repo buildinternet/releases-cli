@@ -215,6 +215,11 @@ async function orgGetAction(identifier: string, opts: OrgGetOpts): Promise<void>
   console.log(`  Created: ${found.createdAt}`);
   console.log(`  Updated: ${found.updatedAt}`);
   if (found.category) console.log(`  Category: ${found.category}`);
+  console.log(
+    `  AI content: ${
+      found.autoGenerateContent ? chalk.green("on (overviews + summaries)") : chalk.dim("off")
+    }`,
+  );
   if (orgTags.length > 0) console.log(`  Tags:    ${orgTags.join(", ")}`);
   if (found.notice) console.log(`  ${chalk.yellow(formatNotice(found.notice))}`);
 
@@ -282,6 +287,7 @@ type OrgUpdateOpts = {
   avatar?: string | boolean;
   paused?: boolean;
   featured?: boolean;
+  autoGenerateContent?: boolean;
   discovery?: string;
   notice?: string;
   noticeLink?: string;
@@ -330,6 +336,12 @@ async function orgUpdateAction(identifier: string, opts: OrgUpdateOpts): Promise
   // boolean (undefined when neither is passed).
   if (opts.featured !== undefined) updates.featured = opts.featured;
 
+  // The single backend gate for both org overviews and per-release summaries
+  // (buildinternet/releases#1794). Commander surfaces --auto-generate-content /
+  // --no-auto-generate-content as one boolean (undefined when neither passed).
+  if (opts.autoGenerateContent !== undefined)
+    updates.autoGenerateContent = opts.autoGenerateContent;
+
   if (opts.discovery !== undefined) updates.discovery = opts.discovery;
 
   const noticePatch = buildNoticePatch(opts, logger);
@@ -357,8 +369,16 @@ async function orgUpdateAction(identifier: string, opts: OrgUpdateOpts): Promise
   else {
     const pausedSuffix =
       opts.paused === true ? "  — paused" : opts.paused === false ? "  — unpaused" : "";
+    const autoGenSuffix =
+      opts.autoGenerateContent === true
+        ? "  — AI content on"
+        : opts.autoGenerateContent === false
+          ? "  — AI content off"
+          : "";
     logger.info(
-      chalk.green(`Updated organization: ${updated.name} (${updated.slug})${pausedSuffix}`),
+      chalk.green(
+        `Updated organization: ${updated.name} (${updated.slug})${pausedSuffix}${autoGenSuffix}`,
+      ),
     );
   }
 }
@@ -743,6 +763,14 @@ Examples:
     .option("--featured", "Promote this org on the home-page featured rail")
     .option("--no-featured", "Remove this org from the home-page featured rail")
     .option(
+      "--auto-generate-content",
+      "Opt this org into automatic AI content (overviews + per-release summaries)",
+    )
+    .option(
+      "--no-auto-generate-content",
+      "Opt this org out of automatic AI content (overviews + per-release summaries)",
+    )
+    .option(
       "--discovery <status>",
       `Promote/demote discovery status (${SOURCE_DISCOVERY.join(" | ")})`,
     )
@@ -815,6 +843,14 @@ Examples:
     .option("--no-paused", "Resume ingest for this org's sources")
     .option("--featured", "Promote this org on the home-page featured rail")
     .option("--no-featured", "Remove this org from the home-page featured rail")
+    .option(
+      "--auto-generate-content",
+      "Opt this org into automatic AI content (overviews + per-release summaries)",
+    )
+    .option(
+      "--no-auto-generate-content",
+      "Opt this org out of automatic AI content (overviews + per-release summaries)",
+    )
     .option(
       "--discovery <status>",
       `Promote/demote discovery status (${SOURCE_DISCOVERY.join(" | ")})`,
