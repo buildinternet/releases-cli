@@ -1,5 +1,11 @@
 # @buildinternet/releases
 
+## 0.67.0
+
+### Minor Changes
+
+- bf51f1b: Add `--auto-generate-content` / `--no-auto-generate-content` to `releases admin org update` — the single backend gate that decides whether an org gets AI overviews and per-release summaries. Previously the only way to toggle it was a raw `curl` PATCH. `releases admin org get` now shows the current value, and `releases admin overview plan` surfaces an `opted_out` action for orgs the batch skips because the flag is off.
+
 ## 0.66.0
 
 ### Minor Changes
@@ -11,6 +17,7 @@
 ### Minor Changes
 
 - 5d70021: Agent-DX: uniform `dryRun: true` marker on every dry-run output, and `--dry-run` for the mutations that lacked it.
+
   - Every `--json` dry-run payload now carries a uniform `dryRun: true` marker (via the new `markDryRun` helper in `src/lib/dry-run.ts`), additively — each command keeps its existing preview fields (`status: "would-add"`, `wouldUpdate`, `wouldRemove`, `wouldPost`, …). An agent can now detect "this was a preview, not a write" without per-command knowledge.
   - Added `--dry-run` to the mutations that previously had none: `follow`/`unfollow`, `keys create`/`keys revoke`, `admin webhook add`/`edit`/`remove`/`test`/`rotate-secret`, and `admin onboard apply` (per-source would-action preview, no writes).
   - `admin release delete --source` and `import` gained a `--json` dry-run body where they previously printed only text.
@@ -18,6 +25,7 @@
 - e806807: Agent-DX: `--fields` projection mask on the reader commands.
 
   `--fields id,version,source.slug` post-filters `--json` output down to a comma-separated mask (dot-notation for nested keys), so an agent can pull exactly the leaves it needs and spend fewer tokens.
+
   - Available on `get` (release/source/org/product), `search`, and `tail`/`latest`.
   - It's a post-projection over whatever shape the reader produced, so it **composes with `--full`** (mask the full payload) and reuses the slim vocabulary by default — no new field names to learn.
   - Dot-notation walks plain objects only (request an array-valued field like `media` whole). A field that resolves nowhere is dropped with one stderr warning; `--fields` without `--json` warns and is ignored, matching `--full`.
@@ -26,6 +34,7 @@
 - 292b1c8: Agent-DX: `--page-all` streams every page of a list reader as NDJSON.
 
   `releases list --json --page-all` (and `org list` / `admin product list`) walks every page itself and emits one source/org/product per line as newline-delimited JSON, instead of returning a single `{ items, pagination }` page the caller has to paginate by hand.
+
   - One agent command consumes a whole result set — no `--page`/`--limit` bookkeeping, no truncation warning to react to.
   - NDJSON keeps memory flat and lets a consumer (`jq -c`, a stream parser) process rows as they arrive rather than buffering one giant array.
   - `--json`-only, like `--full`/`--fields`: without `--json` it warns and falls through to the normal table. `--page-all` together with `--page` is rejected (they contradict). `--limit` still sets the per-request page size as a round-trip tuning knob.
@@ -34,6 +43,7 @@
 - 403738a: Agent-DX: raw JSON payloads for source mutations via `--input`.
 
   `releases admin source create` and `releases admin source update` now accept a `--input <json>` body, so an agent can send the request shape directly instead of reverse-mapping it onto a dozen bespoke flags. Pass a literal JSON string, `@<path>` for a file, or `-` for stdin.
+
   - The body maps to the **CLI input shape**, not the raw API — dedup, org-resolution, metadata-packing, and validation still run. `create --input` mirrors a `--batch` element (`name`/`url`/`type`/`org`/`metadataSet`/…); `update --input` maps to the update fields plus a convenience `metadata` object (each key set directly, a JSON `null` value deletes it).
   - `--strict`/`--dry-run`/`--json` remain execution modifiers from the flags (the body never sets them). On `create`, `--input` is mutually exclusive with `--batch`.
   - Invalid JSON and shape errors throw `CliError`, so they serialize to the structured `{ error }` payload under `--json`.
@@ -41,6 +51,7 @@
 ### Patch Changes
 
 - 624370c: Agent-DX hardening: structured `--json` errors and input validation.
+
   - When `--json` is set, thrown errors now emit a parseable `{ error: { kind, message, status?, method?, path?, field? } }` payload on stdout (with a non-zero exit) instead of an unstructured stderr dump. Without `--json`, known error types (API + invalid-input) print a clean one-line message rather than a stack trace.
   - User-supplied identifiers are validated before any network call — control characters, `..` traversal, `%` percent-encoding, embedded `?`/`#`, whitespace, and backslashes are rejected at the entity resolvers (`findOrg`/`findProduct`/`findSource`/`getRelease`). `apiFetch` gains a control-character backstop, and file-reading flags reject `..` traversal.
 
@@ -153,6 +164,7 @@
   **Part A — render:** `releases get`, `releases org get`, and `releases admin source update` detail views now display a curator notice in yellow when the API returns one — formatted as `Notice: <message> → <coordinate-or-href>` (pointer omitted when absent). The notice also passes through in all `--json` outputs.
 
   **Part B — set/clear:** New flags on the three entity update commands:
+
   - `releases org update --notice <msg>` / `--notice-link <coord|url>` / `--notice-link-text <label>` / `--clear-notice`
   - `releases admin product update` — same flags
   - `releases admin source update` — same flags
@@ -202,11 +214,13 @@
 ### Minor Changes
 
 - c4d9046: Admin source/org ergonomics: three fixes surfaced during a Discord onboarding cleanup.
+
   - `admin source backfill <id|slug>` — new verb wrapping the full-history backfill endpoint (`POST /v1/workflows/backfill-source`). Resolves a slug to the typed `src_…` ID, dry-runs by default (counts + date range), and writes with `--no-dry-run`/`--commit`. Supports `--max-windows` and `--markdown-file` (for JS-heavy / bot-blocked pages the worker can't fetch itself). (#252)
   - `admin source create` now accepts `--keyword-allow <list>` (→ `metadata.feedKeywordAllow`) and the general repeatable `--metadata-set key=value`, so feed filters are set atomically at create time. This closes the race where a follow-up `source update` lost to the onboard auto-fetch and ingested the whole unfiltered feed. (#237)
   - `admin org delete --hard` now succeeds: it sends the typed `org_` ID the destructive path requires instead of the slug the server rejects. Soft delete still uses the slug. (#236)
 
 - a744cad: Admin source backfill/re-extract: async-aware backfill + a new `reextract` verb.
+
   - `admin source backfill` now handles the async dispatch shape. Deep Firecrawl backfills run as a durable workflow (buildinternet/releases#1281/#1282) and return `202 { instanceId, statusUrl }` instead of a report; the CLI now detects this rather than crashing on the non-report body. Matching `admin overview batch`, it **dispatches and returns the workflow instance ID by default** (non-blocking — the right primitive for the CLI's primary agent users), with `--wait` to poll inline and render the report. New sibling `admin source backfill-status <instanceId>` does a single-shot status read (renders the report when complete) so a dispatched workflow can be polled on the caller's own cadence. The Firecrawl-ceiling `guidance` hint is now surfaced. (buildinternet/releases#1285)
   - `admin source reextract <id|slug>` — new verb wrapping `POST /v1/workflows/reextract-source` (buildinternet/releases#1284). Re-extracts releases from a stored raw snapshot (`released-raw`) with no live scrape, no Firecrawl credits, deterministic input — for reprocessing history after extraction/parse logic improves. Dry-run by default; `--snapshot-id` pins a specific capture, `--commit`/`--no-dry-run` writes. Surfaces the endpoint's actionable errors (`no_snapshot`/`snapshot_not_found` 404, `snapshot_expired` 410, non-scrape 400, missing bucket/key 503). (buildinternet/releases-cli#257)
 
@@ -402,6 +416,7 @@
 ### Minor Changes
 
 - d6c54fb: Improve the default `releases get` output for all entity kinds so the response is useful on its own without flag discovery, while staying token-efficient via progressive disclosure to the dedicated drill-in commands.
+
   - **Release**: the summary is now labeled `Summary · AI-generated, abbreviated` (it was unlabeled before, so callers couldn't tell it wasn't the full body). Every response ends with a `Next steps` footer that points at `releases release get <id>` for the full content — phrasing flips when no summary is on file yet.
   - **Organization**: now surfaces description, tags, a source breakdown (active / erroring / hidden), and the product list with names + slugs. Latest-releases preview trimmed from 10 to 5. Footer hints at `org get` (overview / accounts / aliases), `org overview`, and the org-scoped release feed.
   - **Product**: previously showed only static metadata. Now adds description, tags, and the product's source list, with footer hints to the org-scoped release feed and to drilling into a specific source.
@@ -465,6 +480,7 @@ citedText}[]`). The CLI validates the shape locally and forwards the array to
 ### Minor Changes
 
 - 913fdd2: Collections are now first-class browsable from the CLI.
+
   - `releases collection list` and `releases collection get <slug>` are public — no API key needed. The same commands also stay under `admin` for back-compat.
   - New `releases collection releases <slug>` shows the cross-org release feed with cursor pagination (`--limit`, `--cursor`, `--include-prereleases`).
   - `releases get <orgslug>` now lists the collections an org belongs to. Failures degrade silently with a logger warning so an unrelated bug in the collections endpoint never breaks the canonical org card.
@@ -472,6 +488,7 @@ citedText}[]`). The CLI validates the shape locally and forwards the array to
   The wire shape for `CollectionReleaseItem` isn't published in `@buildinternet/releases-api-types` yet, so the CLI declares it inline. When api-types ships its next minor, the inline type can drop.
 
 - d2053e3: Tabular reader commands (`get`, `org list`, `product list`, `list sources`, `collection list`, `stats`, `check`, `fetch-log`, `admin overview list`, `admin overview plan`) now fit themselves to the terminal width instead of relying on bordered tables that broke when the window was narrow.
+
   - TTY: borderless, two-space delimited columns; uppercase cyan headers; per-column truncation with `…`; per-column right-alignment for counts. Width is read from `process.stdout.columns` (override with `COLUMNS=<n>`).
   - Non-TTY (piped): bare TSV — no headers, no color, no truncation — so `releases org list | cut -f2` works without parsing ANSI. For complete parseable output, prefer `--json`.
 
@@ -513,6 +530,7 @@ citedText}[]`). The CLI validates the shape locally and forwards the array to
   Previously only delete-shaped commands and a few specials (`source import`, `product adopt`, `release suppress`, `policy ignore/block`, `embed`) could preview their effects. Create/update/link verbs went straight to the API, which made scripted onboarding flows hard to validate before running them.
 
   Now also supports `--dry-run`:
+
   - `admin org create` (+ deprecated `org add`)
   - `admin org update` (+ deprecated `org edit`)
   - `admin org link`, `admin org unlink`
@@ -562,6 +580,7 @@ citedText}[]`). The CLI validates the shape locally and forwards the array to
   Canonical surface mirrors the verb-rename pattern (PR #113) — `admin overview list/get/update/inputs/plan` are subcommands under `admin overview`. The legacy kebab-case names (`overview-list`, `overview-write`, `overview-inputs`, and the bare `overview <slug>` read form) are wired as deprecated aliases that warn-and-delegate to the same handler.
 
   New planning surface:
+
   - `admin overview list --stale-days <n> --missing --has-activity --json` — drives `GET /v1/admin/overviews`, returning a planning-ready manifest in one call instead of `org list` + per-org `overview` round-trips. Each row includes `releasesSinceOverview` (the freshness signal that actually matters), `staleness` (`missing | behind | fresh`), `orgLastActivity`, etc. The legacy `--stale / --stale-min-releases / --stale-grace-days` flags still work and trigger the older client-side scan.
   - `admin overview plan --json` — same manifest with `format=plan`, adding per-row `action` (`missing | refresh | skip`) and `needsFetch` (true when active sources exist but ingest is lagging ≥ 7 days).
   - `admin overview inputs <org> --check` — pre-flight payload (`{orgSlug, selected, totalAvailable, hasExistingContent, wouldRegenerate, windowDays}`) so an orchestrator can decide whether to dispatch a regen sub-agent without paying for the full release-content + media payload.
@@ -599,6 +618,7 @@ citedText}[]`). The CLI validates the shape locally and forwards the array to
 ### Minor Changes
 
 - 74297a5: Add `--notes-file` and `--parse-instructions-file` flags for AI-generated multi-paragraph content (#103 workstream 3). The inline `--notes` and `--parse-instructions` forms are quote-hostile and silently truncate at unescaped newlines, which is exactly the shape of content these flags get fed.
+
   - `releases admin playbook <org> --notes-file <path>` (use `-` for stdin) replaces inline notes.
   - `releases admin source update <id> --parse-instructions-file <path>` (use `-` for stdin) replaces inline parse instructions. The deprecated `edit` alias gets the same flag.
   - An empty file clears, matching the existing inline empty-string semantics.
@@ -627,6 +647,7 @@ citedText}[]`). The CLI validates the shape locally and forwards the array to
   `{ items, pagination }` envelope the API now returns for `/v1/orgs`,
   `/v1/admin/blocklist`, `/v1/orgs/:slug/ignored-urls`, and `/v1/sessions`
   (monorepo PR #723):
+
   - `releases org list`
   - `releases admin discovery task list`
   - `releases admin policy block list`
@@ -639,6 +660,7 @@ citedText}[]`). The CLI validates the shape locally and forwards the array to
   Closes #105.
 
 - a27f459: Adopt the `-` stdin convention in two more commands and tighten `--json` output safety on alias listings.
+
   - `releases import <file>` now accepts `-` for stdin (`cat manifest.json | releases import -`). Removes the temp-file dance for callers that generate manifests from another command.
   - `releases admin webhook verify --body-file <path>` now accepts `-` for stdin (`curl ... | releases admin webhook verify --secret ... --signature ... --body-file -`). Mirrors the convention already in `add --batch -` and `admin overview-write --content-file -`.
   - `org alias list --json` and `product alias list --json` now route through the drain-safe `writeJson()` helper instead of `console.log(JSON.stringify(...))`. Closes the small remaining surface area of the 96 KB pipe-truncation class first fixed in #33.
@@ -656,6 +678,7 @@ citedText}[]`). The CLI validates the shape locally and forwards the array to
 ### Minor Changes
 
 - 0c244f3: Adopt the org-scoped API path shape so the CLI keeps working after the monorepo rejects bare-slug source/product paths with 400 (#698).
+
   - `findSource(identifier)` and `findProduct(identifier)` now branch on the input shape: typed `src_…`/`prod_…` IDs hit the legacy bare path (still safe — IDs are globally unique), `org/slug` coordinates split into the org-scoped form, and bare slugs round-trip through the new `GET /v1/lookups/{source,product}-by-slug` resolver to pick a canonical home before fetching.
   - Mutation helpers (`updateSource`, `deleteSource`, `deleteSources`, `deleteReleasesForSource`, `insertReleasesBatch`, `checkContentHash`, `updateSourceMeta`, `updateProduct`) now take a typed-ID-bearing entity object instead of a slug string and target the bare path with `id`, which the API still accepts.
   - `getKnownReleasesForSource(identifier, …)` accepts the same identifier shapes as `findSource`.
@@ -663,6 +686,7 @@ citedText}[]`). The CLI validates the shape locally and forwards the array to
   No CLI command surface changes — operators continue to type slugs, IDs, or `org/slug` coordinates wherever an identifier is accepted. The slug branch costs one extra round-trip to the lookup endpoint per command (cached aggressively at the network layer), which is the price for unambiguous resolution after #690 made slugs per-org.
 
 - 2a775fb: `admin org delete --hard` now shows a cascade-scope preview and requires the user to type the org slug back to confirm. Backs the post-#690 Phase C schema, where hard-deleting an org now cascades into every source, release, fetch_log, changelog file/chunk, release summary, media asset, and webhook subscription tied to it (vs. orphaning sources via SET NULL pre-flip).
+
   - `releases admin org delete <slug> --hard` lists exact dependent counts, then waits for slug typeback. Wrong slug aborts with exit 1 and no API call to the destructive endpoint.
   - `--yes` / `-y` skips the prompt for scripted ops.
   - A piped (non-TTY) stdin without `--yes` exits 1 with a clear "no interactive TTY" message instead of silently auto-confirming.
@@ -723,6 +747,7 @@ citedText}[]`). The CLI validates the shape locally and forwards the array to
 - cb55e62: `releases admin source fetch` now accepts `--wait [seconds]`, blocking until the managed-agent session reaches a terminal state. Without `--wait` the command stays fire-and-forget. Default wait is 900s; pass an explicit value to shorten it (e.g. `--wait 60`).
 
   Exit codes:
+
   - `0` — session completed successfully
   - `1` — our-side error (no tools called, parser failure, timeout)
   - `2` — managed-agents/provider error (e.g. `unknown_error`, `model_overloaded_error`, retries exhausted) — the message is tagged `(managed-agents · <type>)` and includes retry count when the session ended in `retries_exhausted`
@@ -756,6 +781,7 @@ citedText}[]`). The CLI validates the shape locally and forwards the array to
 - 487ea5b: Replace the handwritten `src/api/types.ts` with a re-export from the newly-published `@buildinternet/releases-api-types` package. Eliminates drift between the CLI's wire-protocol types and the monorepo source.
 
   Additive fields now surfaced on `--json` output:
+
   - Source shapes gain `lastPolledAt`, `medianGapDays`, `lastRetieredAt`
   - New `ReleaseCoverageResponse` / `ReleaseCoverageRow` types for release coverage consumers
   - `SearchCatalogHit` is now the canonical name for catalog/product search hits (`SearchProductHit` remains as a deprecated alias)
@@ -775,11 +801,13 @@ citedText}[]`). The CLI validates the shape locally and forwards the array to
 ### Patch Changes
 
 - 4f9ed94: Discovery triggers moved under `/v1/workflows/*` on the API per issue #504 tier 2. The `releases admin discovery onboard` and `releases admin fetch` commands are unchanged from the user's perspective, but the underlying URLs now follow the convention:
+
   - `POST /v1/discover` → `POST /v1/workflows/discover`
   - `POST /v1/update` → `POST /v1/workflows/update`
   - `GET /v1/discover/:sessionId` is gone — the CLI polls `GET /v1/sessions/:sessionId` instead, which reads from the same DO with a richer shape (progress fields live at the top level, not nested under `progress`).
 
 - 1ef271f: Follow-up to the overview nesting: three more API surfaces moved under their parent resource.
+
   - Playbook: `getPlaybook(slug)` and `updatePlaybookNotes(slug, notes)` now call `/v1/orgs/:slug/playbook` and `/v1/orgs/:slug/playbook/notes`.
   - Summaries: `getSummariesForSource`, `upsertSummary`, and `getMonthlySummary` now call `/v1/sources/:slug/summaries`. `upsertSummary`'s signature changed from `(data)` (with `sourceId` in the body) to `(sourceSlugOrId, data)`.
   - Aliases: the `/v1/aliases` endpoints are gone. Domain aliases are now a `string[]` field on the parent — read via `/v1/orgs/:slug` or `/v1/products/:slug`, written via `PATCH { aliases: [...] }` on the parent. The CLI replaces `addDomainAlias`/`removeDomainAlias`/`listDomainAliases` with `getAliases(scope, slug)` and `setAliases(scope, slug, aliases)`. `releases org alias add|remove|list` and `releases product alias add|remove|list` commands are unchanged from the user's perspective.
@@ -805,6 +833,7 @@ citedText}[]`). The CLI validates the shape locally and forwards the array to
   The API worker moved the three embed-backfill triggers from `/v1/admin/embed/*` to `/v1/workflows/embed-*` in [buildinternet/releases#494](https://github.com/buildinternet/releases/issues/494). Without this bump, those three commands return `404` against the live API.
 
   Changes:
+
   - `embedReleases` now posts to `/v1/workflows/embed-releases`
   - `embedEntities` now posts to `/v1/workflows/embed-entities`
   - `embedChangelogs` now posts to `/v1/workflows/embed-changelogs`
@@ -821,11 +850,13 @@ citedText}[]`). The CLI validates the shape locally and forwards the array to
   Mirrors the tool-UX consolidation from the monorepo (upstream issue [buildinternet/releases#459](https://github.com/buildinternet/releases/issues/459)). Deprecated per-action tool names are replaced with the consolidated equivalents across every skill that cited them.
 
   Typed-tool renames:
+
   - `add_source` / `edit_source` / `remove_source` / `fetch_source` → `manage_source` with `action: "add" | "edit" | "remove" | "fetch"`
   - `get_playbook` / `update_playbook_notes` → `manage_playbook` with `action: "get" | "update_notes"`
   - `list_categories` — retired; valid categories surface via `manage_org` / `manage_product` tool descriptions and system prompts
 
   Skill-specific changes:
+
   - `managing-sources` — Primary Sources section rewritten with conditional `is_primary` guidance, added a note about the slug auto-suffix behavior on `manage_source(action=add)`, ported the Organization Descriptions + Embedding Side Effects sections from upstream.
   - `seeding-playbooks` and `parsing-changelogs` — replaced the stale `releases admin content playbook` CLI path with `releases admin playbook` (the `content` subgroup was removed in #42).
   - `analyzing-releases` and `finding-changelogs` — call-site updates only.
@@ -843,6 +874,7 @@ citedText}[]`). The CLI validates the shape locally and forwards the array to
   new server route `GET /v1/overview-inputs` and the existing dumb upsert at
   `POST /v1/overview`. Generation itself runs in Claude Code via the
   `regenerating-overviews` skill — no Anthropic client returns to the CLI.
+
   - `releases admin overview <slug>` — read the current overview
   - `releases admin overview-inputs <slug> --json [--window N]` — input-builder
   - `releases admin overview-write <slug> --content-file <path>` — upload result
@@ -862,6 +894,7 @@ citedText}[]`). The CLI validates the shape locally and forwards the array to
 - 51ec406: **`releases admin playbook <org>` is back**
 
   Ships the missing CLI wrapper for reading and updating an organization's playbook. Same shape as the old monorepo command, flattened from `admin content playbook` to `admin playbook` (no other live inhabitants of the `admin content` subgroup remain).
+
   - `releases admin playbook <org>` — read the assembled playbook (header + agent notes)
   - `releases admin playbook <org> --json` — JSON output
   - `releases admin playbook <org> --notes "..."` — replace agent notes; seeds a fresh header on first write
@@ -883,6 +916,7 @@ citedText}[]`). The CLI validates the shape locally and forwards the array to
 - 7e617c7: **CLI JSON contract: shared envelope, parsed metadata, truncation warnings**
 
   `releases list --json` now returns a consistent `{ items, pagination }` envelope whether or not `--limit` is passed, parses `metadata` into a nested object (no more `.metadata | fromjson?` in jq), and emits a stderr warning when results may be truncated.
+
   - **New shared types** in `@buildinternet/releases-core/cli-contracts`: `ListResponse<T>`, `Pagination`, `DEFAULT_PAGE_SIZE`, `computePagination()`, `parseMetadataField()`, `formatTruncationWarning()`. Single source of truth for the CLI's `--json` output shape.
   - **Default page size is now 500** (previously 100, the API's silent default) so a default `releases list --json` call returns 5× more rows before any risk of truncation. Explicit `--limit` still wins.
   - **Metadata fields are parsed** into nested objects in `--json` output for both the list view and single-source detail view.
@@ -895,6 +929,7 @@ citedText}[]`). The CLI validates the shape locally and forwards the array to
 - 94e05dc: **Add `releases whoami` — mode, API URL, and auth diagnostic**
 
   New top-level command that reports how the CLI is configured:
+
   - Current CLI version
   - API URL and whether it's the default (`https://api.releases.sh`) or overridden via `RELEASED_API_URL`
   - Mode (`public` vs `admin`) based on whether `RELEASED_API_KEY` is set
@@ -907,6 +942,7 @@ citedText}[]`). The CLI validates the shape locally and forwards the array to
 - 2da36c8: **`releases list --json` now surfaces accurate `totalItems` on every page**
 
   The API's `?envelope=true` response is now consumed end-to-end: `totalItems`, `totalPages`, and `hasMore` are populated on the first page as well as the tail, instead of only when the final page is reached. The stderr truncation warning on the table view now uses the API-returned `hasMore` instead of inferring from `returned === pageSize` (which flagged spuriously when totalItems was an exact multiple of pageSize).
+
   - `listSourcesWithOrg({ envelope: true })` returns `ListResponse<SourceWithOrg>` via a typed overload; existing bare-array callers (`check`, MCP) are untouched.
   - Closes the loop opened by the API's envelope support (buildinternet/releases#356).
 
@@ -915,6 +951,7 @@ citedText}[]`). The CLI validates the shape locally and forwards the array to
 ### Minor Changes
 
 - 08b7297: Add `releases tail` as the canonical "latest releases" command (with `latest` retained as an alias), plus `-f/--follow` streaming mode:
+
   - `releases tail -f` polls the cached `/v1/releases/latest` endpoint on a 60-second interval (configurable with `--interval <seconds>`) and streams new releases as they arrive. Novelty detection is client-side via a bounded seen-id set, so every follow-poller collapses onto the shared KV cache entry rather than forking it with a per-client `since`.
   - `getLatestReleases` now calls the unified `/v1/releases/latest` endpoint in a single request. Replaces the previous scatter-gather (fetch `/sources`, call `/sources/:slug` for the first 10, sort locally), which sampled rather than enumerated and meant the CLI's "latest across all sources" was incomplete for indexes larger than 10 sources.
   - Extracted `renderLatestReleasesTable` into `src/cli/render/` so `tail` and `show` share one formatter.

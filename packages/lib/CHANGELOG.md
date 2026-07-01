@@ -1,5 +1,7 @@
 # @buildinternet/releases-lib
 
+## 0.67.0
+
 ## 0.66.0
 
 ## 0.65.0
@@ -148,6 +150,7 @@
   The API worker moved the three embed-backfill triggers from `/v1/admin/embed/*` to `/v1/workflows/embed-*` in [buildinternet/releases#494](https://github.com/buildinternet/releases/issues/494). Without this bump, those three commands return `404` against the live API.
 
   Changes:
+
   - `embedReleases` now posts to `/v1/workflows/embed-releases`
   - `embedEntities` now posts to `/v1/workflows/embed-entities`
   - `embedChangelogs` now posts to `/v1/workflows/embed-changelogs`
@@ -164,11 +167,13 @@
   Mirrors the tool-UX consolidation from the monorepo (upstream issue [buildinternet/releases#459](https://github.com/buildinternet/releases/issues/459)). Deprecated per-action tool names are replaced with the consolidated equivalents across every skill that cited them.
 
   Typed-tool renames:
+
   - `add_source` / `edit_source` / `remove_source` / `fetch_source` → `manage_source` with `action: "add" | "edit" | "remove" | "fetch"`
   - `get_playbook` / `update_playbook_notes` → `manage_playbook` with `action: "get" | "update_notes"`
   - `list_categories` — retired; valid categories surface via `manage_org` / `manage_product` tool descriptions and system prompts
 
   Skill-specific changes:
+
   - `managing-sources` — Primary Sources section rewritten with conditional `is_primary` guidance, added a note about the slug auto-suffix behavior on `manage_source(action=add)`, ported the Organization Descriptions + Embedding Side Effects sections from upstream.
   - `seeding-playbooks` and `parsing-changelogs` — replaced the stale `releases admin content playbook` CLI path with `releases admin playbook` (the `content` subgroup was removed in #42).
   - `analyzing-releases` and `finding-changelogs` — call-site updates only.
@@ -192,6 +197,7 @@
 - 51ec406: **`releases admin playbook <org>` is back**
 
   Ships the missing CLI wrapper for reading and updating an organization's playbook. Same shape as the old monorepo command, flattened from `admin content playbook` to `admin playbook` (no other live inhabitants of the `admin content` subgroup remain).
+
   - `releases admin playbook <org>` — read the assembled playbook (header + agent notes)
   - `releases admin playbook <org> --json` — JSON output
   - `releases admin playbook <org> --notes "..."` — replace agent notes; seeds a fresh header on first write
@@ -213,6 +219,7 @@
 - 7e617c7: **CLI JSON contract: shared envelope, parsed metadata, truncation warnings**
 
   `releases list --json` now returns a consistent `{ items, pagination }` envelope whether or not `--limit` is passed, parses `metadata` into a nested object (no more `.metadata | fromjson?` in jq), and emits a stderr warning when results may be truncated.
+
   - **New shared types** in `@buildinternet/releases-core/cli-contracts`: `ListResponse<T>`, `Pagination`, `DEFAULT_PAGE_SIZE`, `computePagination()`, `parseMetadataField()`, `formatTruncationWarning()`. Single source of truth for the CLI's `--json` output shape.
   - **Default page size is now 500** (previously 100, the API's silent default) so a default `releases list --json` call returns 5× more rows before any risk of truncation. Explicit `--limit` still wins.
   - **Metadata fields are parsed** into nested objects in `--json` output for both the list view and single-source detail view.
