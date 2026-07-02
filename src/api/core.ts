@@ -1,7 +1,7 @@
 import { getApiUrl, getApiKey, isAdminMode } from "../lib/mode.js";
 import { shouldRecordMutation, recordMutation } from "../lib/mutation-log.js";
 import { RELEASES_CLI_UA } from "../lib/user-agent.js";
-import { ApiError } from "../lib/errors.js";
+import { ApiError, apiErrorMessage } from "../lib/errors.js";
 import { assertSafePath } from "../lib/validate-input.js";
 import type { LatestRelease, MediaItem } from "./types.js";
 import { type ListResponse } from "@buildinternet/releases-core/cli-contracts";
@@ -86,8 +86,8 @@ export async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T> 
   if (res.status === 404 && (!opts?.method || opts.method === "GET")) return null as T;
 
   if (!res.ok) {
-    const body = await res.json().catch(() => ({ message: res.statusText }));
-    const message = (body as { message?: string }).message ?? res.statusText;
+    const body: unknown = await res.json().catch(() => null);
+    const message = apiErrorMessage(body) ?? res.statusText;
     if (logMutation) {
       recordMutation({ method, path, ok: false, status: res.status, error: message });
     }

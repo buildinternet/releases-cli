@@ -74,21 +74,29 @@ describe("apiFetch 404 handling", () => {
     expect(result).toBeNull();
   });
 
-  it("throws on POST 404 (addIgnoredUrl)", async () => {
-    mockFetch(404, { message: "Not Found" });
+  it("surfaces the message from the standardized nested error envelope (POST 404)", async () => {
+    // The API emits `{ error: { code, type, message } }`; the CLI must read
+    // `error.message`, not a top-level `message`.
+    mockFetch(404, { error: { code: "not_found", type: "not_found", message: "Org not found" } });
     await expect(client.addIgnoredUrl("https://example.com", "org_123")).rejects.toThrow(
-      /API error \(404\) on POST/,
+      /API error \(404\) on POST .*: Org not found/,
     );
   });
 
-  it("throws on DELETE 404 (deleteRelease)", async () => {
+  it("tolerates a legacy flat { message } body (DELETE 404)", async () => {
     mockFetch(404, { message: "Not Found" });
-    await expect(client.deleteRelease("rel_123")).rejects.toThrow(/API error \(404\) on DELETE/);
+    await expect(client.deleteRelease("rel_123")).rejects.toThrow(
+      /API error \(404\) on DELETE .*: Not Found/,
+    );
   });
 
-  it("throws on non-404 errors for GET", async () => {
-    mockFetch(500, { message: "Internal Server Error" });
-    await expect(client.findSource("test")).rejects.toThrow(/API error \(500\)/);
+  it("throws on non-404 errors for GET, surfacing the envelope message", async () => {
+    mockFetch(500, {
+      error: { code: "internal_error", type: "internal", message: "Internal server error" },
+    });
+    await expect(client.findSource("test")).rejects.toThrow(
+      /API error \(500\).*: Internal server error/,
+    );
   });
 });
 
