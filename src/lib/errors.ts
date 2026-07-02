@@ -62,6 +62,27 @@ export type CliErrorPayload = {
   };
 };
 
+/**
+ * Pull the human message out of a non-2xx API body. The API emits the
+ * standardized nested envelope `{ error: { code, type, message } }`; this reads
+ * `error.message`, tolerating a legacy flat `{ message }` body and any
+ * malformed/empty payload (→ undefined so the caller falls back to statusText).
+ *
+ * A thin stand-in for `@buildinternet/releases-api-types`' `decodeApiError`:
+ * the CLI only needs the message, and the published api-types pin does not yet
+ * export the errors module. Swap for `decodeApiError().message` once it does.
+ */
+export function apiErrorMessage(body: unknown): string | undefined {
+  if (!body || typeof body !== "object") return undefined;
+  const nested = (body as { error?: unknown }).error;
+  if (nested && typeof nested === "object") {
+    const message = (nested as { message?: unknown }).message;
+    if (typeof message === "string" && message.length > 0) return message;
+  }
+  const flat = (body as { message?: unknown }).message;
+  return typeof flat === "string" && flat.length > 0 ? flat : undefined;
+}
+
 /** Render any thrown value into the stable structured error payload. */
 export function toErrorPayload(err: unknown): CliErrorPayload {
   if (err instanceof ApiError) {
