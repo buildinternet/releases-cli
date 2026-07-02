@@ -1,5 +1,7 @@
 # @buildinternet/releases-skills
 
+## 0.67.1
+
 ## 0.67.0
 
 ## 0.66.0
