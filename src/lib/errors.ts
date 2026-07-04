@@ -9,6 +9,8 @@
  * (emitted to stdout by the top-level handler when `--json` is set).
  */
 
+import { decodeApiError, isApiError } from "@buildinternet/releases-api-types";
+
 /** A non-2xx response from the Releases API. Message format is preserved for
  * the existing `/API error \(NNN\) on METHOD path/` characterization tests. */
 export class ApiError extends Error {
@@ -64,22 +66,22 @@ export type CliErrorPayload = {
 
 /**
  * Pull the human message out of a non-2xx API body. The API emits the
- * standardized nested envelope `{ error: { code, type, message } }`; this reads
- * `error.message`, tolerating a legacy flat `{ message }` body and any
- * malformed/empty payload (→ undefined so the caller falls back to statusText).
+ * standardized nested envelope `{ error: { code, type, message } }`; a real
+ * envelope is decoded via api-types' canonical `decodeApiError`, the single
+ * source of truth for the wire shape.
  *
- * A thin stand-in for `@buildinternet/releases-api-types`' `decodeApiError`:
- * the CLI only needs the message, and the published api-types pin does not yet
- * export the errors module. Swap for `decodeApiError().message` once it does.
+ * Returns `undefined` (so the caller falls back to `res.statusText`) for
+ * anything that isn't a full envelope — an empty message, or a malformed body
+ * like a bare `{ error: "not_found" }`. We keep a manual fallback for a legacy
+ * flat `{ message }` body (which predates the envelope and so is NOT an
+ * `isApiError`); `decodeApiError` can't read that on its own.
  */
 export function apiErrorMessage(body: unknown): string | undefined {
-  if (!body || typeof body !== "object") return undefined;
-  const nested = (body as { error?: unknown }).error;
-  if (nested && typeof nested === "object") {
-    const message = (nested as { message?: unknown }).message;
-    if (typeof message === "string" && message.length > 0) return message;
+  if (isApiError(body)) {
+    const { message } = decodeApiError(body);
+    if (message.length > 0) return message;
   }
-  const flat = (body as { message?: unknown }).message;
+  const flat = (body as { message?: unknown } | null)?.message;
   return typeof flat === "string" && flat.length > 0 ? flat : undefined;
 }
 
