@@ -56,8 +56,8 @@
   },
   "homepage": "https://releases.sh",
   "dependencies": {
-    "@buildinternet/releases-api-types": "^0.34.1",
-    "@buildinternet/releases-core": "^0.23.0",
+    "@buildinternet/releases-api-types": "^0.35.0",
+    "@buildinternet/releases-core": "^0.25.0",
     "@buildinternet/releases-lib": "workspace:*",
     "@buildinternet/releases-skills": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.29.0",
