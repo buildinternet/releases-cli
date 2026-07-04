@@ -220,6 +220,10 @@ async function orgGetAction(identifier: string, opts: OrgGetOpts): Promise<void>
       found.autoGenerateContent ? chalk.green("on (overviews + summaries)") : chalk.dim("off")
     }`,
   );
+  // Field ships in api-types after the next publish; read defensively until then.
+  const cadenceOverride = (found as { overviewCadenceDays?: number | null }).overviewCadenceDays;
+  if (cadenceOverride != null)
+    console.log(`  Overview cadence: every ${cadenceOverride}d ${chalk.dim("(manual override)")}`);
   if (orgTags.length > 0) console.log(`  Tags:    ${orgTags.join(", ")}`);
   if (found.notice) console.log(`  ${chalk.yellow(formatNotice(found.notice))}`);
 
@@ -288,6 +292,7 @@ type OrgUpdateOpts = {
   paused?: boolean;
   featured?: boolean;
   autoGenerateContent?: boolean;
+  overviewCadence?: string;
   discovery?: string;
   notice?: string;
   noticeLink?: string;
@@ -309,6 +314,24 @@ async function orgUpdateAction(identifier: string, opts: OrgUpdateOpts): Promise
   ) {
     logger.error(`Invalid discovery "${opts.discovery}". Valid: ${SOURCE_DISCOVERY.join(", ")}`);
     process.exit(1);
+  }
+  // Overview regen cadence override (buildinternet/releases#1895): "auto"
+  // clears back to the velocity-tiered automatic cadence; a number (1-90,
+  // matching the API's validation range) pins a fixed cadence in days.
+  let overviewCadenceDays: number | null | undefined;
+  if (opts.overviewCadence !== undefined) {
+    if (opts.overviewCadence.toLowerCase() === "auto") {
+      overviewCadenceDays = null;
+    } else {
+      const n = Number(opts.overviewCadence);
+      if (!Number.isInteger(n) || n < 1 || n > 90) {
+        logger.error(
+          `Invalid --overview-cadence "${opts.overviewCadence}". Use a whole number of days (1-90) or "auto".`,
+        );
+        process.exit(1);
+      }
+      overviewCadenceDays = n;
+    }
   }
 
   const found = await findOrg(identifier);
@@ -341,6 +364,8 @@ async function orgUpdateAction(identifier: string, opts: OrgUpdateOpts): Promise
   // --no-auto-generate-content as one boolean (undefined when neither passed).
   if (opts.autoGenerateContent !== undefined)
     updates.autoGenerateContent = opts.autoGenerateContent;
+
+  if (overviewCadenceDays !== undefined) updates.overviewCadenceDays = overviewCadenceDays;
 
   if (opts.discovery !== undefined) updates.discovery = opts.discovery;
 
@@ -375,9 +400,15 @@ async function orgUpdateAction(identifier: string, opts: OrgUpdateOpts): Promise
         : opts.autoGenerateContent === false
           ? "  — AI content off"
           : "";
+    const cadenceSuffix =
+      overviewCadenceDays === null
+        ? "  — overview cadence: automatic"
+        : overviewCadenceDays !== undefined
+          ? `  — overview cadence: every ${overviewCadenceDays}d`
+          : "";
     logger.info(
       chalk.green(
-        `Updated organization: ${updated.name} (${updated.slug})${pausedSuffix}${autoGenSuffix}`,
+        `Updated organization: ${updated.name} (${updated.slug})${pausedSuffix}${autoGenSuffix}${cadenceSuffix}`,
       ),
     );
   }
@@ -771,6 +802,10 @@ Examples:
       "Opt this org out of automatic AI content (overviews + per-release summaries)",
     )
     .option(
+      "--overview-cadence <days|auto>",
+      'Pin the automated overview regen cadence in days (1-90), or "auto" for the velocity-tiered default',
+    )
+    .option(
       "--discovery <status>",
       `Promote/demote discovery status (${SOURCE_DISCOVERY.join(" | ")})`,
     )
@@ -850,6 +885,10 @@ Examples:
     .option(
       "--no-auto-generate-content",
       "Opt this org out of automatic AI content (overviews + per-release summaries)",
+    )
+    .option(
+      "--overview-cadence <days|auto>",
+      'Pin the automated overview regen cadence in days (1-90), or "auto" for the velocity-tiered default',
     )
     .option(
       "--discovery <status>",
