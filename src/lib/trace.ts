@@ -3,15 +3,14 @@ import { basename, join } from "node:path";
 import { getRunsDir, expandHome } from "@releases/lib/config";
 import { resolveRunDir } from "./run-dir.js";
 import type { Session } from "@buildinternet/releases-api-types";
-import { type BatchOverviewStatusResponse } from "../api/sources.js";
 
 /**
  * Managed-session traces. Server-triggered sessions (`onboard`,
- * `source fetch --wait`, `overview batch --wait`) return full records the CLI
- * reads but does not persist. These helpers land one as
- * `<dir>/<id>/{trace.json,summary.md}`, with `summary.md` mirroring the
- * run-summary template in `docs/architecture/maintenance-workspace.md` so
- * managed sessions and Claude-Code batches read uniformly.
+ * `source fetch --wait`) return full records the CLI reads but does not
+ * persist. These helpers land one as `<dir>/<id>/{trace.json,summary.md}`,
+ * with `summary.md` mirroring the run-summary template in
+ * `docs/architecture/maintenance-workspace.md` so managed sessions and
+ * Claude-Code batches read uniformly.
  */
 
 /**
@@ -105,45 +104,6 @@ export function buildSessionSummaryMarkdown(session: Session): string {
   ].join("\n");
 }
 
-function workflowStatusLabel(status: string): string {
-  if (status === "complete") return "completed";
-  if (status === "errored" || status === "terminated") return "failed";
-  return status;
-}
-
-export function buildBatchOverviewSummaryMarkdown(
-  status: BatchOverviewStatusResponse,
-  instanceId: string,
-): string {
-  const label = workflowStatusLabel(status.status);
-  const errText =
-    status.error != null
-      ? typeof status.error === "string"
-        ? status.error
-        : JSON.stringify(status.error)
-      : null;
-  const resultBlock = errText ?? "See ./trace.json for the full workflow output.";
-
-  return [
-    `# batch-overview workflow — ${instanceId}`,
-    "",
-    `**Status:** ${label}`,
-    `**Cost:** see ./trace.json (per-org estimatedUsd in the workflow output)`,
-    "",
-    "## Workflow",
-    "",
-    mdTable([
-      ["Instance ID", instanceId],
-      ["Status", status.status],
-    ]),
-    "",
-    "## Result",
-    "",
-    resultBlock,
-    "",
-  ].join("\n");
-}
-
 /**
  * Trace IDs come from API responses (session/instance IDs). Constrain them to a
  * single safe path segment so a malicious or tampered response can't traverse
@@ -184,40 +144,15 @@ export function writeSessionTrace(session: Session, explicitDir?: string): strin
   });
 }
 
-export function writeBatchOverviewTrace(
-  status: BatchOverviewStatusResponse,
-  instanceId: string,
-  explicitDir?: string,
-): string {
-  return writeTrace({
-    traceDir: resolveTraceDir(explicitDir),
-    id: instanceId,
-    record: status,
-    summaryMarkdown: buildBatchOverviewSummaryMarkdown(status, instanceId),
-  });
-}
-
 /**
- * Fail-open variants for auto-capture paths (onboard / fetch --wait / overview
- * batch --wait). A trace write must never break the session command, so these
- * swallow errors and return `null` instead of throwing. Explicit `--save`
- * surfaces errors via the throwing `writeSessionTrace` directly.
+ * Fail-open variant for auto-capture paths (onboard / fetch --wait). A trace
+ * write must never break the session command, so this swallows errors and
+ * returns `null` instead of throwing. Explicit `--save` surfaces errors via
+ * the throwing `writeSessionTrace` directly.
  */
 export function trySaveSessionTrace(session: Session, explicitDir?: string): string | null {
   try {
     return writeSessionTrace(session, explicitDir);
-  } catch {
-    return null;
-  }
-}
-
-export function trySaveBatchOverviewTrace(
-  status: BatchOverviewStatusResponse,
-  instanceId: string,
-  explicitDir?: string,
-): string | null {
-  try {
-    return writeBatchOverviewTrace(status, instanceId, explicitDir);
   } catch {
     return null;
   }

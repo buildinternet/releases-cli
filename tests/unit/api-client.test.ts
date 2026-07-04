@@ -1173,44 +1173,6 @@ describe("backfill and re-extract", () => {
 
 // ── Batch overview ───────────────────────────────────────────────────────────
 
-describe("batch overview workflow", () => {
-  let originalFetch: typeof globalThis.fetch;
-  beforeEach(() => {
-    originalFetch = globalThis.fetch;
-  });
-  afterEach(() => {
-    globalThis.fetch = originalFetch;
-  });
-
-  it("triggerBatchOverview POSTs to /v1/workflows/batch-overview", async () => {
-    const calls = captureFetch(200, {
-      instanceId: "inst_ov",
-      statusUrl: "https://api/status/inst_ov",
-    });
-    const result = await client.triggerBatchOverview({ maxCostUsd: 1.0, dryRun: false } as any);
-    expect(calls[0].url).toContain("/v1/workflows/batch-overview");
-    expect(calls[0].init?.method).toBe("POST");
-    const body = JSON.parse(calls[0].init!.body as string);
-    expect(body.maxCostUsd).toBe(1.0);
-    expect(result.instanceId).toBe("inst_ov");
-  });
-
-  it("getBatchOverviewStatus GETs /v1/workflows/batch-overview/status/:id", async () => {
-    const calls = captureFetch(200, { instanceId: "inst_ov", status: "running" });
-    const result = await client.getBatchOverviewStatus("inst_ov");
-    expect(calls[0].url).toContain("/v1/workflows/batch-overview/status/inst_ov");
-    expect(calls[0].init?.method).toBeUndefined();
-    expect(result.status).toBe("running");
-  });
-
-  it("getBatchOverviewStatus throws when instance not found (null body)", async () => {
-    captureFetch(404);
-    await expect(client.getBatchOverviewStatus("bad_id")).rejects.toThrow(
-      /Workflow instance not found/,
-    );
-  });
-});
-
 // ── Media assets ─────────────────────────────────────────────────────────────
 
 describe("media assets", () => {

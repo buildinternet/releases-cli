@@ -15,22 +15,15 @@ import {
   getOverviewInputsCheck,
   getOverviewManifest,
   upsertOverview,
-  triggerBatchOverview,
-  getBatchOverviewStatus,
   type OverviewInputs,
-  type BatchOverviewTriggerBody,
-  type BatchOverviewStatusResponse,
 } from "../../../api/sources.js";
 import { type OverviewCitation, type OverviewManifestRow } from "../../../api/types.js";
 import { orgNotFound } from "../../suggest.js";
 import { writeJson } from "../../../lib/output.js";
-import { trySaveBatchOverviewTrace } from "../../../lib/trace.js";
 import {
   MAX_CONTENT_CHARS_DEFAULT,
   parseMaxContentCharsFlag,
-  parseNonNegIntFlag,
   parsePositiveIntFlag,
-  parseTagList,
 } from "../../../lib/flags.js";
 import { logger } from "@releases/lib/logger";
 import { timeAgo } from "@buildinternet/releases-core/dates";
@@ -89,17 +82,6 @@ interface OverviewPlanOpts {
   staleDays?: string;
   missing?: boolean;
   hasActivity?: boolean;
-}
-
-interface OverviewBatchOpts {
-  orgs?: string;
-  minNewReleases?: string;
-  minOverviewAgeDays?: string;
-  maxCandidates?: string;
-  maxCostUsd?: string;
-  wait?: boolean;
-  json?: boolean;
-  traceDir?: string;
 }
 
 interface OverviewFreshnessInput {
@@ -635,87 +617,6 @@ async function overviewPlanAction(opts: OverviewPlanOpts): Promise<void> {
   console.log(chalk.dim(`\n${rows.length} org(s) — ${parts}`));
 }
 
-// ── Batch workflow trigger ────────────────────────────────────────────────────
-
-/** Terminal Workflows states per Cloudflare's WorkflowInstance.status() enum. */
-const TERMINAL_STATUSES = new Set(["complete", "errored", "terminated"]);
-
-/** Poll cadence for --wait. 30s matches the issue's spec and the workflow's typical 3-minute end-to-end. */
-const POLL_INTERVAL_MS = 30_000;
-
-function parsePositiveFloatFlag(label: string, raw: string | undefined): number | undefined {
-  if (raw === undefined) return undefined;
-  const n = Number(raw);
-  if (!Number.isFinite(n) || n <= 0) {
-    logger.error(`Invalid --${label}: must be a positive number (got ${raw})`);
-    process.exit(2);
-  }
-  return n;
-}
-
-async function overviewBatchAction(opts: OverviewBatchOpts): Promise<void> {
-  const minNewReleases = parseNonNegIntFlag("min-new-releases", opts.minNewReleases);
-  const minOverviewAgeDays = parseNonNegIntFlag("min-overview-age-days", opts.minOverviewAgeDays);
-  const maxCandidates = parsePositiveIntFlag("max-candidates", opts.maxCandidates);
-  const maxCostUsd = parsePositiveFloatFlag("max-cost-usd", opts.maxCostUsd);
-  const orgs = opts.orgs ? parseTagList(opts.orgs) : undefined;
-
-  const body: BatchOverviewTriggerBody = {
-    ...(minNewReleases !== undefined && { minNewReleases }),
-    ...(minOverviewAgeDays !== undefined && { minOverviewAgeDays }),
-    ...(maxCandidates !== undefined && { maxCandidates }),
-    ...(maxCostUsd !== undefined && { maxCostUsd }),
-    ...(orgs && orgs.length > 0 && { orgs }),
-  };
-
-  const triggered = await triggerBatchOverview(body);
-
-  if (!opts.wait) {
-    if (opts.json) {
-      await writeJson(triggered);
-      return;
-    }
-    console.log(chalk.green(`Triggered batch-overview workflow: ${triggered.instanceId}`));
-    console.log(chalk.dim(`  status: ${triggered.statusUrl}`));
-    console.log(
-      chalk.dim(`  Re-run with --wait or 'releases admin overview batch --wait' to poll inline.`),
-    );
-    return;
-  }
-
-  if (!opts.json) {
-    console.log(chalk.bold(`Triggered batch-overview workflow: ${triggered.instanceId}`));
-    console.log(chalk.dim(`  Polling every ${POLL_INTERVAL_MS / 1000}s until terminal...`));
-  }
-
-  let last: BatchOverviewStatusResponse | undefined;
-  while (true) {
-    // eslint-disable-next-line no-await-in-loop -- polling cadence
-    last = await getBatchOverviewStatus(triggered.instanceId);
-    if (!opts.json) {
-      console.log(chalk.dim(`  status: ${last.status}`));
-    }
-    if (TERMINAL_STATUSES.has(last.status)) break;
-    // eslint-disable-next-line no-await-in-loop
-    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
-  }
-
-  const tracePath = trySaveBatchOverviewTrace(last, triggered.instanceId, opts.traceDir);
-
-  if (opts.json) {
-    await writeJson(last);
-  } else {
-    if (last.status === "complete") {
-      logger.info(chalk.green(`Done. Final status: ${last.status}`));
-    } else {
-      logger.error(chalk.red(`Workflow ended in non-success state: ${last.status}`));
-    }
-    if (tracePath) process.stderr.write(chalk.dim(`  Trace: ${tracePath}\n`));
-  }
-
-  if (last.status !== "complete") process.exit(1);
-}
-
 // ── Command registration ──────────────────────────────────────────────────────
 
 export function registerOverviewCommands(admin: Command): void {
@@ -847,41 +748,6 @@ happens client-side — the CLI still receives the full payload over the wire �
 so it removes that footgun without a multi-step jq workaround.`,
     )
     .action(overviewInputsAction);
-
-  overview
-    .command("batch")
-    .description("Trigger BatchOverviewWorkflow for the eligibility-filtered org set")
-    .option("--orgs <slugs>", "Comma-separated org slug allowlist (skips eligibility filtering)")
-    .option("--min-new-releases <n>", "Min releases shipped since the last overview (default 20)")
-    .option(
-      "--min-overview-age-days <n>",
-      "Min age in days of an existing overview to consider it stale (default 14)",
-    )
-    .option("--max-candidates <n>", "Cap on candidate count picked by the workflow (default 100)")
-    .option("--max-cost-usd <n>", "Per-run cost ceiling in USD; workflow aborts above this")
-    .option("--wait", "Poll the workflow status every 30s until it reaches a terminal state")
-    .option(
-      "--trace-dir <dir>",
-      "With --wait, write the terminal workflow as <dir>/<instanceId>/{trace.json,summary.md} (default: ~/.releases/work/runs)",
-    )
-    .option("--json", "Output as JSON")
-    .addHelpText(
-      "after",
-      `
-Examples:
-  releases admin overview batch --orgs vercel,anthropic --wait
-  releases admin overview batch --max-candidates 4 --max-cost-usd 0.05 --json
-  releases admin overview batch --min-new-releases 30 --min-overview-age-days 7
-
-Triggers POST /v1/workflows/batch-overview. When --wait is omitted the command
-returns immediately with the instanceId and statusUrl; with --wait it polls
-GET /v1/workflows/batch-overview/status/:instanceId every 30s and exits
-non-zero on any terminal state other than 'complete'.
-
---orgs explicitly bypasses the workflow's eligibility predicate (recency +
-overview-age) so handpicked smoke tests run even on already-fresh orgs.`,
-    )
-    .action(overviewBatchAction);
 
   overview
     .command("update")

@@ -27,7 +27,6 @@ type BackfillOpts = {
 
 // Deep Firecrawl backfills run as a durable workflow (minutes). When `--wait`
 // polls inline, hit the status endpoint at this cadence until terminal.
-// Single-source backfills finish faster than the batch-overview sweep (30s).
 const POLL_INTERVAL_MS = 5_000;
 const TERMINAL_STATUSES = new Set(["complete", "errored", "terminated"]);
 
@@ -56,10 +55,10 @@ export async function backfillAction(identifier: string, opts: BackfillOpts): Pr
   }
 
   // ── Async path: deep Firecrawl backfill dispatched to a durable workflow ────
-  // Mirrors `admin overview batch`: dispatch and return the handle by default;
-  // `--wait` polls inline. Non-blocking-by-default is the right primitive for
-  // agents — pair the printed instanceId with `backfill-status` to poll on your
-  // own cadence, or pass `--wait` for a blocking report.
+  // Dispatch and return the handle by default; `--wait` polls inline.
+  // Non-blocking-by-default is the right primitive for agents — pair the
+  // printed instanceId with `backfill-status` to poll on your own cadence, or
+  // pass `--wait` for a blocking report.
   if (isBackfillAsync(res)) {
     if (!wait) {
       if (opts.json) return writeJson(res);
