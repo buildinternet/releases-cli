@@ -982,61 +982,6 @@ export async function reextractSource(body: {
   });
 }
 
-// ── Batch overview workflow (admin-only) ──
-
-/** Trigger body for POST /v1/workflows/batch-overview — mirrors `BatchOverviewBody` on the API worker. */
-export interface BatchOverviewTriggerBody {
-  minNewReleases?: number;
-  minOverviewAgeDays?: number;
-  maxCandidates?: number;
-  orgs?: string[];
-  maxCostUsd?: number;
-}
-
-export interface BatchOverviewTriggerResponse {
-  instanceId: string;
-  statusUrl: string;
-}
-
-/**
- * Cloudflare Workflows surfaces a small enum on `WorkflowInstance.status()`.
- * Terminal states are `complete | errored | terminated`; pre-terminal states
- * are `queued | running | paused`. We type the field as string to stay
- * forward-compatible with any new values CF introduces.
- */
-export interface BatchOverviewStatusResponse {
-  instanceId: string;
-  status: string;
-  output?: unknown;
-  error?: unknown;
-  [k: string]: unknown;
-}
-
-export async function triggerBatchOverview(
-  body: BatchOverviewTriggerBody,
-): Promise<BatchOverviewTriggerResponse> {
-  return apiFetch<BatchOverviewTriggerResponse>("/v1/workflows/batch-overview", {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-}
-
-export async function getBatchOverviewStatus(
-  instanceId: string,
-): Promise<BatchOverviewStatusResponse> {
-  // apiFetch returns null on 404 for GETs. The status route 404s with
-  // `instance_not_found` when the workflow ID is wrong (or briefly during
-  // the create→status race window). Throw so callers reading `.status`
-  // can't crash silently.
-  const res = await apiFetch<BatchOverviewStatusResponse | null>(
-    `/v1/workflows/batch-overview/status/${encodeURIComponent(instanceId)}`,
-  );
-  if (res === null) {
-    throw new Error(`Workflow instance not found: ${instanceId}`);
-  }
-  return res;
-}
-
 // ── Domain Aliases ──
 
 export async function getAliases(

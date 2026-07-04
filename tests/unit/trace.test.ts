@@ -6,7 +6,6 @@ import type { Session } from "@buildinternet/releases-api-types";
 import {
   resolveTraceDir,
   buildSessionSummaryMarkdown,
-  buildBatchOverviewSummaryMarkdown,
   writeTrace,
   writeSessionTrace,
   trySaveSessionTrace,
@@ -87,26 +86,6 @@ describe("buildSessionSummaryMarkdown", () => {
     const md = buildSessionSummaryMarkdown({ ...baseSession, usage: undefined });
     expect(md).toContain("**Status:** completed");
     expect(md).toContain("n/a");
-  });
-});
-
-describe("buildBatchOverviewSummaryMarkdown", () => {
-  it("maps a complete workflow to completed and includes the instance id", () => {
-    const md = buildBatchOverviewSummaryMarkdown(
-      { instanceId: "wf_1", status: "complete" },
-      "wf_1",
-    );
-    expect(md).toContain("**Status:** completed");
-    expect(md).toContain("wf_1");
-  });
-
-  it("maps errored/terminated to failed and surfaces the error", () => {
-    const md = buildBatchOverviewSummaryMarkdown(
-      { instanceId: "wf_2", status: "errored", error: "boom" },
-      "wf_2",
-    );
-    expect(md).toContain("**Status:** failed");
-    expect(md).toContain("boom");
   });
 });
 
