@@ -1,5 +1,12 @@
 # @buildinternet/releases
 
+## 0.67.3
+
+### Patch Changes
+
+- 9fae093: `releases admin org update --overview-cadence <days|auto>` — pin an org's automated overview-regen cadence (1–90 days) or clear back to the velocity-tiered automatic default; `releases admin org get` shows the override when set (buildinternet/releases#1895).
+- cb01cc2: Removed `releases admin overview batch` — its API route was retired in buildinternet/releases#1902; use the automated overview regen (per-org cadence) or `--overview-cadence` instead.
+
 ## 0.67.2
 
 ### Patch Changes
