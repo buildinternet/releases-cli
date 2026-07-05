@@ -51,6 +51,7 @@ import { registerWhoamiCommand } from "./commands/whoami.js";
 import { registerWebhookCommand } from "./commands/webhook.js";
 import { registerWebhookAdminCommand } from "./commands/admin/webhook.js";
 import { registerAgentContextCommand } from "./commands/agent-context.js";
+import { registerJsonCommand } from "./commands/json.js";
 import { registerCompletionCommand } from "./commands/completion.js";
 import { completionNotice } from "./completion/hint.js";
 import { registerSkillsCommand } from "./commands/skills.js";
@@ -262,6 +263,7 @@ registerLoginCommand(program);
 registerKeysCommand(program);
 registerFollowsCommands(program);
 registerAgentContextCommand(program);
+registerJsonCommand(program);
 registerCompletionCommand(program);
 registerSkillsCommand(program);
 // `webhook {list,add,…}` — self-serve `/v1/me/webhooks` (auth required).
