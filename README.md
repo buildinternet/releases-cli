@@ -75,6 +75,7 @@ Neither needs an account or API key:
 ```bash
 releases submit https://acme.dev/changelog       # suggest a changelog / release-notes URL
 releases feedback "tail -f reconnects slowly"     # report a bug or share an idea
+releases json validate releases.json              # check a releases.json manifest before publishing
 ```
 
 Both prompt interactively when run with no argument, accept input on stdin, and take `--dry-run --json` to preview the payload without sending. `feedback --type` is `bug` / `idea` / `other`; `submit --note` carries extra context (product name, repo, feed quirks). Submissions feed the same review queue as the [web submit form](https://releases.sh/submit).
