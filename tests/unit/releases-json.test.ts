@@ -21,7 +21,7 @@ describe("releases.json (repo-root product mapping)", () => {
     expect(parsed.$schema).toBe("https://releases.sh/schemas/releases.json");
     expect(parsed.version).toBe(2);
     if (!("product" in parsed)) throw new Error("expected repo-scoped manifest");
-    expect(parsed.product?.slug).toBe("cli");
+    expect(parsed.product.slug).toBe("cli");
     expect(parsed.releases?.[0]?.github).toBe("self");
   });
 });
