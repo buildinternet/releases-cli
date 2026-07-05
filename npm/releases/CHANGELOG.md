@@ -1,5 +1,15 @@
 # @buildinternet/releases
 
+## 0.68.0
+
+### Minor Changes
+
+- c1e5ee6: Add `releases json validate <path>` — validate a `releases.json` v2 owner manifest against the published schema (`ReleasesJsonConfigSchema`) before publishing it. Accepts a file path or `-` for stdin, detects the hosting scope (domain vs repo) for readable path-anchored errors, and supports `--json` for machine output (exit 0 valid / 1 invalid). The `domain` form (live fetch + materialization plan) is deferred until the public dry-run endpoint lands (buildinternet/releases#1910) so web and CLI share one verdict.
+
+### Patch Changes
+
+- cf95da6: Adopt `@buildinternet/releases-api-types` 0.37.0 (releases.json v2 schema) and migrate the repo-root `releases.json` to the v2 manifest format (product binding + `github: "self"` release locator).
+
 ## 0.67.3
 
 ### Patch Changes
