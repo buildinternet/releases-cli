@@ -30,6 +30,11 @@ interface ValidateResult {
   scope: Scope | null;
   issues: Issue[];
   summary?: DomainSummary | RepoSummary;
+  // Set only on the deferred domain form (exit 2): the outcome is neither a
+  // pass nor a schema failure, so it carries a marker plus operator guidance
+  // rather than issues. Keeps every `--json` outcome on one documented shape.
+  unsupported?: "domain";
+  message?: string;
 }
 
 interface DomainSummary {
@@ -71,24 +76,12 @@ function looksLikeDomain(target: string): boolean {
   return HOSTNAME_RE.test(target);
 }
 
-// Domain-only top-level keys. Their presence disambiguates the union so a
-// mis-typed file gets errors from the scope it clearly intended rather than the
-// noisy "matched neither branch" union failure.
-const DOMAIN_KEYS = new Set([
-  "name",
-  "description",
-  "category",
-  "avatar",
-  "tags",
-  "social",
-  "products",
-]);
-
+// The single top-level discriminator between the two hosting scopes: only the
+// repo-root manifest declares `product` (singular). Everything else — including
+// a minimal `{version, releases}` file — is treated as domain scope, which
+// picks the right scoped schema for readable error messages.
 function detectScope(data: unknown): Scope {
-  if (typeof data !== "object" || data === null) return "domain";
-  const keys = Object.keys(data as Record<string, unknown>);
-  if (keys.includes("product")) return "repo";
-  if (keys.some((k) => DOMAIN_KEYS.has(k))) return "domain";
+  if (typeof data === "object" && data !== null && "product" in data) return "repo";
   return "domain";
 }
 
@@ -136,9 +129,9 @@ function registryBinding(parsed: Record<string, unknown>): RegistryBinding | nul
   };
 }
 
-function buildSummary(parsed: Record<string, unknown>): DomainSummary | RepoSummary {
+function buildSummary(parsed: Record<string, unknown>, scope: Scope): DomainSummary | RepoSummary {
   const binding = registryBinding(parsed);
-  if ("product" in parsed) {
+  if (scope === "repo") {
     const product = parsed.product as { name?: string; slug?: string } | undefined;
     return {
       scope: "repo",
@@ -208,14 +201,15 @@ async function runValidate(target: string, opts: { json?: boolean }): Promise<vo
       `For now, save the file locally and validate the path:\n` +
       `  curl -s https://${target}/.well-known/releases.json | releases json validate -`;
     if (opts.json) {
-      await writeJson({
+      const result: ValidateResult = {
         target,
         valid: false,
         scope: null,
         issues: [],
         unsupported: "domain",
         message: message.replace(/\n\s*/g, " "),
-      });
+      };
+      await writeJson(result);
     } else {
       logger.error(message);
     }
@@ -230,12 +224,13 @@ async function runValidate(target: string, opts: { json?: boolean }): Promise<vo
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     if (opts.json) {
-      await writeJson({
+      const result: ValidateResult = {
         target,
         valid: false,
         scope: null,
         issues: [{ path: "(root)", message: `not valid JSON: ${detail}`, code: "invalid_json" }],
-      });
+      };
+      await writeJson(result);
     } else {
       logger.error(`Not valid JSON: ${detail}`);
     }
@@ -246,11 +241,11 @@ async function runValidate(target: string, opts: { json?: boolean }): Promise<vo
   const scope = detectScope(data);
 
   if (verdict.success) {
-    const summary = buildSummary(data as Record<string, unknown>);
+    const summary = buildSummary(data as Record<string, unknown>, scope);
     const result: ValidateResult = {
       target,
       valid: true,
-      scope: summary.scope,
+      scope,
       issues: [],
       summary,
     };
@@ -301,6 +296,10 @@ Examples:
 
 Validates either hosting scope (domain-hosted /.well-known/releases.json or a
 repo-root releases.json). Exit code 0 when valid, 1 when invalid.
+
+A bare hostname (e.g. acme.com) targets the domain form — live fetch plus
+materialization plan — which is deferred until the public dry-run endpoint
+lands (buildinternet/releases#1910); it exits 2 with guidance for now.
 Docs: https://releases.sh/docs/listing`,
     )
     .action(async (target: string, opts: { json?: boolean }) => {

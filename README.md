@@ -70,7 +70,7 @@ Org-scoped: up to 10 (`--org`, optional `--source`, `--product`, `--type feature
 
 ### Contribute to the registry
 
-Neither needs an account or API key:
+None of these need an account or API key:
 
 ```bash
 releases submit https://acme.dev/changelog       # suggest a changelog / release-notes URL
@@ -78,7 +78,9 @@ releases feedback "tail -f reconnects slowly"     # report a bug or share an ide
 releases json validate releases.json              # check a releases.json manifest before publishing
 ```
 
-Both prompt interactively when run with no argument, accept input on stdin, and take `--dry-run --json` to preview the payload without sending. `feedback --type` is `bug` / `idea` / `other`; `submit --note` carries extra context (product name, repo, feed quirks). Submissions feed the same review queue as the [web submit form](https://releases.sh/submit).
+`submit` and `feedback` both prompt interactively when run with no argument, accept input on stdin, and take `--dry-run --json` to preview the payload without sending. `feedback --type` is `bug` / `idea` / `other`; `submit --note` carries extra context (product name, repo, feed quirks). Submissions feed the same review queue as the [web submit form](https://releases.sh/submit).
+
+`json validate` is a read-only manifest check: it validates a [`releases.json`](https://releases.sh/docs/listing) v2 file against the published schema (pass a path or `-` for stdin) and adds `--json` for machine-readable output — no network, no submission.
 
 ### MCP & Claude Code
 
