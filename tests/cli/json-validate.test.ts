@@ -225,6 +225,24 @@ describe("json validate <domain> (live listing validation)", () => {
     expect(out).toContain("releases.sh/docs/listing");
   });
 
+  it("exits 1 cleanly on a 2xx response with an unparseable body", async () => {
+    globalThis.fetch = (async () =>
+      new Response("not json at all", {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })) as any;
+    const { logs, restore } = captureLogs();
+    try {
+      await runValidate("acme.com", {});
+    } catch (e) {
+      expect((e as Error).message).toBe("process.exit called");
+    } finally {
+      restore();
+    }
+    expect(exitCode).toBe(1);
+    expect(logs.join("\n")).toContain("unreadable response");
+  });
+
   it("prints a friendly retry message on 429 and exits 1", async () => {
     mockFetchOnce(429, {
       error: { code: "rate_limited", type: "rate_limit", message: "Too many requests" },

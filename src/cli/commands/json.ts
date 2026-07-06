@@ -229,7 +229,18 @@ async function runDomainValidate(target: string, opts: { json?: boolean }): Prom
     process.exit(1);
   }
 
-  const result = (await res.json()) as ListingValidationResult;
+  let result: ListingValidationResult;
+  try {
+    result = (await res.json()) as ListingValidationResult;
+  } catch {
+    const message = "The listing endpoint returned an unreadable response. Please try again.";
+    if (opts.json) {
+      await writeJson({ target, valid: false, scope: null, issues: [], message });
+    } else {
+      console.log(chalk.red(message));
+    }
+    process.exit(1);
+  }
 
   if (opts.json) {
     // Raw wire shape merged with the target — deliberately NOT the local-file
