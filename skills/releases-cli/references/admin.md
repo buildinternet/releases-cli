@@ -251,6 +251,19 @@ releases admin org delete vercel --hard --yes             # permanent purge + FK
 
 There is no `org refresh` command. To refresh an org: fetch its sources with `releases admin source fetch --org <slug>` (see **Fetch** above), then regenerate the overview with the `overview` subcommands — `releases admin overview inputs <slug>` → generate the body → `releases admin overview update <slug>` (or `releases admin overview batch` for a server-side sweep). Overview generation is agent-driven; no single command does both.
 
+### Stub-tier orgs
+
+A stub org carries identity + declared release locations but no sources (buildinternet/releases#1947):
+
+```bash
+releases admin org create-stub "Example" --domain example.com --location '{"url":"https://example.com/changelog"}'
+releases admin org create-stub "Example" --from-file locations.json      # locations array or full body JSON
+releases admin org create-stub-from-domain example.com --dry-run         # from /.well-known/releases.json
+releases admin org promote example --dry-run                             # materialize locations → sources, tier → tracked
+```
+
+`--location` is repeatable and takes one JSON locator per flag (`url` / `feed` / `github` / `appstore` / `file`, plus optional `title` / `canonical`). `promote` is idempotent — an already-tracked org is a no-op.
+
 `org delete` soft-deletes by default (a reversible tombstone). `--hard` purges the row and cascade-deletes every dependent source, release, fetch-log, changelog file/chunk, summary, media asset, and webhook subscription; it prompts for a slug typeback unless `--yes` is passed (required in non-TTY/scripted contexts). You can pass a slug or an `org_…` ID either way — the CLI resolves to the typed ID the destructive path requires.
 
 ## Products

@@ -6,7 +6,7 @@ import type {
   Tag,
 } from "@buildinternet/releases-core/schema";
 import type { OrgCatalogResponse, OrgDependentsResponse } from "./types.js";
-import type { SetOrgAvatarResponse } from "@buildinternet/releases-api-types";
+import type { CreateStubOrgBody, SetOrgAvatarResponse } from "@buildinternet/releases-api-types";
 import { apiFetch, suggestEntities } from "./core.js";
 import { assertCleanIdentifier } from "../lib/validate-input.js";
 import { type ListResponse } from "@buildinternet/releases-core/cli-contracts";
@@ -167,6 +167,66 @@ export async function getOrgDependents(identifier: string): Promise<OrgDependent
     throw new Error(`Org dependents preview not available for "${identifier}" (org not found).`);
   }
   return result;
+}
+
+// ── Stub-tier orgs (#1947) ──
+
+/** POST /v1/orgs/stub — create a curator-authored stub org (identity +
+ *  declared release locations, no sources). Admin scope required. */
+export async function createStubOrg(
+  body: CreateStubOrgBody,
+): Promise<Organization & { productCount: number; locationCount: number }> {
+  return apiFetch<Organization & { productCount: number; locationCount: number }>("/v1/orgs/stub", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export interface StubFromDomainResult {
+  created: boolean;
+  orgId?: string;
+  skippedReason?: string;
+  productCount?: number;
+  locationCount?: number;
+  /** Populated on dryRun: the stub input that WOULD be written. */
+  plan?: Record<string, unknown>;
+}
+
+/** POST /v1/orgs/stub-from-domain — create a stub org from a domain's
+ *  /.well-known/releases.json manifest. `dryRun` rides as a query param. */
+export async function createStubOrgFromDomain(
+  domain: string,
+  opts?: { dryRun?: boolean },
+): Promise<StubFromDomainResult> {
+  const qs = opts?.dryRun ? "?dryRun=1" : "";
+  return apiFetch<StubFromDomainResult>(`/v1/orgs/stub-from-domain${qs}`, {
+    method: "POST",
+    body: JSON.stringify({ domain }),
+  });
+}
+
+export interface PromoteOrgResult {
+  promoted: boolean;
+  /** True when the org was already `tracked` — a no-op success (idempotent). */
+  alreadyTracked?: boolean;
+  sourcesCreated: number;
+  sourcesMatched: number;
+  locatorsStamped: number;
+  /** The materialization plan (the whole payload under dryRun). */
+  plan?: Record<string, unknown>;
+}
+
+/** POST /v1/orgs/:slug/promote — materialize a stub's locations into sources
+ *  and flip the org to `tier: "tracked"`. `dryRun` rides as a query param. */
+export async function promoteOrg(
+  identifier: string,
+  opts?: { dryRun?: boolean },
+): Promise<PromoteOrgResult> {
+  assertCleanIdentifier(identifier, "org");
+  const qs = opts?.dryRun ? "?dryRun=1" : "";
+  return apiFetch<PromoteOrgResult>(`/v1/orgs/${encodeURIComponent(identifier)}/promote${qs}`, {
+    method: "POST",
+  });
 }
 
 export async function updateOrg(
