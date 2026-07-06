@@ -6,9 +6,11 @@ import {
   ReleasesJsonDomainSchema,
   ReleasesJsonRepoSchema,
 } from "@buildinternet/releases-api-types";
+import type { ListingValidationResult } from "@buildinternet/releases-api-types";
 import { logger } from "@releases/lib/logger";
 import { readContentArg } from "../../lib/input.js";
 import { writeJson } from "../../lib/output.js";
+import { getApiUrl } from "../../lib/mode.js";
 
 // The owner-declared manifest documented at https://releases.sh/docs/listing.
 // Two hosting scopes share one public union schema (ReleasesJsonConfigSchema):
@@ -30,11 +32,6 @@ interface ValidateResult {
   scope: Scope | null;
   issues: Issue[];
   summary?: DomainSummary | RepoSummary;
-  // Set only on the deferred domain form (exit 2): the outcome is neither a
-  // pass nor a schema failure, so it carries a marker plus operator guidance
-  // rather than issues. Keeps every `--json` outcome on one documented shape.
-  unsupported?: "domain";
-  message?: string;
 }
 
 interface DomainSummary {
@@ -188,32 +185,121 @@ function printIssues(target: string, scope: Scope, issues: Issue[]): void {
   );
 }
 
-async function runValidate(target: string, opts: { json?: boolean }): Promise<void> {
-  if (looksLikeDomain(target)) {
-    // The domain form fetches https://<domain>/.well-known/releases.json and
-    // renders the materialization plan. Its verdict must come from the shared
-    // web fast-lane backend (the public rate-limited dry-run endpoint) so web
-    // and CLI never disagree — that endpoint is buildinternet/releases#1910 and
-    // hasn't landed. Ship the local-file half first; keep the surface stable.
-    const message =
-      `Domain validation isn't available yet — it needs the public dry-run ` +
-      `endpoint (buildinternet/releases#1910). ` +
-      `For now, save the file locally and validate the path:\n` +
-      `  curl -s https://${target}/.well-known/releases.json | releases json validate -`;
+// The domain form. The verdict comes from the shared web fast-lane backend
+// (POST /v1/listing/validate — buildinternet/releases#1910/#1947 phase 2) so
+// web and CLI never disagree: the API fetches https://<domain>/.well-known/
+// releases.json live and returns the validation verdict plus the
+// materialization plan. Anonymous, per-IP rate-limited; no auth header.
+async function runDomainValidate(target: string, opts: { json?: boolean }): Promise<never> {
+  let res: Response;
+  try {
+    res = await fetch(`${getApiUrl()}/v1/listing/validate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ domain: target }),
+    });
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    const message = `Could not reach the listing endpoint: ${detail}`;
     if (opts.json) {
-      const result: ValidateResult = {
-        target,
-        valid: false,
-        scope: null,
-        issues: [],
-        unsupported: "domain",
-        message: message.replace(/\n\s*/g, " "),
-      };
-      await writeJson(result);
+      await writeJson({ target, valid: false, scope: null, issues: [], message });
     } else {
       logger.error(message);
     }
-    process.exit(2);
+    process.exit(1);
+  }
+
+  if (!res.ok) {
+    let message = "Validation request failed. Please try again.";
+    if (res.status === 429) {
+      message = "Too many checks — please try again in a minute.";
+    } else {
+      try {
+        const body = (await res.json()) as { error?: { message?: string } };
+        if (typeof body?.error?.message === "string") message = body.error.message;
+      } catch {
+        // keep the generic fallback
+      }
+    }
+    if (opts.json) {
+      await writeJson({ target, valid: false, scope: null, issues: [], message });
+    } else {
+      console.log(chalk.red(message));
+    }
+    process.exit(1);
+  }
+
+  let result: ListingValidationResult;
+  try {
+    result = (await res.json()) as ListingValidationResult;
+  } catch {
+    const message = "The listing endpoint returned an unreadable response. Please try again.";
+    if (opts.json) {
+      await writeJson({ target, valid: false, scope: null, issues: [], message });
+    } else {
+      console.log(chalk.red(message));
+    }
+    process.exit(1);
+  }
+
+  if (opts.json) {
+    // Raw wire shape merged with the target — deliberately NOT the local-file
+    // ValidateResult: the domain form's verdict carries the materialization
+    // plan (domainStatus/identity/products/locations), not zod issues.
+    await writeJson({ target, ...result });
+    process.exit(result.valid ? 0 : 1);
+  }
+
+  if (!result.valid) {
+    printIssues(
+      target,
+      "domain",
+      result.errors.map((e) => ({ path: e.path, message: e.message, code: "invalid" })),
+    );
+    process.exit(1);
+  }
+
+  console.log(chalk.green("✓ valid releases.json") + chalk.dim(` (domain — ${target})`));
+  if (result.identity) {
+    line("org", result.identity.name);
+    line("slug", result.identity.slug);
+    line("domain", result.identity.domain);
+  }
+  if (result.products?.length) {
+    line(
+      "products",
+      result.products
+        .map((p) => `${p.name} (${p.locationCount} locator${p.locationCount === 1 ? "" : "s"})`)
+        .join(", "),
+    );
+  }
+  line("status", result.domainStatus);
+  if (result.locations.length) {
+    console.log("");
+    console.log(chalk.dim("  release locators"));
+    for (const loc of result.locations) {
+      const classification =
+        loc.classification === "tier1-live"
+          ? chalk.green("goes live")
+          : chalk.yellow("reviewed first");
+      console.log(`    ${chalk.cyan(loc.kind.padEnd(9))}${loc.locator}`);
+      console.log(`    ${" ".repeat(9)}${classification}${chalk.dim(` — ${loc.becomes}`)}`);
+    }
+  }
+  console.log("");
+  if (result.domainStatus === "unlisted") {
+    console.log(`Activate at https://releases.sh/submit`);
+  } else {
+    console.log(
+      `This domain is already listed.${result.org ? ` ${chalk.dim(result.org.webUrl)}` : ""}`,
+    );
+  }
+  process.exit(0);
+}
+
+export async function runValidate(target: string, opts: { json?: boolean }): Promise<void> {
+  if (looksLikeDomain(target)) {
+    await runDomainValidate(target, opts);
   }
 
   const raw = await readContentArg(target);
@@ -297,9 +383,8 @@ Examples:
 Validates either hosting scope (domain-hosted /.well-known/releases.json or a
 repo-root releases.json). Exit code 0 when valid, 1 when invalid.
 
-A bare hostname (e.g. acme.com) targets the domain form — live fetch plus
-materialization plan — which is deferred until the public dry-run endpoint
-lands (buildinternet/releases#1910); it exits 2 with guidance for now.
+A bare hostname (e.g. acme.com) targets the domain form — validates live
+against the registry's listing endpoint and prints the materialization plan.
 Docs: https://releases.sh/docs/listing`,
     )
     .action(async (target: string, opts: { json?: boolean }) => {

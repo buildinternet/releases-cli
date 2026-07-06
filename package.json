@@ -56,7 +56,7 @@
   },
   "homepage": "https://releases.sh",
   "dependencies": {
-    "@buildinternet/releases-api-types": "^0.38.0",
+    "@buildinternet/releases-api-types": "^0.39.0",
     "@buildinternet/releases-core": "^0.25.0",
     "@buildinternet/releases-lib": "workspace:*",
     "@buildinternet/releases-skills": "workspace:*",
