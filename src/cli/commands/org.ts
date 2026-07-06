@@ -51,6 +51,7 @@ import {
 import { warnDeprecatedAlias } from "../../lib/deprecated-alias.js";
 import { parseTagList } from "../../lib/flags.js";
 import { buildNoticePatch, formatNotice, type EntityWithNotice } from "../../lib/notice.js";
+import { registerOrgStubCommands } from "./org-stub.js";
 
 // ── Shared action handlers ────────────────────────────────────────────────────
 
@@ -546,6 +547,9 @@ async function resolveAvatarSource(
 
 export function registerOrgCommand(program: Command) {
   const org = program.command("org").description("Manage organizations");
+
+  // Stub-tier verbs — create-stub / create-stub-from-domain / promote (#1947)
+  registerOrgStubCommands(org);
 
   // ── org create (canonical) / org add (deprecated) ──
   org
