@@ -4,10 +4,15 @@
 [![Release](https://github.com/buildinternet/releases-cli/actions/workflows/release.yml/badge.svg)](https://github.com/buildinternet/releases-cli/actions/workflows/release.yml)
 [![Test](https://github.com/buildinternet/releases-cli/actions/workflows/test.yml/badge.svg)](https://github.com/buildinternet/releases-cli/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+[![Backend](https://img.shields.io/badge/backend-buildinternet%2Freleases-24292e?logo=github)](https://github.com/buildinternet/releases)
 [![skills.sh](https://skills.sh/b/buildinternet/releases-cli)](https://skills.sh/buildinternet/releases-cli)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/buildinternet/releases-cli)
 
+**[releases.sh](https://releases.sh)** &nbsp;·&nbsp; **[Backend monorepo →](https://github.com/buildinternet/releases)** &nbsp;·&nbsp; [Install](#install) &nbsp;·&nbsp; [Usage](#usage) &nbsp;·&nbsp; [Authentication](#authentication)
+
 The changelog & release-notes registry for developers and AI agents — a lean HTTP client for [releases.sh](https://releases.sh). Search and browse release notes from GitHub, RSS/Atom/JSON feeds, and product changelog pages, with no local infrastructure.
+
+This repo is the **CLI** only. The backend that powers `api.releases.sh` — the API worker, MCP server, web frontend, and ingest pipeline — is open source in its own repo: [buildinternet/releases](https://github.com/buildinternet/releases).
 
 The CLI talks to the hosted registry at `api.releases.sh`. **Search and browse work out of the box — no account or config.** Sign in with `releases login` to follow orgs and products, get a personalized feed, and manage outbound webhooks; it mints a personal **read-only** API key (and earns you higher rate limits as those roll out). Write/admin access (`releases admin …`) is a separate, closed beta — open an issue for early access.
 

@@ -2,7 +2,7 @@
 
 Thanks for your interest in contributing! This guide covers everything you need to build, test, and ship changes to the CLI and the packages it ships alongside (`@buildinternet/releases`, `@buildinternet/releases-lib`, `@buildinternet/releases-skills`).
 
-The CLI is a thin HTTP client for [releases.sh](https://releases.sh). The backend, web frontend, MCP server, and discovery agents live in a separate (private) monorepo and ship through the hosted API.
+The CLI is a thin HTTP client for [releases.sh](https://releases.sh). The backend, web frontend, MCP server, and discovery agents live in a separate open-source monorepo — [buildinternet/releases](https://github.com/buildinternet/releases) — and ship through the hosted API.
 
 ## Setup
 
@@ -30,12 +30,12 @@ The CLI is a thin HTTP client for [releases.sh](https://releases.sh). The backen
 
 The project is a Bun workspace. `@buildinternet/releases-lib` and `@buildinternet/releases-skills` are published from this repo alongside the CLI — those are open for direct contribution here.
 
-A couple of dependencies come from the upstream backend monorepo:
+A couple of dependencies come from the upstream backend monorepo, [buildinternet/releases](https://github.com/buildinternet/releases):
 
 - `@buildinternet/releases-core` — shared schema, helpers, and the FTS sanitizer.
 - `@buildinternet/releases-api-types` — wire-protocol types served by `api.releases.sh`.
 
-That monorepo is currently private (we plan to open-source it down the road), so those packages aren't open for direct PRs yet. If you hit a bug or need a missing field in either one, **open an issue here** describing what you need and we'll route it. In the meantime this repo just pins a published version and bumps when upstream cuts a release.
+Both are published from that repo, where the schema is the source of truth — so changes to either land there first, then this repo bumps its pinned version when upstream cuts a release. If you hit a bug or need a missing field in either one, open a PR or issue against [buildinternet/releases](https://github.com/buildinternet/releases); for anything CLI-only, this repo just pins the published version.
 
 ### Environment
 
@@ -97,7 +97,7 @@ A few things to know about how versioning works here:
 
 - The eight `@buildinternet/releases*` packages (meta + 5 platform binaries + `-lib` + `-skills`) live in a **fixed group** — they bump together. Targeting any one of them in a changeset cascades to all eight.
 - **Target `@buildinternet/releases`**, not `releases-cli`. The package isn't named `releases-cli` on npm.
-- `@buildinternet/releases-core` is published from the private monorepo and is **not** in the fixed group — don't include it in a changeset here.
+- `@buildinternet/releases-core` is published from the [backend monorepo](https://github.com/buildinternet/releases) and is **not** in the fixed group — don't include it in a changeset here.
 
 Pick the bump type by user impact:
 

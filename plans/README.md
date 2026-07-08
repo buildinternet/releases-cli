@@ -56,5 +56,5 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED 
   rotate them if the machine is ever shared. No code change planned.
 - **Bare-slug source lookup N+1 / bulk source delete** — both require new
   **API-side** endpoints (`/v1/lookups/source-by-slug`, a batch-delete route).
-  Out of scope for this client-only repo; file against the private monorepo
-  instead.
+  Out of scope for this client-only repo; file against the backend monorepo
+  ([buildinternet/releases](https://github.com/buildinternet/releases)) instead.
