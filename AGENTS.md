@@ -1,6 +1,6 @@
 # Agents guide — releases-cli
 
-This repo is the public, client-only CLI for the Releases registry. It talks to `api.releases.sh` over HTTP. Ingest, database access, and AI pipelines live in a separate private repo.
+This repo is the public, client-only CLI for the Releases registry. It talks to `api.releases.sh` over HTTP. Ingest, database access, and AI pipelines live in a separate open-source backend monorepo, [buildinternet/releases](https://github.com/buildinternet/releases).
 
 ## Stack
 
@@ -42,7 +42,7 @@ bun test                      # bun test (not part of check)
 ## Conventions
 
 - All logging to **stderr** via `@releases/lib/logger`. stdout is reserved for MCP JSON-RPC in `admin mcp serve` mode and for `--json` command output.
-- Reader commands (top-level `search`, `latest`, `list`, `show`, `stats`, `categories`) are unauthenticated GETs — safe to run without credentials. `summary` and `compare` are intentionally not in this CLI; they require AI provider calls and live in the private monorepo.
+- Reader commands (top-level `search`, `latest`, `list`, `show`, `stats`, `categories`) are unauthenticated GETs — safe to run without credentials. `summary` and `compare` are intentionally not in this CLI; they require AI provider calls and live in the backend monorepo.
 - Admin commands under `releases admin` are gated at CLI startup: missing `RELEASES_API_KEY` errors out before Commander dispatch.
 - IDs over slugs everywhere. Every `<identifier>` arg accepts a typed ID (`org_…`, `src_…`, `prod_…`, `rel_…`), a bare slug, or — for sources and products — an `org/slug` coordinate (e.g. `vercel/vercel-ai-sdk`). `findSource(identifier)` / `findProduct(identifier)` in `src/api/client.ts` branch on shape: typed IDs hit the bare API path (still safe — IDs stay globally unique), `org/slug` is split locally and routed to `/v1/orgs/{org}/sources/{slug}`, bare slugs round-trip through `GET /v1/lookups/{source,product}-by-slug` to resolve a canonical home before fetching (#698). Bare slugs cost one extra round-trip per command; coordinate and typed-ID forms skip the resolver. Mutation helpers take a typed-ID-bearing entity object (`{ id }`) and POST/PATCH/DELETE against the bare path with the ID — see existing call sites in `cli/commands/{edit,product,release,remove}.ts`.
 - `--json` supported on every reader command. Admin commands support it where it makes sense.
@@ -81,11 +81,11 @@ On merge to `main`, `.github/workflows/release.yml` opens or updates a `chore: v
 
 ## What's NOT in this repo
 
-Anything that touches a database, AI provider, or crawl infrastructure stays in the private monorepo:
+Anything that touches a database, AI provider, or crawl infrastructure stays in the backend monorepo ([buildinternet/releases](https://github.com/buildinternet/releases)):
 
 - `src/db/`, `src/ai/`, `src/adapters/` — ingest engine and DB queries
 - `workers/` — Cloudflare API, MCP, and discovery workers
 - `web/` — the public catalog
 - Managed agent config and deploy scripts
 
-The OSS CLI is a pure HTTP client. If a feature requires local Anthropic/Cloudflare calls, it lives in the private repo.
+The OSS CLI is a pure HTTP client. If a feature requires local Anthropic/Cloudflare calls, it lives in the backend monorepo.
