@@ -1,5 +1,13 @@
 # @buildinternet/releases
 
+## 0.69.0
+
+### Minor Changes
+
+- f1f11ae: `releases json validate <domain>` now validates live against the registry's listing endpoint (previously deferred). The domain form POSTs the public `/v1/listing/validate` endpoint and renders the verdict plus the materialization plan — identity, products, and each release locator with its classification ("goes live" / "reviewed first") — ending with an activation pointer for unlisted domains. Exit codes: 0 valid, 1 invalid or check failed (the old unconditional exit 2 is gone). `--json` emits the raw `ListingValidationResult` merged with `{ target }`. Bumps `@buildinternet/releases-api-types` to ^0.39.0 for the listing wire types.
+- af88692: `releases admin release update` (and its deprecated `release edit` alias) now accept a `--url <url>` flag to set a release's canonical URL. Passing a non-empty value sets the URL; passing an empty string (`--url ""`) clears it. The backend `PATCH /v1/releases/:id` route already accepted the `url` field — this wires it through the CLI.
+- 042efbd: Add stub-tier org verbs (buildinternet/releases#1947): `releases admin org create-stub` (curator-authored stub org with repeatable `--location` JSON locators and/or `--from-file`), `releases admin org create-stub-from-domain <domain>` (stub from a domain's `/.well-known/releases.json` manifest, `--dry-run` supported), and `releases admin org promote <slug>` (materialize declared locations into sources and flip the org to tracked, `--dry-run` supported). Bumps `@buildinternet/releases-api-types` to ^0.38.0 for the stub-tier wire types.
+
 ## 0.68.0
 
 ### Minor Changes
