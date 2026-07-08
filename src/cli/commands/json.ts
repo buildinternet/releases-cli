@@ -388,11 +388,20 @@ export async function runExport(org: string, opts: { output?: string }): Promise
 
   const manifest = await res.json();
 
-  // Belt-and-suspenders: the server already returns a schema-valid manifest,
-  // but re-checking locally against the published schema means a version skew
-  // between CLI and API surfaces here rather than at host time.
-  if (!ReleasesJsonDomainSchema.safeParse(manifest).success) {
-    logger.warn("The exported manifest did not validate against this CLI's schema version.");
+  // The manifest comes from our own backend, which builds and validates it
+  // before returning. We deliberately do NOT re-validate against this CLI's
+  // pinned api-types schema: the deployed API tracks monorepo HEAD and can
+  // legitimately emit fields newer than the last published schema (e.g.
+  // product-level tags) — re-checking would false-alarm on a valid manifest.
+  // A minimal shape guard still catches a genuinely broken response (an error
+  // envelope, an empty body) without rejecting forward-compatible fields.
+  if (
+    !manifest ||
+    typeof manifest !== "object" ||
+    (manifest as { version?: unknown }).version !== 2
+  ) {
+    logger.error("Unexpected response from the API (not a releases.json v2 manifest).");
+    process.exit(1);
   }
 
   const json = JSON.stringify(manifest, null, 2) + "\n";
