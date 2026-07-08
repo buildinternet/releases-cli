@@ -111,6 +111,8 @@ type ReleaseUpdateOpts = {
   title?: string;
   version?: string;
   content?: string;
+  /** Canonical human-readable URL (empty string clears it). */
+  url?: string;
   /** AI-generated self-contained headline (#860). */
   titleGenerated?: string;
   /** AI-generated smart-brevity headline (#860). */
@@ -164,6 +166,11 @@ async function releaseUpdateAction(rawId: string, opts: ReleaseUpdateOpts): Prom
     const v = opts.summary.length === 0 ? null : opts.summary;
     updates.summary = v;
     changes.push(v === null ? "summary → (cleared)" : `summary → (${opts.summary.length} chars)`);
+  }
+  if (opts.url !== undefined) {
+    const v = opts.url.length === 0 ? null : opts.url;
+    updates.url = v;
+    changes.push(v === null ? "url → (cleared)" : `url → ${v}`);
   }
 
   if (changes.length === 0) {
@@ -345,6 +352,7 @@ export function registerReleaseCommand(program: Command) {
       "Update AI-generated smart-brevity headline (pass empty string to clear)",
     )
     .option("--summary <summary>", "Update AI-generated summary (pass empty string to clear)")
+    .option("--url <url>", "Set the release's canonical URL (pass empty string to clear)")
     .option("--json", "Output as JSON")
     .option("--dry-run", "Show what would change without writing")
     .action(releaseUpdateAction);
@@ -365,6 +373,7 @@ export function registerReleaseCommand(program: Command) {
       "Update AI-generated smart-brevity headline (pass empty string to clear)",
     )
     .option("--summary <summary>", "Update AI-generated summary (pass empty string to clear)")
+    .option("--url <url>", "Set the release's canonical URL (pass empty string to clear)")
     .option("--json", "Output as JSON")
     .option("--dry-run", "Show what would change without writing")
     .action(
