@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import { existsSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import {
   ReleasesJsonConfigSchema,
   ReleasesJsonDomainSchema,
@@ -358,6 +358,56 @@ export async function runValidate(target: string, opts: { json?: boolean }): Pro
   process.exit(1);
 }
 
+// Export the reverse direction: reconstruct a releases.json domain manifest
+// from an org already tracked in the registry, so an owner can host it at
+// /.well-known/releases.json and take ownership of their listing. The backend
+// endpoint (GET /v1/orgs/:slug/manifest) is the single source of truth for the
+// source→locator mapping; the CLI is a thin client that fetches and validates.
+export async function runExport(org: string, opts: { output?: string }): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(`${getApiUrl()}/v1/orgs/${encodeURIComponent(org)}/manifest`, {
+      headers: { accept: "application/json" },
+    });
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    logger.error(`Could not reach the API: ${detail}`);
+    process.exit(1);
+  }
+
+  if (res.status === 404) {
+    logger.error(
+      `No tracked org found for "${org}". Pass the org slug (e.g. \`releases json export vercel\`).`,
+    );
+    process.exit(1);
+  }
+  if (!res.ok) {
+    logger.error(`Export failed: ${res.status} ${res.statusText}`);
+    process.exit(1);
+  }
+
+  const manifest = await res.json();
+
+  // Belt-and-suspenders: the server already returns a schema-valid manifest,
+  // but re-checking locally against the published schema means a version skew
+  // between CLI and API surfaces here rather than at host time.
+  if (!ReleasesJsonDomainSchema.safeParse(manifest).success) {
+    logger.warn("The exported manifest did not validate against this CLI's schema version.");
+  }
+
+  const json = JSON.stringify(manifest, null, 2) + "\n";
+  if (opts.output) {
+    writeFileSync(opts.output, json);
+    // Confirmation to stderr so stdout stays clean when the manifest is piped.
+    logger.info(`Wrote ${opts.output}`);
+  } else {
+    // The manifest itself is the machine output — write it directly to stdout.
+    if (!process.stdout.write(json)) {
+      await new Promise<void>((resolve) => process.stdout.once("drain", resolve));
+    }
+  }
+}
+
 export function registerJsonCommand(program: Command): void {
   const json = program
     .command("json")
@@ -389,5 +439,28 @@ Docs: https://releases.sh/docs/listing`,
     )
     .action(async (target: string, opts: { json?: boolean }) => {
       await runValidate(target, opts);
+    });
+
+  json
+    .command("export")
+    .description("Generate a releases.json manifest from an already-tracked org")
+    .argument("<org>", "Org slug (e.g. vercel)")
+    .option("-o, --output <file>", "Write to a file instead of stdout")
+    .addHelpText(
+      "after",
+      `
+Examples:
+  $ releases json export vercel
+  $ releases json export vercel -o .well-known/releases.json
+  $ releases json export vercel | releases json validate -
+
+Reconstructs the domain-scope manifest from what the registry already tracks
+for the org (products + release sources) — a starter you can host at
+/.well-known/releases.json to own your listing. Re-ingest ENRICHES missing
+fields only (fill-if-empty); it never overwrites existing values.
+Docs: https://releases.sh/docs/listing`,
+    )
+    .action(async (org: string, opts: { output?: string }) => {
+      await runExport(org, opts);
     });
 }
