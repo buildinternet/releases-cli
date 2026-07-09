@@ -15,7 +15,7 @@ import { markDryRun } from "../../lib/dry-run.js";
 //   POST /v1/orgs/stub-from-domain   → `admin org create-stub-from-domain`
 //   POST /v1/orgs/:slug/promote      → `admin org promote`
 
-const LOCATOR_KEYS = ["url", "feed", "github", "appstore", "file"] as const;
+export const LOCATOR_KEYS = ["url", "feed", "github", "appstore", "file"] as const;
 
 type Locator = NonNullable<CreateStubOrgBody["releases"]>[number];
 

@@ -52,7 +52,7 @@ import {
 import { warnDeprecatedAlias } from "../../lib/deprecated-alias.js";
 import { parseTagList } from "../../lib/flags.js";
 import { buildNoticePatch, formatNotice, type EntityWithNotice } from "../../lib/notice.js";
-import { registerOrgStubCommands } from "./org-stub.js";
+import { registerOrgStubCommands, LOCATOR_KEYS } from "./org-stub.js";
 
 // ── Shared action handlers ────────────────────────────────────────────────────
 
@@ -178,10 +178,6 @@ async function orgCreateAction(name: string, opts: OrgCreateOpts): Promise<void>
   if (opts.json) await writeJson({ ...created, existed: false });
   else logger.info(chalk.green(`Organization created: ${name} (${slug})`));
 }
-
-// Mirrors LOCATOR_KEYS in org-stub.ts — kept local to avoid a re-export just
-// for display formatting.
-const LOCATOR_KEYS = ["url", "feed", "github", "appstore", "file"] as const;
 
 type OrgGetOpts = { json?: boolean };
 
