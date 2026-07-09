@@ -1,5 +1,11 @@
 # @buildinternet/releases
 
+## 0.70.1
+
+### Patch Changes
+
+- cee0540: Fix overview stale warning to use content write time (`updatedAt`) instead of original generation time. Amended overviews no longer show as months-old when recently rewritten.
+
 ## 0.70.0
 
 ### Minor Changes
