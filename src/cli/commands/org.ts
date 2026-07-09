@@ -42,6 +42,7 @@ import {
   type ListResponse,
 } from "@buildinternet/releases-core/cli-contracts";
 import { OVERVIEW_STALE_DAYS, overviewPreview } from "@buildinternet/releases-core/overview";
+import type { ReleaseLocationItem } from "@buildinternet/releases-api-types";
 import {
   formatOverviewFreshnessHint,
   formatOverviewFreshnessLine,
@@ -51,7 +52,7 @@ import {
 import { warnDeprecatedAlias } from "../../lib/deprecated-alias.js";
 import { parseTagList } from "../../lib/flags.js";
 import { buildNoticePatch, formatNotice, type EntityWithNotice } from "../../lib/notice.js";
-import { registerOrgStubCommands } from "./org-stub.js";
+import { registerOrgStubCommands, LOCATOR_KEYS } from "./org-stub.js";
 
 // ── Shared action handlers ────────────────────────────────────────────────────
 
@@ -208,7 +209,14 @@ async function orgGetAction(identifier: string, opts: OrgGetOpts): Promise<void>
     return;
   }
 
-  console.log(chalk.bold(found.name));
+  // `status`/`locations` are stub-tier fields (#1947) added by the API detail
+  // route; `Organization` is the core DB row type, not api-types' OrgDetailSchema,
+  // so read defensively rather than widening the shared DB type.
+  const stubFields = found as { status?: string; locations?: ReleaseLocationItem[] };
+  const isStub = stubFields.status === "stub";
+  console.log(
+    `${chalk.bold(found.name)}${isStub ? `  ${chalk.yellow("stub · not yet tracked")}` : ""}`,
+  );
   console.log(`  Slug:    ${found.slug}`);
   console.log(`  Domain:  ${found.domain ?? chalk.dim("—")}`);
   if (aliases.length > 0) console.log(`  Aliases: ${aliases.join(", ")}`);
@@ -260,6 +268,22 @@ async function orgGetAction(identifier: string, opts: OrgGetOpts): Promise<void>
       console.log(`  ${chalk.cyan(s.slug.padEnd(30))} ${status} ${fetched}`);
       console.log(`  ${" ".repeat(30)} ${chalk.dim(s.url)}`);
     }
+  }
+
+  if (isStub && stubFields.locations && stubFields.locations.length > 0) {
+    console.log();
+    console.log(chalk.bold("Declared locations:"));
+    for (const loc of stubFields.locations) {
+      const kind = LOCATOR_KEYS.find((key) => typeof loc[key] === "string");
+      const target = kind ? loc[kind] : undefined;
+      const canonicalLabel = loc.canonical ? `  ${chalk.green("canonical")}` : "";
+      console.log(
+        `  ${chalk.cyan((kind ?? "unknown").padEnd(9))}${target ?? chalk.dim("—")}${canonicalLabel}`,
+      );
+      if (loc.title) console.log(`  ${" ".repeat(9)}${chalk.dim(loc.title)}`);
+    }
+    console.log();
+    console.log(chalk.dim(`  Enable tracking: releases admin org promote ${found.slug}`));
   }
 
   if (overview?.content) {
