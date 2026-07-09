@@ -32,7 +32,6 @@ import { orgNotFound } from "../suggest.js";
 import { toSlug } from "@buildinternet/releases-core/slug";
 import { isValidCategory, CATEGORIES } from "@buildinternet/releases-core/categories";
 import { SOURCE_DISCOVERY } from "@buildinternet/releases-core/source-enums";
-import { timeAgo } from "@buildinternet/releases-core/dates";
 import { writeJson } from "../../lib/output.js";
 import { markDryRun } from "../../lib/dry-run.js";
 import { handlePageAll } from "../../lib/paginate.js";
@@ -42,12 +41,13 @@ import {
   formatTruncationWarning,
   type ListResponse,
 } from "@buildinternet/releases-core/cli-contracts";
+import { OVERVIEW_STALE_DAYS, overviewPreview } from "@buildinternet/releases-core/overview";
 import {
-  OVERVIEW_STALE_DAYS,
-  overviewAgeDays,
-  isOverviewStale,
-  overviewPreview,
-} from "@buildinternet/releases-core/overview";
+  formatOverviewFreshnessHint,
+  formatOverviewFreshnessLine,
+  isOverviewContentStale,
+  overviewContentAgeDays,
+} from "../../lib/overview-freshness.js";
 import { warnDeprecatedAlias } from "../../lib/deprecated-alias.js";
 import { parseTagList } from "../../lib/flags.js";
 import { buildNoticePatch, formatNotice, type EntityWithNotice } from "../../lib/notice.js";
@@ -213,8 +213,8 @@ async function orgGetAction(identifier: string, opts: OrgGetOpts): Promise<void>
   console.log(`  Domain:  ${found.domain ?? chalk.dim("—")}`);
   if (aliases.length > 0) console.log(`  Aliases: ${aliases.join(", ")}`);
   if (found.description) console.log(`  About:   ${found.description}`);
-  console.log(`  Created: ${found.createdAt}`);
-  console.log(`  Updated: ${found.updatedAt}`);
+  console.log(`  Created: ${found.createdAt ?? chalk.dim("—")}`);
+  console.log(`  Updated: ${found.updatedAt ?? chalk.dim("—")}`);
   if (found.category) console.log(`  Category: ${found.category}`);
   console.log(
     `  AI content: ${
@@ -264,10 +264,11 @@ async function orgGetAction(identifier: string, opts: OrgGetOpts): Promise<void>
 
   if (overview?.content) {
     const preview = overviewPreview(stripAnsi(overview.content));
-    const stale = overview.generatedAt ? isOverviewStale(overview.generatedAt) : false;
-    const generatedHint = overview.generatedAt
-      ? chalk.dim(`generated ${timeAgo(overview.generatedAt) ?? "?"}`)
-      : "";
+    // Content write time (updatedAt), not original generatedAt — amends refresh
+    // the body without resetting generation, so stale checks must follow the write.
+    const stale = isOverviewContentStale(overview);
+    const freshnessHint = formatOverviewFreshnessHint(overview);
+    const generatedHint = freshnessHint ? chalk.dim(freshnessHint) : "";
 
     console.log();
     console.log(`${chalk.bold("Overview")}  ${generatedHint}`);
@@ -737,8 +738,10 @@ Examples:
         return;
       }
 
-      const stale = overview.generatedAt ? isOverviewStale(overview.generatedAt) : false;
-      const ageDays = overview.generatedAt ? overviewAgeDays(overview.generatedAt) : null;
+      // Prefer updatedAt for age/stale: generatedAt is fixed at first write and
+      // stays old after amends (e.g. generated 3mo ago, updated 4d ago).
+      const stale = isOverviewContentStale(overview);
+      const ageDays = overviewContentAgeDays(overview);
 
       if (opts.json) {
         console.log(
@@ -762,13 +765,7 @@ Examples:
       }
 
       console.log(chalk.bold(`${found.name} — overview`));
-      if (overview.generatedAt) {
-        console.log(
-          chalk.dim(
-            `  generated ${timeAgo(overview.generatedAt) ?? "?"} · ${overview.releaseCount} releases`,
-          ),
-        );
-      }
+      console.log(chalk.dim(`  ${formatOverviewFreshnessLine(overview)}`));
       if (stale) {
         console.log(
           chalk.yellow(

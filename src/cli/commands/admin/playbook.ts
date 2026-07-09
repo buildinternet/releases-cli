@@ -75,9 +75,15 @@ run by --notes-file also seeds a fresh header on first write.`,
         return;
       }
 
-      const ageLabel = playbook.generatedAt ? (timeAgo(playbook.generatedAt) ?? "?") : "?";
+      // Prefer content write time; generatedAt is fixed at first write.
+      const contentAt = playbook.updatedAt ?? playbook.generatedAt;
+      const contentAge = contentAt ? (timeAgo(contentAt) ?? "?") : "?";
+      const ageLabel =
+        playbook.updatedAt && playbook.generatedAt && playbook.updatedAt !== playbook.generatedAt
+          ? `updated ${contentAge} · generated ${timeAgo(playbook.generatedAt) ?? "?"}`
+          : `generated ${contentAge}`;
       console.log(chalk.bold(`${org.name} — playbook`));
-      console.log(chalk.dim(`  generated ${ageLabel} · ${playbook.releaseCount} sources`));
+      console.log(chalk.dim(`  ${ageLabel} · ${playbook.releaseCount} sources`));
       console.log();
       console.log(playbook.content);
       if (playbook.notes) {

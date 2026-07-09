@@ -33,12 +33,16 @@ import {
   STALE_GRACE_DAYS_DEFAULT,
   type OrgWithOverview,
 } from "../../../lib/overview-stale-filter.js";
+import { formatOverviewFreshnessLine } from "../../../lib/overview-freshness.js";
 import type { OrgListItem } from "@buildinternet/releases-api-types";
 import { computePagination } from "@buildinternet/releases-core/cli-contracts";
 import { unescapeHtmlEntities } from "./overview/unescape-html.js";
 import { parseCitationsJson, ParseCitationsError } from "./overview/parse-citations.js";
 import { readContentArg } from "../../../lib/input.js";
 import { warnDeprecatedAlias } from "../../../lib/deprecated-alias.js";
+
+// Re-export for callers/tests that imported the helper from this command module.
+export { formatOverviewFreshnessLine } from "../../../lib/overview-freshness.js";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -84,57 +88,7 @@ interface OverviewPlanOpts {
   hasActivity?: boolean;
 }
 
-interface OverviewFreshnessInput {
-  generatedAt?: string | null;
-  updatedAt?: string | null;
-  releaseCount: number;
-  citationCount?: number;
-}
-
 // ── Action handlers ───────────────────────────────────────────────────────────
-
-/**
- * Formats an overview timestamp for compact status output.
- */
-function ageLabel(iso: string | null | undefined): string {
-  return iso ? (timeAgo(iso) ?? "?") : "?";
-}
-
-/**
- * Compares overview timestamps by instant, falling back to raw value comparison
- * when either value is missing or cannot be parsed.
- */
-function timestampsDifferMeaningfully(
-  first: string | null | undefined,
-  second: string | null | undefined,
-): boolean {
-  if (!first || !second) return first !== second;
-
-  const firstMs = Date.parse(first);
-  const secondMs = Date.parse(second);
-  if (!Number.isFinite(firstMs) || !Number.isFinite(secondMs)) return first !== second;
-
-  return firstMs !== secondMs;
-}
-
-/**
- * Builds the human-readable freshness line shown above an org overview.
- */
-export function formatOverviewFreshnessLine(overview: OverviewFreshnessInput): string {
-  const generatedLabel = ageLabel(overview.generatedAt);
-  const releaseLabel = `${overview.releaseCount} releases contributing`;
-  const citationLabel =
-    overview.citationCount === undefined ? "" : ` · ${overview.citationCount} citations`;
-
-  if (
-    overview.updatedAt &&
-    timestampsDifferMeaningfully(overview.updatedAt, overview.generatedAt)
-  ) {
-    return `updated ${ageLabel(overview.updatedAt)} · generated ${generatedLabel} · ${releaseLabel}${citationLabel}`;
-  }
-
-  return `generated ${generatedLabel} · ${releaseLabel}${citationLabel}`;
-}
 
 async function overviewGetAction(orgIdentifier: string, opts: OverviewGetOpts): Promise<void> {
   const org = await findOrg(orgIdentifier);
