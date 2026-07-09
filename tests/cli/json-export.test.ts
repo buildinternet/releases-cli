@@ -1,4 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, spyOn } from "bun:test";
+import { readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { runCli } from "../utils.js";
 
 // Top-level await import (module scope) — `runExport` calls getApiUrl() lazily,
@@ -93,5 +96,55 @@ describe("json export <org> (backend reconstruction)", () => {
       expect((e as Error).message).toBe("process.exit called");
     }
     expect(exitCode).toBe(1);
+  });
+
+  it("exits 1 on a generic non-OK response (500)", async () => {
+    mockFetchOnce(500, { error: { message: "internal error" } });
+    try {
+      await runExport("acme", {});
+    } catch (e) {
+      expect((e as Error).message).toBe("process.exit called");
+    }
+    expect(exitCode).toBe(1);
+  });
+
+  it("exits 1 when the response is not a v2 manifest (shape guard)", async () => {
+    mockFetchOnce(200, { version: 3, name: "Wrong" });
+    try {
+      await runExport("acme", {});
+    } catch (e) {
+      expect((e as Error).message).toBe("process.exit called");
+    }
+    expect(exitCode).toBe(1);
+  });
+
+  it("exits 1 when the network request throws", async () => {
+    globalThis.fetch = (async () => {
+      throw new Error("network down");
+    }) as unknown as typeof fetch;
+    try {
+      await runExport("acme", {});
+    } catch (e) {
+      expect((e as Error).message).toBe("process.exit called");
+    }
+    expect(exitCode).toBe(1);
+  });
+
+  it("writes the manifest to a file with -o and keeps stdout clean", async () => {
+    mockFetchOnce(200, VALID_MANIFEST);
+    const out = join(tmpdir(), `releases-export-${process.pid}.json`);
+    const { chunks, restore } = captureStdout();
+    try {
+      await runExport("acme", { output: out });
+    } finally {
+      restore();
+    }
+    expect(exitCode).toBeUndefined();
+    // Nothing on stdout in file mode.
+    expect(chunks.join("")).toBe("");
+    const written = JSON.parse(readFileSync(out, "utf8")) as typeof VALID_MANIFEST;
+    expect(written.version).toBe(2);
+    expect(written.name).toBe("Acme");
+    rmSync(out, { force: true });
   });
 });

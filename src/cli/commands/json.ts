@@ -11,6 +11,8 @@ import { logger } from "@releases/lib/logger";
 import { readContentArg } from "../../lib/input.js";
 import { writeJson } from "../../lib/output.js";
 import { getApiUrl } from "../../lib/mode.js";
+import { apiFetch } from "../../api/core.js";
+import { ApiError } from "../../lib/errors.js";
 
 // The owner-declared manifest documented at https://releases.sh/docs/listing.
 // Two hosting scopes share one public union schema (ReleasesJsonConfigSchema):
@@ -364,29 +366,30 @@ export async function runValidate(target: string, opts: { json?: boolean }): Pro
 // endpoint (GET /v1/orgs/:slug/manifest) is the single source of truth for the
 // source→locator mapping; the CLI is a thin client that fetches and validates.
 export async function runExport(org: string, opts: { output?: string }): Promise<void> {
-  let res: Response;
+  // Route through the shared apiFetch so this command inherits the common
+  // transport-error handling, error-envelope parsing, and JSON decoding used by
+  // every other reader command. A GET 404 resolves to `null` (org not tracked);
+  // any other non-2xx or a malformed body throws (ApiError / parse error).
+  let manifest: unknown;
   try {
-    res = await fetch(`${getApiUrl()}/v1/orgs/${encodeURIComponent(org)}/manifest`, {
-      headers: { accept: "application/json" },
-    });
+    manifest = await apiFetch(`/v1/orgs/${encodeURIComponent(org)}/manifest`);
   } catch (err) {
-    const detail = err instanceof Error ? err.message : String(err);
-    logger.error(`Could not reach the API: ${detail}`);
+    const detail =
+      err instanceof ApiError
+        ? err.serverMessage
+        : err instanceof Error
+          ? err.message
+          : String(err);
+    logger.error(`Export failed: ${detail}`);
     process.exit(1);
   }
 
-  if (res.status === 404) {
+  if (manifest === null) {
     logger.error(
       `No tracked org found for "${org}". Pass the org slug (e.g. \`releases json export vercel\`).`,
     );
     process.exit(1);
   }
-  if (!res.ok) {
-    logger.error(`Export failed: ${res.status} ${res.statusText}`);
-    process.exit(1);
-  }
-
-  const manifest = await res.json();
 
   // The manifest comes from our own backend, which builds and validates it
   // before returning. We deliberately do NOT re-validate against this CLI's
@@ -406,7 +409,13 @@ export async function runExport(org: string, opts: { output?: string }): Promise
 
   const json = JSON.stringify(manifest, null, 2) + "\n";
   if (opts.output) {
-    writeFileSync(opts.output, json);
+    try {
+      writeFileSync(opts.output, json);
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      logger.error(`Could not write ${opts.output}: ${detail}`);
+      process.exit(1);
+    }
     // Confirmation to stderr so stdout stays clean when the manifest is piped.
     logger.info(`Wrote ${opts.output}`);
   } else {
