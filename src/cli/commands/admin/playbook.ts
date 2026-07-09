@@ -5,7 +5,7 @@ import { getPlaybook, updatePlaybookNotes } from "../../../api/sources.js";
 import { orgNotFound } from "../../suggest.js";
 import { writeJson } from "../../../lib/output.js";
 import { readContentArg } from "../../../lib/input.js";
-import { timeAgo } from "@buildinternet/releases-core/dates";
+import { formatOverviewFreshnessHint } from "../../../lib/overview-freshness.js";
 
 interface PlaybookOpts {
   json?: boolean;
@@ -75,15 +75,10 @@ run by --notes-file also seeds a fresh header on first write.`,
         return;
       }
 
-      // Prefer content write time; generatedAt is fixed at first write.
-      const contentAt = playbook.updatedAt ?? playbook.generatedAt;
-      const contentAge = contentAt ? (timeAgo(contentAt) ?? "?") : "?";
-      const ageLabel =
-        playbook.updatedAt && playbook.generatedAt && playbook.updatedAt !== playbook.generatedAt
-          ? `updated ${contentAge} · generated ${timeAgo(playbook.generatedAt) ?? "?"}`
-          : `generated ${contentAge}`;
+      // Same content-write freshness rules as org overview (updatedAt over generatedAt).
+      const freshnessHint = formatOverviewFreshnessHint(playbook) ?? "generated ?";
       console.log(chalk.bold(`${org.name} — playbook`));
-      console.log(chalk.dim(`  ${ageLabel} · ${playbook.releaseCount} sources`));
+      console.log(chalk.dim(`  ${freshnessHint} · ${playbook.releaseCount} sources`));
       console.log();
       console.log(playbook.content);
       if (playbook.notes) {

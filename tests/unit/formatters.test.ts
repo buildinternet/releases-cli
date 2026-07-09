@@ -484,6 +484,19 @@ describe("knowledgeToMarkdown", () => {
     expect(md).toContain("updated: 2024-07-04");
   });
 
+  it("omits updated when timestamps are the same instant under different ISO forms", () => {
+    const md = knowledgeToMarkdown(
+      {
+        ...fullKnowledge,
+        generatedAt: "2024-06-16T00:00:00.000Z",
+        updatedAt: "2024-06-16T00:00:00+00:00",
+      },
+      { orgSlug: "vercel" },
+    );
+    expect(md).toContain("generated: 2024-06-16");
+    expect(md).not.toContain("updated:");
+  });
+
   it("includes the content body after frontmatter", () => {
     const md = knowledgeToMarkdown(fullKnowledge);
     expect(md).toContain("# Overview");

@@ -16,6 +16,7 @@ import type {
   UnifiedSearchResponse,
   OverviewPageItem,
 } from "../api/types.js";
+import { timestampsDifferMeaningfully } from "./overview-freshness.js";
 
 // Re-exports under legacy/monorepo-compatible names so ported test suites and
 // external callers can import either name.
@@ -437,7 +438,11 @@ export function overviewToMarkdown(
   }
   lines.push(yamlLine("generated", isoDateOnly(overview.generatedAt)));
   // Content write time when it differs from first generation (amends).
-  if (overview.updatedAt && overview.updatedAt !== overview.generatedAt) {
+  // Compare by instant so equivalent ISO forms (Z vs +00:00) don't double-emit.
+  if (
+    overview.updatedAt &&
+    timestampsDifferMeaningfully(overview.generatedAt, overview.updatedAt)
+  ) {
     lines.push(yamlLine("updated", isoDateOnly(overview.updatedAt)));
   }
   if (opts.baseUrl && opts.orgSlug) {
