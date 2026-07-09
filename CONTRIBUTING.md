@@ -1,6 +1,6 @@
 # Contributing to Releases CLI
 
-Thanks for your interest in contributing! This guide covers everything you need to build, test, and ship changes to the CLI and the packages it ships alongside (`@buildinternet/releases`, `@buildinternet/releases-lib`, `@buildinternet/releases-skills`).
+Thanks for your interest in contributing! This guide covers everything you need to build, test, and ship changes to the CLI and the packages it ships alongside (`@buildinternet/releases`, `@buildinternet/releases-lib`).
 
 The CLI is a thin HTTP client for [releases.sh](https://releases.sh). The backend, web frontend, MCP server, and discovery agents live in a separate open-source monorepo — [buildinternet/releases](https://github.com/buildinternet/releases) — and ship through the hosted API.
 
@@ -28,7 +28,7 @@ The CLI is a thin HTTP client for [releases.sh](https://releases.sh). The backen
    bun run build                    # compile to dist/releases
    ```
 
-The project is a Bun workspace. `@buildinternet/releases-lib` and `@buildinternet/releases-skills` are published from this repo alongside the CLI — those are open for direct contribution here.
+The project is a Bun workspace. `@buildinternet/releases-lib` is published from this repo alongside the CLI — it's open for direct contribution here. (Agent skills ship from the repo's `skills/` tree via `npx skills add`, not as an npm package; the retired `@buildinternet/releases-skills` shim is deprecated on npm.)
 
 A couple of dependencies come from the upstream backend monorepo, [buildinternet/releases](https://github.com/buildinternet/releases):
 
