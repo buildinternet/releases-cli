@@ -25,7 +25,7 @@ import type {
   OverviewManifestResponse,
 } from "@buildinternet/releases-api-types";
 import { apiFetch, SCOPE_RESOURCE } from "./core.js";
-import { assertCleanIdentifier } from "../lib/validate-input.js";
+import { assertCleanIdentifier, assertSafeReadPath } from "../lib/validate-input.js";
 import { type ListResponse } from "@buildinternet/releases-core/cli-contracts";
 import { findBlockedUrl, findIgnoredUrl } from "./orgs.js";
 import type { Organization } from "@buildinternet/releases-core/schema";
@@ -136,6 +136,7 @@ export async function sourceChangelog(
   identifier: string,
   range?: { path?: string; offset?: number; limit?: number; tokens?: number },
 ): Promise<SourceChangelogResponse | null> {
+  if (range?.path !== undefined) assertSafeReadPath(range.path);
   const target = await resolveSourceTarget(identifier);
   if (!target) return null;
   const params = new URLSearchParams();

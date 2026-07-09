@@ -159,6 +159,14 @@ describe("get_catalog_entry changelog params", () => {
     const text = result.content[0]!.text;
     expect(text).toContain("No CHANGELOG file is tracked");
   });
+
+  it("rejects a traversal-shaped changelog_path before any request is built", async () => {
+    const handler = toolHandler("get_catalog_entry");
+    await expect(
+      handler({ identifier: "src_abc123", changelog_path: "../../etc/passwd" }),
+    ).rejects.toThrow(/path-traversal/);
+    expect(requestedUrls.some((u) => u.includes("/changelog"))).toBe(false);
+  });
 });
 
 describe("get_source_changelog (deprecated but functional)", () => {

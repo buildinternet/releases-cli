@@ -526,18 +526,24 @@ server.registerTool(
         ),
       changelog_offset: z
         .number()
+        .int()
+        .nonnegative()
         .optional()
         .describe(
           "Character offset into the selected CHANGELOG. Snapped forward to the next heading unless 0. Passing this implies include_changelog.",
         ),
       changelog_limit: z
         .number()
+        .int()
+        .positive()
         .optional()
         .describe(
           "Target slice size in characters. Slice ends at a heading boundary. Defaults to 40000 when slicing without a token budget. Passing this implies include_changelog.",
         ),
       changelog_tokens: z
         .number()
+        .int()
+        .positive()
         .optional()
         .describe(
           "Target slice size in tokens (cl100k_base). Takes precedence over changelog_limit. Recommended brackets: 2000, 5000, 10000, 20000. Passing this implies include_changelog.",
@@ -602,7 +608,7 @@ server.registerTool(
       // (#373).
       let changelog;
       try {
-        changelog = await sourceChangelog(identifier, {
+        changelog = await sourceChangelog(source.id, {
           path: changelog_path,
           offset: changelog_offset,
           limit: changelog_limit,
