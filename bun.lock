@@ -8,7 +8,6 @@
         "@buildinternet/releases-api-types": "^0.41.0",
         "@buildinternet/releases-core": "^0.25.2",
         "@buildinternet/releases-lib": "workspace:*",
-        "@buildinternet/releases-skills": "workspace:*",
         "@modelcontextprotocol/sdk": "^1.29.0",
         "chalk": "^5.6.2",
         "commander": "^15.0.0",
@@ -29,7 +28,7 @@
     },
     "npm/releases": {
       "name": "@buildinternet/releases",
-      "version": "0.70.0",
+      "version": "0.70.1",
       "bin": {
         "releases": "bin/releases",
       },
@@ -43,31 +42,27 @@
     },
     "npm/releases-darwin-arm64": {
       "name": "@buildinternet/releases-darwin-arm64",
-      "version": "0.70.0",
+      "version": "0.70.1",
     },
     "npm/releases-darwin-x64": {
       "name": "@buildinternet/releases-darwin-x64",
-      "version": "0.70.0",
+      "version": "0.70.1",
     },
     "npm/releases-linux-arm64": {
       "name": "@buildinternet/releases-linux-arm64",
-      "version": "0.70.0",
+      "version": "0.70.1",
     },
     "npm/releases-linux-x64": {
       "name": "@buildinternet/releases-linux-x64",
-      "version": "0.70.0",
+      "version": "0.70.1",
     },
     "npm/releases-windows-x64": {
       "name": "@buildinternet/releases-windows-x64",
-      "version": "0.70.0",
+      "version": "0.70.1",
     },
     "packages/lib": {
       "name": "@buildinternet/releases-lib",
-      "version": "0.70.0",
-    },
-    "packages/skills": {
-      "name": "@buildinternet/releases-skills",
-      "version": "0.70.0",
+      "version": "0.70.1",
     },
   },
   "packages": {
@@ -88,8 +83,6 @@
     "@buildinternet/releases-linux-arm64": ["@buildinternet/releases-linux-arm64@workspace:npm/releases-linux-arm64"],
 
     "@buildinternet/releases-linux-x64": ["@buildinternet/releases-linux-x64@workspace:npm/releases-linux-x64"],
-
-    "@buildinternet/releases-skills": ["@buildinternet/releases-skills@workspace:packages/skills"],
 
     "@buildinternet/releases-windows-x64": ["@buildinternet/releases-windows-x64@workspace:npm/releases-windows-x64"],
 

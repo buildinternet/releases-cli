@@ -95,13 +95,14 @@ Point any MCP-compatible agent at the hosted server:
 npx mcp-remote https://mcp.releases.sh/mcp
 ```
 
-This repo is also a Claude Code marketplace with two plugins — `releases` (reader: hosted MCP tools, a `/releases` lookup command, and auto-trigger skills) and `releases-admin` (source onboarding + maintenance; needs admin access):
+This repo is also a Claude Code marketplace with the `releases` plugin — hosted MCP tools, a `/releases` lookup command, and auto-trigger skills:
 
 ```bash
 /plugin marketplace add buildinternet/releases-cli
-/plugin install releases@releases          # reader
-/plugin install releases-admin@releases    # admin
+/plugin install releases@releases
 ```
+
+Operator/maintainer skills (source onboarding, parsing, playbooks) live with the backend in the [releases monorepo](https://github.com/buildinternet/releases) — its `.claude/skills/` tree is picked up automatically in a checkout.
 
 Or install just the skills into any agent (Cursor, Codex, Gemini CLI, Windsurf, …):
 

@@ -60,9 +60,9 @@ export function registerSkillsCommand(parent: Command): void {
   skills
     .command("install")
     .description(
-      "Install the bundled releases skills (releases-mcp, releases-cli, finding-changelogs, ...) into the detected coding agent",
+      "Install the bundled releases skills (releases-mcp, releases-cli, analyzing-releases) into the detected coding agent",
     )
-    .argument("[skills...]", "specific skills to install (default: all 8 bundled skills)")
+    .argument("[skills...]", "specific skills to install (default: all bundled skills)")
     .option("-g, --global", "install to user dir instead of the current project")
     .option("-a, --agent <name>", "override agent auto-detection (e.g. claude-code, cursor, codex)")
     .option("--copy", "copy files instead of symlinking")

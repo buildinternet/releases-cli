@@ -3,13 +3,13 @@
   "owner": {
     "name": "Build Internet"
   },
-  "description": "Search changelogs, look up releases, and maintain sources in the Releases.sh registry.",
+  "description": "Search changelogs and look up releases in the Releases.sh registry.",
   "plugins": [
     {
       "name": "releases",
       "source": "./",
       "description": "Search changelogs and look up releases via the hosted Releases.sh registry. Bundles the hosted MCP connection, the /releases lookup command, and auto-triggering skills for release/changelog questions.",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "author": {
         "name": "Build Internet"
       },
@@ -17,27 +17,6 @@
       "skills": ["./skills/releases-mcp", "./skills/releases-cli", "./skills/analyzing-releases"],
       "commands": "./plugins/claude/releases/commands",
       "mcpServers": "./plugins/claude/releases/.mcp.json"
-    },
-    {
-      "name": "releases-admin",
-      "source": "./",
-      "description": "Operator playbooks and discovery/worker agents for onboarding and maintaining changelog sources. Requires admin access to the hosted Releases.sh registry.",
-      "version": "0.2.0",
-      "author": {
-        "name": "Build Internet"
-      },
-      "strict": false,
-      "skills": [
-        "./skills/managing-sources",
-        "./skills/parsing-changelogs",
-        "./skills/classify-media-relevance",
-        "./skills/seeding-playbooks",
-        "./skills/finding-changelogs"
-      ],
-      "agents": [
-        "./plugins/claude/releases/agents/discovery.md",
-        "./plugins/claude/releases/agents/worker.md"
-      ]
     }
   ]
 }
