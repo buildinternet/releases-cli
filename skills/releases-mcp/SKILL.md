@@ -30,6 +30,8 @@ The hosted server exposes these tools. There is no AI summarization or compariso
 - `list_collections` / `get_collection` / `get_collection_releases` — curated cross-org "playlists" (e.g. "Frontier AI Labs", "Coding Agents") independent of the category taxonomy.
 - `lookup_domain` — resolve a URL/domain to the org that owns it. Use when you have a URL-shaped input rather than a name.
 
+The server also exposes **signed-in personal-account tools** — `follow` / `unfollow` / `list_follows`, `get_personalized_feed`, and `whats_changed` (releases since the user's last check across their follows). They require an authenticated connection (OAuth or a user API key) and error for anonymous clients; the reader tools above need no auth. Reach for them only when the user asks about *their* follows or feed — for general "what's new in X" questions, the reader tools answer without sign-in.
+
 ## How to Look Up Releases
 
 ### Step 1: Resolve the entity
