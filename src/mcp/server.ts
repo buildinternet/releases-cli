@@ -34,7 +34,10 @@ function textResult(text: string) {
   return { content: [{ type: "text" as const, text }] };
 }
 
-const server = new McpServer({
+// Exported (in addition to `startMcpServer`) so tests can reach into
+// `server._registeredTools[name].handler` and exercise a tool handler
+// directly without spinning up a stdio transport.
+export const server = new McpServer({
   name: "releases",
   version: VERSION,
 });
@@ -309,7 +312,7 @@ server.registerTool(
   "get_source_changelog",
   {
     description:
-      "Read a tracked CHANGELOG file for a GitHub source. Supports heading-aligned slicing by chars (`limit`) or tokens (`tokens`, cl100k_base). Chain successive calls via `nextOffset` to page through large files.",
+      "DEPRECATED — use get_catalog_entry with changelog_* params instead. Read a tracked CHANGELOG file for a GitHub source. Supports heading-aligned slicing by chars (`limit`) or tokens (`tokens`, cl100k_base). Chain successive calls via `nextOffset` to page through large files.",
     inputSchema: {
       source: z.string().describe("Source slug or ID (e.g. 'apollo-client' or 'src_...')"),
       path: z
@@ -504,14 +507,60 @@ server.registerTool(
   "get_catalog_entry",
   {
     description:
-      "Get detail for a single catalog entry — a product or a standalone source. Accepts a slug, `prod_` id, or `src_` id and dispatches to the matching entity.",
+      "Get detail for a single catalog entry — a product or a standalone source. Accepts a slug, `prod_` id, or `src_` id and dispatches to the matching entity. Changelog only applies to source entries (products have none): pass `include_changelog: true` to inline the root tracked CHANGELOG, or `changelog_path` / `changelog_offset` / `changelog_limit` / `changelog_tokens` to embed a specific file or slice — heading-aligned, supports per-package files in monorepos (e.g. `packages/next/CHANGELOG.md`). `changelog_tokens` takes precedence over `changelog_limit`; any `changelog_*` param implies `include_changelog`.",
     inputSchema: {
       identifier: z
         .string()
         .describe("Product or source identifier — slug, `prod_` id, or `src_` id"),
+      include_changelog: z
+        .boolean()
+        .optional()
+        .describe(
+          "When true, inline the root tracked CHANGELOG for a source-kind entry. Ignored for products.",
+        ),
+      changelog_path: z
+        .string()
+        .optional()
+        .describe(
+          "Specific CHANGELOG path for a source-kind entry (e.g. 'packages/next/CHANGELOG.md'). Passing this implies include_changelog.",
+        ),
+      changelog_offset: z
+        .number()
+        .optional()
+        .describe(
+          "Character offset into the selected CHANGELOG. Snapped forward to the next heading unless 0. Passing this implies include_changelog.",
+        ),
+      changelog_limit: z
+        .number()
+        .optional()
+        .describe(
+          "Target slice size in characters. Slice ends at a heading boundary. Defaults to 40000 when slicing without a token budget. Passing this implies include_changelog.",
+        ),
+      changelog_tokens: z
+        .number()
+        .optional()
+        .describe(
+          "Target slice size in tokens (cl100k_base). Takes precedence over changelog_limit. Recommended brackets: 2000, 5000, 10000, 20000. Passing this implies include_changelog.",
+        ),
     },
   },
-  async ({ identifier }) => {
+  async ({
+    identifier,
+    include_changelog,
+    changelog_path,
+    changelog_offset,
+    changelog_limit,
+    changelog_tokens,
+  }) => {
+    // Any changelog_* param — or the bare boolean — implies the caller wants
+    // the slice inlined (mirrors the hosted tool's ChangelogRenderOptions).
+    const changelogRequested =
+      include_changelog === true ||
+      changelog_path !== undefined ||
+      changelog_offset !== undefined ||
+      changelog_limit !== undefined ||
+      changelog_tokens !== undefined;
+
     const renderProduct = async () => {
       const product = await findProduct(identifier);
       if (!product) return null;
@@ -521,6 +570,10 @@ server.registerTool(
       ];
       if (product.description) lines.push(`Description: ${product.description}`);
       if (product.url) lines.push(`URL: ${product.url}`);
+      if (changelogRequested) {
+        lines.push("");
+        lines.push("Changelog does not apply to products — pass a source identifier instead.");
+      }
       return textResult(lines.join("\n"));
     };
 
@@ -541,16 +594,63 @@ server.registerTool(
         `URL: ${source.url}`,
         `Last fetched: ${source.lastFetchedAt ?? "Never"}`,
       ];
+
+      if (!changelogRequested) return textResult(lines.join("\n"));
+
+      // Fetch the slice through the same REST route get_source_changelog
+      // uses, and inline it — matching how the hosted tool merges the two
+      // (#373).
+      let changelog;
+      try {
+        changelog = await sourceChangelog(identifier, {
+          path: changelog_path,
+          offset: changelog_offset,
+          limit: changelog_limit,
+          tokens: changelog_tokens,
+        });
+      } catch (err) {
+        if (err instanceof AmbiguousSourceError) return textResult(describeAmbiguousSource(err));
+        throw err;
+      }
+
+      if (!changelog) {
+        lines.push("");
+        lines.push(
+          `No CHANGELOG file is tracked for "${identifier}". Only GitHub sources expose this.`,
+        );
+        return textResult(lines.join("\n"));
+      }
+
+      lines.push("");
+      lines.push(`**${changelog.path}**`);
+      lines.push(`Source: ${changelog.url ?? ""}`);
+      lines.push(
+        `Offset: ${changelog.offset} | Total chars: ${changelog.totalChars} | Total tokens: ${changelog.totalTokens ?? "N/A"}`,
+      );
+      if (changelog.truncated) {
+        lines.push(`WARNING: File truncated at 1MB cap.`);
+      }
+      if (changelog.nextOffset != null && changelog.nextOffset < changelog.totalChars) {
+        lines.push(`Next offset: ${changelog.nextOffset} (pass as changelog_offset to continue)`);
+      }
+      lines.push("");
+      lines.push(changelog.content);
+
       return textResult(lines.join("\n"));
     };
 
-    // Dispatch on the identifier prefix; bare slugs try product then source.
+    // Dispatch on the identifier prefix; bare slugs try product then source
+    // — unless a changelog param was passed, which only a source can satisfy,
+    // so try source first (mirrors the hosted tool's tie-break, #373).
     const notFound = textResult(`No catalog entry found matching "${identifier}"`);
     if (identifier.startsWith("src_")) {
       return (await renderSource()) ?? notFound;
     }
     if (identifier.startsWith("prod_")) {
       return (await renderProduct()) ?? notFound;
+    }
+    if (changelogRequested) {
+      return (await renderSource()) ?? (await renderProduct()) ?? notFound;
     }
     return (await renderProduct()) ?? (await renderSource()) ?? notFound;
   },
