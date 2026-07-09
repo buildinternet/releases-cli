@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
+import { stripAnsi } from "../../src/lib/sanitize.js";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -126,9 +127,14 @@ describe("refetchRelease client", () => {
 describe("releaseRefetchAction", () => {
   let originalFetch: typeof globalThis.fetch;
   let originalExit: typeof process.exit;
+  let originalWrite: typeof process.stdout.write;
+  let originalLog: typeof console.log;
+  let originalError: typeof console.error;
   let dir: string;
   let postBody: Record<string, unknown> | null = null;
   let exitCode: number | undefined;
+  let out: string;
+  let errOut: string;
 
   function mockRefetch(response: unknown = DRY_RUN_RESPONSE) {
     globalThis.fetch = (async (url: string, init?: RequestInit) => {
@@ -143,10 +149,27 @@ describe("releaseRefetchAction", () => {
   beforeEach(() => {
     originalFetch = globalThis.fetch;
     originalExit = process.exit;
+    originalWrite = process.stdout.write;
+    originalLog = console.log;
+    originalError = console.error;
     dir = mkdtempSync(join(tmpdir(), "rel-refetch-cmd-"));
     process.env.RELEASES_RUN_DIR = dir;
     postBody = null;
     exitCode = undefined;
+    out = "";
+    errOut = "";
+    // The human view uses console.log; --json uses writeJson → stdout.write.
+    // Capture both so either path's output lands in `out`.
+    process.stdout.write = ((chunk: unknown) => {
+      out += typeof chunk === "string" ? chunk : String(chunk);
+      return true;
+    }) as typeof process.stdout.write;
+    console.log = (...args: unknown[]) => {
+      out += args.map(String).join(" ") + "\n";
+    };
+    console.error = (...args: unknown[]) => {
+      errOut += args.map(String).join(" ") + "\n";
+    };
     process.exit = ((code?: number) => {
       exitCode = code ?? 0;
       throw new Error(`process.exit(${code})`);
@@ -156,6 +179,9 @@ describe("releaseRefetchAction", () => {
   afterEach(() => {
     globalThis.fetch = originalFetch;
     process.exit = originalExit;
+    process.stdout.write = originalWrite;
+    console.log = originalLog;
+    console.error = originalError;
     delete process.env.RELEASES_RUN_DIR;
     rmSync(dir, { recursive: true, force: true });
   });
@@ -177,6 +203,64 @@ describe("releaseRefetchAction", () => {
     const { releaseRefetchAction } = await import("../../src/cli/commands/release.js");
     await releaseRefetchAction("rel_abc123", { url: "https://example.com/posts/foo" });
     expect((postBody as { url?: string }).url).toBe("https://example.com/posts/foo");
+  });
+
+  it("--json writes the raw response as pretty JSON and nothing else", async () => {
+    const { releaseRefetchAction } = await import("../../src/cli/commands/release.js");
+    await releaseRefetchAction("rel_abc123", { json: true });
+    expect(postBody).toMatchObject({ releaseId: "rel_abc123", dryRun: true });
+    expect(JSON.parse(out)).toEqual(DRY_RUN_RESPONSE);
+  });
+
+  it("renders the formatted dry-run preview with current and proposed snapshots", async () => {
+    const { releaseRefetchAction } = await import("../../src/cli/commands/release.js");
+    await releaseRefetchAction("rel_abc123", {});
+    const text = stripAnsi(out);
+    expect(text).toContain("[dry-run] Refetch preview for rel_abc123");
+    expect(text).toContain("via fetch, https://example.com/posts/foo");
+    expect(text).toContain("Current:");
+    expect(text).toContain("Proposed:");
+    expect(text).toContain("Old title");
+    expect(text).toContain("New title");
+    expect(text).toContain("480 chars");
+    expect(text).toContain("Re-run with --apply to persist these changes.");
+  });
+
+  it("renders the formatted updated snapshot after --apply", async () => {
+    mockRefetch(WRITE_RESPONSE);
+    const { releaseRefetchAction } = await import("../../src/cli/commands/release.js");
+    await releaseRefetchAction("rel_abc123", { apply: true });
+    const text = stripAnsi(out);
+    expect(text).toContain("Refetched release rel_abc123");
+    expect(text).toContain("Updated:");
+    expect(text).toContain("New title");
+    expect(text).not.toContain("[dry-run]");
+  });
+
+  it("prints the API error and exits 1 when refetchRelease rejects (400 fragment URL)", async () => {
+    globalThis.fetch = (async () =>
+      new Response(
+        JSON.stringify({
+          error: {
+            code: "bad_request",
+            type: "validation_error",
+            message:
+              "This release's stored URL is a synthesized index anchor (or missing) — fetching it would ingest the index page. Pass the post's canonical `url` explicitly.",
+          },
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      )) as unknown as typeof globalThis.fetch;
+    const { releaseRefetchAction } = await import("../../src/cli/commands/release.js");
+    let threw = false;
+    try {
+      await releaseRefetchAction("rel_abc123", {});
+    } catch {
+      threw = true; // the process.exit stub throws
+    }
+    expect(threw).toBe(true);
+    expect(exitCode).toBe(1);
+    expect(stripAnsi(errOut)).toContain("canonical `url` explicitly");
+    expect(out).toBe("");
   });
 
   it("rejects a non-rel_ id before making any network call", async () => {
