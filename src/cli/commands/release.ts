@@ -10,6 +10,8 @@ import {
   batchSuppressReleases,
   updateRelease,
   deleteReleasesForSource,
+  refetchRelease,
+  type RefetchReleaseSnapshot,
 } from "../../api/releases.js";
 import { findSource } from "../../api/sources.js";
 import { stripAnsi } from "../../lib/sanitize.js";
@@ -194,6 +196,57 @@ async function releaseUpdateAction(rawId: string, opts: ReleaseUpdateOpts): Prom
     console.log(chalk.green(`Updated release ${id}:`));
     for (const change of changes) console.log(`  ${change}`);
   }
+}
+
+type ReleaseRefetchOpts = {
+  url?: string;
+  apply?: boolean;
+  json?: boolean;
+};
+
+function renderRefetchSnapshot(label: string, snap: RefetchReleaseSnapshot): void {
+  console.log(`  ${label}:`);
+  console.log(`    Title:       ${stripAnsi(snap.title)}`);
+  console.log(`    Content:     ${snap.contentChars} chars`);
+  console.log(`    Media:       ${snap.mediaCount}`);
+  console.log(`    Published:   ${snap.publishedAt ?? chalk.dim("—")}`);
+  console.log(`    URL:         ${snap.url ?? chalk.dim("—")}`);
+}
+
+export async function releaseRefetchAction(rawId: string, opts: ReleaseRefetchOpts): Promise<void> {
+  const id = normalizeReleaseId(rawId);
+  if (!id.startsWith("rel_")) {
+    console.error(chalk.red(`Invalid release ID "${rawId}" — expected a release ID (rel_…).`));
+    process.exit(1);
+  }
+
+  const apply = !!opts.apply;
+  let result;
+  try {
+    result = await refetchRelease({ releaseId: id, url: opts.url, dryRun: !apply });
+  } catch (err) {
+    console.error(chalk.red(err instanceof Error ? err.message : String(err)));
+    process.exit(1);
+  }
+
+  if (opts.json) {
+    await writeJson(result);
+    return;
+  }
+
+  if (!result.dryRun) {
+    console.log(chalk.green(`Refetched release ${id} (via ${result.via}, ${result.fetchUrl}):`));
+    renderRefetchSnapshot("Updated", result.updated);
+    return;
+  }
+
+  console.log(
+    chalk.yellow(`[dry-run] Refetch preview for ${id} (via ${result.via}, ${result.fetchUrl}):`),
+  );
+  renderRefetchSnapshot("Current", result.current);
+  renderRefetchSnapshot("Proposed", result.proposed);
+  console.log();
+  console.log(chalk.dim("Re-run with --apply to persist these changes."));
 }
 
 // ── Command registration ──────────────────────────────────────────────────────
@@ -475,4 +528,29 @@ export function registerReleaseCommand(program: Command) {
         );
       }
     });
+
+  release
+    .command("refetch")
+    .description("Re-fetch a release's live page and update the row in place (rel_… id preserved)")
+    .argument("<releaseId>", "Release ID to refetch (rel_…)")
+    .option(
+      "--url <canonicalUrl>",
+      "Canonical permalink to fetch (required when the stored URL is a synthesized #fragment index anchor; must be on the source's host)",
+    )
+    .option("--apply", "Write the changes (default is a dry-run preview)")
+    .option("--json", "Output the raw response as JSON")
+    .addHelpText(
+      "after",
+      `
+Examples:
+  releases admin release refetch rel_abc123                          Dry-run preview
+  releases admin release refetch rel_abc123 --apply                  Write it
+  releases admin release refetch rel_abc123 --url https://example.com/posts/foo --apply
+                                                                       Required when the stored URL is a synthesized #fragment anchor
+
+Re-fetches ONE release's live page and updates the row in place: title,
+content, and publishedAt are replaced; summary/titleGenerated/titleShort are
+nulled for regeneration; media is replaced only when extraction returns items.`,
+    )
+    .action(releaseRefetchAction);
 }

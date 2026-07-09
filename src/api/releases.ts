@@ -55,6 +55,51 @@ export async function unsuppressRelease(releaseId: string): Promise<boolean> {
   return result?.unsuppressed ?? false;
 }
 
+// ── Release refetch (operator in-place healing, #2073) ──
+
+export interface RefetchReleaseSnapshot {
+  title: string;
+  contentChars: number;
+  mediaCount: number;
+  publishedAt: string | null;
+  url: string | null;
+}
+
+export interface RefetchReleaseDryRunResult {
+  dryRun: true;
+  releaseId: string;
+  fetchUrl: string;
+  via: string;
+  current: RefetchReleaseSnapshot;
+  proposed: RefetchReleaseSnapshot;
+}
+
+export interface RefetchReleaseWriteResult {
+  dryRun: false;
+  releaseId: string;
+  fetchUrl: string;
+  via: string;
+  updated: RefetchReleaseSnapshot;
+}
+
+export type RefetchReleaseResult = RefetchReleaseDryRunResult | RefetchReleaseWriteResult;
+
+/**
+ * Re-fetch a single release's live page and update the row in place (same
+ * `rel_` id). `dryRun` defaults to true server-side, so callers must pass it
+ * explicitly either way. See buildinternet/releases#2073.
+ */
+export async function refetchRelease(body: {
+  releaseId: string;
+  url?: string;
+  dryRun: boolean;
+}): Promise<RefetchReleaseResult> {
+  return apiFetch<RefetchReleaseResult>("/v1/workflows/refetch-release", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
 export async function deleteReleasesBatch(releaseIds: string[]): Promise<{ deleted: number }> {
   return apiFetch<{ deleted: number }>(`/v1/releases/batch`, {
     method: "DELETE",
