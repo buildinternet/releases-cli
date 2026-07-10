@@ -1,4 +1,5 @@
 import chalk from "chalk";
+import { IMPORTANCE_MAX, IMPORTANCE_MIN } from "@buildinternet/releases-core/importance";
 
 /**
  * Parse a positive-integer CLI flag value. Returns `undefined` if the option
@@ -92,6 +93,32 @@ export function parseTimeWindowFlag(label: string, raw: string | undefined): str
     process.exit(2);
   }
   return trimmed;
+}
+
+/**
+ * Validate the `--min-importance <1-5>` flag. The range mirrors the server's
+ * `ImportanceScoreSchema` bounds (`IMPORTANCE_MIN`..`IMPORTANCE_MAX`, from
+ * `@buildinternet/releases-core/importance` — the same constants the wire
+ * schema validates against), so a bad value fails fast locally instead of
+ * round-tripping to the API for its 400. Returns `undefined` when the flag
+ * was omitted; exits with code 2 on a malformed value (matches the other flag
+ * parsers here).
+ */
+export function parseImportanceFlag(raw: string | undefined): number | undefined {
+  if (raw === undefined) return undefined;
+  // Strict integer match first — Number.parseInt would silently accept "1.5" → 1
+  // and "4abc" → 4.
+  const isInt = /^-?\d+$/.test(raw);
+  const n = isInt ? Number.parseInt(raw, 10) : NaN;
+  if (!Number.isFinite(n) || n < IMPORTANCE_MIN || n > IMPORTANCE_MAX) {
+    console.error(
+      chalk.red(
+        `Invalid --min-importance: must be an integer between ${IMPORTANCE_MIN} and ${IMPORTANCE_MAX} (got ${raw})`,
+      ),
+    );
+    process.exit(2);
+  }
+  return n;
 }
 
 /** Parse a comma-separated `--tags foo,bar` flag into a trimmed, non-empty list. */

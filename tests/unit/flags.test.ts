@@ -7,6 +7,7 @@ import {
   coerceMetadataValue,
   parseMetadataSetFlag,
   parseTimeWindowFlag,
+  parseImportanceFlag,
 } from "../../src/lib/flags.js";
 
 // Intercept process.exit so invalid-input tests don't kill the runner.
@@ -314,5 +315,55 @@ describe("parseTimeWindowFlag", () => {
     expect(parseTimeWindowFlag("since", "2026-01-01T12:30:00+05:00")).toBe(
       "2026-01-01T12:30:00+05:00",
     );
+  });
+});
+
+describe("parseImportanceFlag", () => {
+  it("returns undefined when the flag is not supplied", () => {
+    expect(parseImportanceFlag(undefined)).toBeUndefined();
+  });
+
+  it("accepts every integer in the 1–5 range", () => {
+    expect(parseImportanceFlag("1")).toBe(1);
+    expect(parseImportanceFlag("2")).toBe(2);
+    expect(parseImportanceFlag("3")).toBe(3);
+    expect(parseImportanceFlag("4")).toBe(4);
+    expect(parseImportanceFlag("5")).toBe(5);
+  });
+
+  it("rejects 0 (below the range)", () => {
+    withExitTrap(() => {
+      expect(() => parseImportanceFlag("0")).toThrow("process.exit called");
+    });
+  });
+
+  it("rejects 6 (above the range)", () => {
+    withExitTrap(() => {
+      expect(() => parseImportanceFlag("6")).toThrow("process.exit called");
+    });
+  });
+
+  it("rejects a non-integer decimal", () => {
+    withExitTrap(() => {
+      expect(() => parseImportanceFlag("3.5")).toThrow("process.exit called");
+    });
+  });
+
+  it("rejects a non-numeric string", () => {
+    withExitTrap(() => {
+      expect(() => parseImportanceFlag("abc")).toThrow("process.exit called");
+    });
+  });
+
+  it("rejects a negative integer", () => {
+    withExitTrap(() => {
+      expect(() => parseImportanceFlag("-1")).toThrow("process.exit called");
+    });
+  });
+
+  it("rejects a string with trailing non-digit chars (4abc must not become 4)", () => {
+    withExitTrap(() => {
+      expect(() => parseImportanceFlag("4abc")).toThrow("process.exit called");
+    });
   });
 });

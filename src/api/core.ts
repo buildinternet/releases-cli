@@ -136,15 +136,17 @@ export type LatestReleaseWire = {
   titleShort?: string | null;
   contentChars?: number | null;
   contentTokens?: number | null;
+  /** AI-scored importance 1–5; `null`/absent means unscored, never "unimportant". */
+  importance?: number | null;
   publishedAt: string | null;
   media: Array<{ type: string; url: string; alt?: string; r2Url?: string }>;
   source: { slug: string; name: string; type: string };
   product?: { slug: string; name: string } | null;
 };
 
-// `titleGenerated`/`titleShort`/`contentChars`/`contentTokens` are carried so
-// the shared renderer's description fallback chain and the slim JSON size hints
-// have data without an extra round-trip. #215.
+// `titleGenerated`/`titleShort`/`contentChars`/`contentTokens`/`importance` are
+// carried so the shared renderer's description fallback chain and the slim
+// JSON size hints have data without an extra round-trip. #215.
 export function toLatestRelease(r: LatestReleaseWire): LatestRelease {
   return {
     id: r.id,
@@ -158,6 +160,7 @@ export function toLatestRelease(r: LatestReleaseWire): LatestRelease {
     titleShort: r.titleShort ?? null,
     contentChars: r.contentChars ?? null,
     contentTokens: r.contentTokens ?? null,
+    importance: r.importance ?? null,
     media: toMediaItems(r.media),
     product: r.product ?? null,
   };

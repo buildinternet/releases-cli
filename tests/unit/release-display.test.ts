@@ -6,6 +6,7 @@ import {
   releaseIdentity,
   releaseProductIdentity,
   releaseDescription,
+  importanceMarker,
 } from "../../src/lib/release-display.js";
 
 describe("relativeDate", () => {
@@ -147,5 +148,23 @@ describe("releaseDescription", () => {
     expect(releaseDescription({ ...base, title: "", content: "## Heading\nbody text" })).toBe(
       "Heading body text",
     );
+  });
+});
+
+describe("importanceMarker", () => {
+  it("renders nothing for null/undefined (unscored — unknown, never unimportant)", () => {
+    expect(importanceMarker(null)).toBe("");
+    expect(importanceMarker(undefined)).toBe("");
+  });
+  it("renders nothing for scores below the web's ≥4 threshold", () => {
+    expect(importanceMarker(1)).toBe("");
+    expect(importanceMarker(2)).toBe("");
+    expect(importanceMarker(3)).toBe("");
+  });
+  it("renders an outline glyph at 4", () => {
+    expect(importanceMarker(4)).toBe("◇");
+  });
+  it("renders a solid glyph at 5", () => {
+    expect(importanceMarker(5)).toBe("◆");
   });
 });

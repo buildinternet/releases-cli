@@ -16,7 +16,7 @@ import { slimLatest } from "../render/release-json.js";
 import { logger } from "@releases/lib/logger";
 import { writeJson, writeJsonLine } from "../../lib/output.js";
 import { applyFieldMask, parseFieldsFlag, projectFields } from "../../lib/fields.js";
-import { parseTimeWindowFlag } from "../../lib/flags.js";
+import { parseTimeWindowFlag, parseImportanceFlag } from "../../lib/flags.js";
 
 function renderStreamLine(row: LatestRelease): string {
   const version = row.version ? chalk.yellow(stripAnsi(row.version)) : "";
@@ -73,6 +73,10 @@ export function registerTailCommand(program: Command) {
       "--until <when>",
       "Only releases published on/before this date. Same formats as --since.",
     )
+    .option(
+      "--min-importance <1-5>",
+      "Only releases with an AI importance score at or above this value (1-5)",
+    )
     .option("-f, --follow", "Poll for new releases and stream them as they arrive")
     .option("--interval <seconds>", "Poll interval in seconds when following (min 5)", "60")
     .option("--json", "Output as JSON")
@@ -92,6 +96,7 @@ Examples:
   releases latest --org acme --limit 100   Up to 100 (--limit is an alias for --count)
   releases tail --product vercel/turborepo   One product's cross-source feed
   releases tail --since 30d             Releases from the last 30 days
+  releases tail --min-importance 4      Only AI-scored high-importance releases
   releases tail -f                      Follow new releases as they arrive (60s interval)
   releases tail -f --interval 30        Follow with a 30s poll interval
   releases tail --json                  Output as JSON
@@ -109,6 +114,7 @@ Examples:
           cursor?: string;
           since?: string;
           until?: string;
+          minImportance?: string;
           follow?: boolean;
           interval: string;
           json?: boolean;
@@ -135,6 +141,7 @@ Examples:
         // Validate locally; the API resolves relative shorthand server-side.
         const since = parseTimeWindowFlag("since", opts.since);
         const until = parseTimeWindowFlag("until", opts.until);
+        const minImportance = parseImportanceFlag(opts.minImportance);
 
         // --product switches to the product's cross-source feed
         // (GET /v1/orgs/:org/releases?product=…) — a different endpoint from the
@@ -183,6 +190,7 @@ Examples:
           includeCoverage: opts.includeCoverage,
           since,
           until,
+          minImportance,
         };
 
         // The product feed (GET /v1/orgs/:org/releases?product=…) is cursor-
@@ -202,6 +210,7 @@ Examples:
             includeCoverage: opts.includeCoverage,
             since,
             until,
+            minImportance,
           });
           if (!res) return productNotFound(opts.product!);
           productNextCursor = res.nextCursor;
