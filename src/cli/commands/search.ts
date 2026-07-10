@@ -4,6 +4,7 @@ import { unifiedSearch } from "../../api/sources.js";
 import { stripAnsi } from "../../lib/sanitize.js";
 import { logger } from "@releases/lib/logger";
 import { isValidKind, KIND_VALUES, type Kind } from "@buildinternet/releases-core/kinds";
+import { isValidCategory, CATEGORIES } from "@buildinternet/releases-core/categories";
 import type { LookupResultPayload, UnifiedSearchResponse } from "../../api/types.js";
 import { writeJson } from "../../lib/output.js";
 import { parseFieldsFlag, projectFields, unmatchedFields } from "../../lib/fields.js";
@@ -127,6 +128,14 @@ export function registerSearchCommand(program: Command) {
       "Scope hits to one product's sources (org/slug coordinate, prod_… id, or product slug)",
     )
     .option(
+      "--category <slug>",
+      `Scope hits to organizations in a category (${CATEGORIES.join(", ")}). See 'releases categories'.`,
+    )
+    .option(
+      "--collection <slug>",
+      "Scope hits to a curated collection's member orgs (e.g. coding-agents)",
+    )
+    .option(
       "--kind <kind>",
       `Filter by taxonomy (${KIND_VALUES.join(", ")}). Release hits use COALESCE(source.kind, product.kind); catalog hits match the row's own kind only.`,
     )
@@ -153,6 +162,8 @@ Examples:
   releases search "breaking change" --kind sdk    Narrow to SDK sources
   releases search "slack integration" --since 90d Only hits from the last 90 days
   releases search webhooks --product vercel/next-js   Scope a term to one product
+  releases search mcp --category developer-tools  Scope to dev-tools companies
+  releases search agents --collection coding-agents   Scope to a collection
   releases search vercel --type orgs              Show only org matches
   releases search shopify/hydrogen                Coordinate lookup (GitHub)`,
     )
@@ -165,6 +176,8 @@ Examples:
           mode?: string;
           domain?: string;
           product?: string;
+          category?: string;
+          collection?: string;
           kind?: string;
           since?: string;
           until?: string;
@@ -194,6 +207,16 @@ Examples:
         }
         const kind = opts.kind as Kind | undefined;
 
+        // Cheap client-side check against the canonical category slugs; the API
+        // is the source of truth (and also resolves curator aliases), but a
+        // typo shouldn't cost a round-trip. Aliases fall through to the API.
+        if (opts.category !== undefined && !isValidCategory(opts.category)) {
+          logger.error(
+            `Invalid --category value: "${opts.category}". Must be one of: ${CATEGORIES.join(", ")}`,
+          );
+          process.exit(1);
+        }
+
         let types: readonly SearchSection[];
         try {
           types = opts.type
@@ -213,6 +236,8 @@ Examples:
           mode?: SearchMode;
           domain?: string;
           product?: string;
+          category?: string;
+          collection?: string;
           kind?: Kind;
           since?: string;
           until?: string;
@@ -220,6 +245,8 @@ Examples:
         if (mode) searchOpts.mode = mode;
         if (opts.domain) searchOpts.domain = opts.domain;
         if (opts.product) searchOpts.product = opts.product;
+        if (opts.category) searchOpts.category = opts.category;
+        if (opts.collection) searchOpts.collection = opts.collection;
         if (kind) searchOpts.kind = kind;
         if (since) searchOpts.since = since;
         if (until) searchOpts.until = until;
@@ -252,6 +279,27 @@ Examples:
             logger.warn(`No product matching "${scopedProduct}". Showing no results.`);
           } else if (productEcho.productStatus === "matched") {
             logger.info(`Scoped to product ${scopedProduct}.`);
+          }
+        }
+
+        // `?category=` / `?collection=` echoes (#371). Read loosely, same
+        // pattern as the `?product=` echo above — the api-types pin here may
+        // predate the shape landing on UnifiedSearchResponse.
+        const scopeEcho = response as unknown as {
+          category?: string;
+          categoryStatus?: "matched";
+          collection?: string;
+          collectionStatus?: "matched" | "not_found";
+        };
+        if (!opts.json && scopeEcho.categoryStatus === "matched") {
+          logger.info(`Scoped to category ${scopeEcho.category ?? opts.category}.`);
+        }
+        if (!opts.json && scopeEcho.collectionStatus !== undefined) {
+          const scopedCollection = scopeEcho.collection ?? opts.collection;
+          if (scopeEcho.collectionStatus === "not_found") {
+            logger.warn(`No collection matching "${scopedCollection}". Showing no results.`);
+          } else if (scopeEcho.collectionStatus === "matched") {
+            logger.info(`Scoped to collection ${scopedCollection}.`);
           }
         }
 
