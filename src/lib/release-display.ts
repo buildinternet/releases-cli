@@ -79,6 +79,10 @@ export interface ReleaseRow {
    *  on feed rows (#1217). Drives the product-identity column the org card uses
    *  to name *which product* shipped each release rather than the raw source. */
   product?: { slug: string; name: string } | null;
+  /** AI-scored importance 1–5. `null`/`undefined` means unscored — never treat
+   *  it as "unimportant". Absent on search hits (the wire shape doesn't carry
+   *  it yet); see {@link importanceMarker}. */
+  importance?: number | null;
 }
 
 /**
@@ -133,4 +137,18 @@ export function releaseDescription(row: ReleaseRow): string {
     if (cleaned) return cleaned;
   }
   return row.title || "";
+}
+
+/**
+ * Marker glyph for a high-importance release, mirroring the web's ≥4
+ * threshold (outline at 4, solid at 5): scores 1–3 render nothing, and so
+ * does `null`/`undefined` — unscored means "unknown", never "unimportant".
+ * Deliberately quiet (a single Unicode glyph, no emoji, no `Importance: n/5`
+ * label) so an unscored or routine feed doesn't get noisier.
+ */
+export function importanceMarker(importance: number | null | undefined): string {
+  if (importance == null) return "";
+  if (importance >= 5) return "◆";
+  if (importance === 4) return "◇";
+  return "";
 }

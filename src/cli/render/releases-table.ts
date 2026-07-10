@@ -7,6 +7,7 @@ import {
   releaseProductIdentity,
   releaseDescription,
   cleanExcerpt,
+  importanceMarker,
 } from "../../lib/release-display.js";
 import { renderTable } from "./table.js";
 
@@ -88,7 +89,13 @@ export function renderReleaseRows(rows: ReleaseRow[], opts: RenderReleaseRowsOpt
   ];
 
   const tableRows = rows.map((r) => {
-    const description = mode === "search" ? singleLine(stripAnsi(r.title)) : releaseDescription(r);
+    const base = mode === "search" ? singleLine(stripAnsi(r.title)) : releaseDescription(r);
+    // Solid glyph (5) reads slightly heavier than outline (4) so the two
+    // levels stay distinguishable at a glance — same restraint as the web's
+    // outline-vs-solid marker, no label, no color-only signal.
+    const marker = importanceMarker(r.importance);
+    const styledMarker = marker === "◆" ? chalk.yellow.bold(marker) : chalk.yellow(marker);
+    const description = marker ? `${styledMarker} ${base}` : base;
     const age = relativeDate(r.publishedAt);
     const identity = identityFor(r);
     return [...(showIdentity ? [identity] : []), description, age, chalk.dim(r.id)];

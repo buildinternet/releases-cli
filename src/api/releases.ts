@@ -130,6 +130,9 @@ export async function getLatestReleases(opts: {
   /** ISO date or relative shorthand (90d/4w/6m/2y); resolved server-side. */
   since?: string;
   until?: string;
+  /** Only releases scored at or above this AI importance (1–5). Validated
+   *  client-side by `parseImportanceFlag`; forwarded as `?minImportance=`. */
+  minImportance?: number;
 }): Promise<LatestRelease[]> {
   const qs = new URLSearchParams();
   qs.set("count", String(opts.count));
@@ -138,6 +141,7 @@ export async function getLatestReleases(opts: {
   if (opts.includeCoverage) qs.set("include_coverage", "true");
   if (opts.since) qs.set("since", opts.since);
   if (opts.until) qs.set("until", opts.until);
+  if (opts.minImportance !== undefined) qs.set("minImportance", String(opts.minImportance));
 
   const data = await apiFetch<{ releases: LatestReleaseWire[] }>(
     `/v1/releases/latest?${qs.toString()}`,
@@ -195,6 +199,9 @@ export async function getProductReleases(opts: {
   includeCoverage?: boolean;
   since?: string;
   until?: string;
+  /** Only releases scored at or above this AI importance (1–5). See
+   *  {@link getLatestReleases}. */
+  minImportance?: number;
 }): Promise<{ releases: LatestRelease[]; nextCursor: string | null } | null> {
   const qs = new URLSearchParams();
   qs.set("product", opts.product);
@@ -203,6 +210,7 @@ export async function getProductReleases(opts: {
   if (opts.includeCoverage) qs.set("include_coverage", "true");
   if (opts.since) qs.set("since", opts.since);
   if (opts.until) qs.set("until", opts.until);
+  if (opts.minImportance !== undefined) qs.set("minImportance", String(opts.minImportance));
 
   const data = await apiFetch<{
     releases: LatestReleaseWire[];

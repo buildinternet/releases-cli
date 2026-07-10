@@ -197,3 +197,69 @@ describe("renderReleaseRows (search)", () => {
     expect(out.split("\n")).toHaveLength(1);
   });
 });
+
+describe("renderReleaseRows (importance marker)", () => {
+  // `chalk` is a process-wide singleton, so forcing colour on here and then
+  // hardcoding it back to 0 would clobber whatever level the runner picked for
+  // every suite that follows. Save and restore instead.
+  let priorChalkLevel: typeof chalk.level;
+  beforeAll(() => {
+    priorChalkLevel = chalk.level;
+    chalk.level = 1;
+  });
+  afterAll(() => {
+    chalk.level = priorChalkLevel;
+  });
+
+  const rowWith = (importance: number | null | undefined): ReleaseRow => ({
+    id: "rel_i",
+    title: "Some release",
+    version: null,
+    summary: null,
+    publishedAt: null,
+    sourceName: "Src",
+    sourceSlug: "src",
+    importance,
+  });
+
+  it("TTY: shows the solid marker at importance 5", () => {
+    const out = stripAnsi(
+      renderReleaseRows([rowWith(5)], { mode: "feed", isTTY: true, maxWidth: 100 }),
+    );
+    expect(out).toContain("◆ Some release");
+  });
+
+  it("TTY: shows the outline marker at importance 4", () => {
+    const out = stripAnsi(
+      renderReleaseRows([rowWith(4)], { mode: "feed", isTTY: true, maxWidth: 100 }),
+    );
+    expect(out).toContain("◇ Some release");
+  });
+
+  it("TTY: shows no marker for importance 3 and below", () => {
+    for (const importance of [3, 2, 1]) {
+      const out = stripAnsi(
+        renderReleaseRows([rowWith(importance)], { mode: "feed", isTTY: true, maxWidth: 100 }),
+      );
+      expect(out).not.toContain("◆");
+      expect(out).not.toContain("◇");
+      expect(out.trim().startsWith("Some release") || out.includes(" Some release")).toBe(true);
+    }
+  });
+
+  it("TTY: shows no marker for a null (unscored) or undefined (absent) importance", () => {
+    for (const importance of [null, undefined]) {
+      const out = stripAnsi(
+        renderReleaseRows([rowWith(importance)], { mode: "feed", isTTY: true, maxWidth: 100 }),
+      );
+      expect(out).not.toContain("◆");
+      expect(out).not.toContain("◇");
+    }
+  });
+
+  it("non-TTY: the machine TSV never carries the marker glyph, regardless of importance", () => {
+    const out = renderReleaseRows([rowWith(5)], { mode: "feed", isTTY: false });
+    expect(out).not.toContain("◆");
+    expect(out.split("\t")[2]).toBe("Some release");
+  });
+});

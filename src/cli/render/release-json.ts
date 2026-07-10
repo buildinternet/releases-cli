@@ -64,6 +64,11 @@ export function slimReleaseDetail(
     // matches slimLatest below.
     contentChars: opts.contentChars ?? undefined,
     contentTokens: opts.contentTokens ?? undefined,
+    // AI-scored importance passes through verbatim, including `null` for an
+    // unscored release — `?? null` (not `?? undefined`) so `omitUndefined`
+    // never drops the field. Machine consumers get the raw score; only the
+    // TTY table applies the ≥4 render threshold.
+    importance: r.importance ?? null,
   });
 }
 
@@ -97,5 +102,7 @@ export function slimLatest(row: LatestRelease, full: boolean): unknown {
     source: { slug: row.sourceSlug, name: row.sourceName },
     contentChars: row.contentChars ?? undefined,
     contentTokens: row.contentTokens ?? undefined,
+    // Verbatim passthrough, including `null` for unscored — see slimReleaseDetail.
+    importance: row.importance ?? null,
   });
 }

@@ -42,6 +42,7 @@ describe("slimReleaseDetail", () => {
         "contentTruncated",
         "excerpt",
         "id",
+        "importance",
         "org",
         "publishedAt",
         "source",
@@ -58,6 +59,28 @@ describe("slimReleaseDetail", () => {
     expect(out).not.toHaveProperty("contentHash");
     expect(out).not.toHaveProperty("sourceId");
     expect(out).not.toHaveProperty("embeddedAt");
+  });
+  it("passes importance through verbatim, including null for an unscored release (never omitted)", () => {
+    const out = slimReleaseDetail(rawDetail, {
+      contentChars: 51,
+      contentTokens: 24,
+      full: false,
+    }) as Record<string, unknown>;
+    // rawDetail carries no `importance` field — absent (undefined) on the wire
+    // normalizes to null, not omission.
+    expect(out.importance).toBeNull();
+    const scored = slimReleaseDetail({ ...rawDetail, importance: 5 } as never, {
+      contentChars: 51,
+      contentTokens: 24,
+      full: false,
+    }) as Record<string, unknown>;
+    expect(scored.importance).toBe(5);
+    const unscored = slimReleaseDetail({ ...rawDetail, importance: null } as never, {
+      contentChars: 51,
+      contentTokens: 24,
+      full: false,
+    }) as Record<string, unknown>;
+    expect(unscored.importance).toBeNull();
   });
   it("surfaces media[] (with r2Url) and a contentTruncated hint in the slim shape (#303)", () => {
     const media = [
@@ -170,5 +193,15 @@ describe("slimLatest", () => {
     expect(out).not.toHaveProperty("media");
     expect(out).not.toHaveProperty("excerpt");
     expect(out.contentTokens).toBe(3);
+  });
+  it("passes importance through verbatim, including null for an unscored release (never omitted)", () => {
+    expect((slimLatest(row, false) as Record<string, unknown>).importance).toBeNull();
+    expect(
+      (slimLatest({ ...row, importance: 3 } as never, false) as Record<string, unknown>).importance,
+    ).toBe(3);
+    expect(
+      (slimLatest({ ...row, importance: null } as never, false) as Record<string, unknown>)
+        .importance,
+    ).toBeNull();
   });
 });
