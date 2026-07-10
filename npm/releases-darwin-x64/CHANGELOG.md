@@ -1,5 +1,7 @@
 # @buildinternet/releases-darwin-x64
 
+## 0.72.0
+
 ## 0.71.0
 
 ## 0.70.1
