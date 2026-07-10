@@ -75,7 +75,7 @@ export function registerTailCommand(program: Command) {
     )
     .option(
       "--min-importance <1-5>",
-      "Only releases with an AI importance score at or above this value (1-5)",
+      "Only releases with an AI importance score at or above this value (1-5). Excludes unscored releases, which is most history.",
     )
     .option("-f, --follow", "Poll for new releases and stream them as they arrive")
     .option("--interval <seconds>", "Poll interval in seconds when following (min 5)", "60")

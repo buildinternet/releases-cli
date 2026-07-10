@@ -103,6 +103,11 @@ export function parseTimeWindowFlag(label: string, raw: string | undefined): str
  * round-tripping to the API for its 400. Returns `undefined` when the flag
  * was omitted; exits with code 2 on a malformed value (matches the other flag
  * parsers here).
+ *
+ * Server semantics worth knowing: the filter compiles to `importance >= ?`,
+ * which never matches a NULL column, so passing this flag drops every unscored
+ * release. Only a recent window of history is scored, so even
+ * `--min-importance 1` is far from a no-op.
  */
 export function parseImportanceFlag(raw: string | undefined): number | undefined {
   if (raw === undefined) return undefined;
