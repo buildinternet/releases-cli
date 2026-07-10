@@ -1,5 +1,17 @@
 # @buildinternet/releases
 
+## 0.71.0
+
+### Minor Changes
+
+- 735ba8a: The local stdio MCP bridge's `get_catalog_entry` tool now accepts `include_changelog`, `changelog_path`, `changelog_offset`, `changelog_limit`, and `changelog_tokens` — matching the hosted server at mcp.releases.sh — so a source entry's tracked CHANGELOG can be inlined or sliced in the same call, without a separate lookup. `changelog_tokens` takes precedence over `changelog_limit`, and any `changelog_*` param implies `include_changelog`; the params are ignored (with a clear message) for product entries. The standalone `get_source_changelog` tool is now deprecated in favor of these params — it remains registered and functional for this release, but agents should migrate.
+- 7ba0ebd: `releases org get` now renders stub-tier orgs (#1947): a `stub · not yet tracked` marker on the header and a `Declared locations` section listing each declared locator (kind, target, `canonical` flag), plus a hint to promote. Previously a stub printed as a bare identity block with no indication it was a declared-but-untracked listing. `--json` output is unchanged.
+
+### Patch Changes
+
+- 64951a6: Add `releases admin release refetch <releaseId>` to re-fetch a single release's live page and heal it in place (title/content/publishedAt, same `rel_` id). Supports `--url` for releases whose stored URL is a synthesized `#fragment` index anchor, defaults to a dry-run preview, and writes with `--apply`.
+- abeab6e: Consolidate agent skills by audience: this repo now ships only the three user-facing skills (`releases-mcp`, `releases-cli`, `analyzing-releases`). The `releases-admin` plugin, its five mirrored operator skills, and the `discovery`/`worker` agent definitions are removed — the canonical operator skills live in the backend monorepo's `.claude/skills/` tree. The `@buildinternet/releases-skills` npm wrapper is retired (removed from the workspace and the changesets fixed group; deprecated on npm). `npx skills add buildinternet/releases-cli` and `releases skills install` continue to work unchanged.
+
 ## 0.70.1
 
 ### Patch Changes
