@@ -216,6 +216,12 @@ export async function unifiedSearch(
     /** Product identifier (org/slug coordinate, prod_… id, or product slug);
      *  scopes hits to that product's sources. Resolved server-side (#1218). */
     product?: string;
+    /** Org category slug (validated against `releases categories`); scopes
+     *  orgs/catalog/release hits to that category. Unknown → 400 (#371). */
+    category?: string;
+    /** Curated collection slug; scopes hits to the collection's member orgs.
+     *  Unknown → empty envelope with `collectionStatus: "not_found"` (#371). */
+    collection?: string;
     mode?: "lexical" | "semantic" | "hybrid";
     kind?: Kind;
     /** ISO date or relative shorthand (90d/4w/6m/2y); resolved server-side. */
@@ -227,6 +233,8 @@ export async function unifiedSearch(
   if (opts?.org) params.set("org", opts.org);
   if (opts?.domain) params.set("domain", opts.domain);
   if (opts?.product) params.set("product", opts.product);
+  if (opts?.category) params.set("category", opts.category);
+  if (opts?.collection) params.set("collection", opts.collection);
   if (opts?.mode) params.set("mode", opts.mode);
   if (opts?.kind) params.set("kind", opts.kind);
   if (opts?.since) params.set("since", opts.since);

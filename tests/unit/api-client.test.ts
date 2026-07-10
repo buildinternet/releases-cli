@@ -458,6 +458,23 @@ describe("since/until query params", () => {
     expect(capturedUrl).toContain("since=30d");
     expect(capturedUrl).toContain("until=2026-05-01");
   });
+
+  it("unifiedSearch forwards category and collection", async () => {
+    captureWith({ orgs: [], catalog: [], releases: [], collections: [] });
+    await client.unifiedSearch("q", 10, {
+      category: "developer-tools",
+      collection: "coding-agents",
+    });
+    expect(capturedUrl).toContain("category=developer-tools");
+    expect(capturedUrl).toContain("collection=coding-agents");
+  });
+
+  it("unifiedSearch omits category/collection when not supplied", async () => {
+    captureWith({ orgs: [], catalog: [], releases: [], collections: [] });
+    await client.unifiedSearch("q", 10);
+    expect(capturedUrl).not.toContain("category=");
+    expect(capturedUrl).not.toContain("collection=");
+  });
 });
 
 // ---------------------------------------------------------------------------
