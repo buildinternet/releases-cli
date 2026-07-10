@@ -199,11 +199,16 @@ describe("renderReleaseRows (search)", () => {
 });
 
 describe("renderReleaseRows (importance marker)", () => {
+  // `chalk` is a process-wide singleton, so forcing colour on here and then
+  // hardcoding it back to 0 would clobber whatever level the runner picked for
+  // every suite that follows. Save and restore instead.
+  let priorChalkLevel: typeof chalk.level;
   beforeAll(() => {
+    priorChalkLevel = chalk.level;
     chalk.level = 1;
   });
   afterAll(() => {
-    chalk.level = 0;
+    chalk.level = priorChalkLevel;
   });
 
   const rowWith = (importance: number | null | undefined): ReleaseRow => ({
