@@ -4,7 +4,7 @@ import { unifiedSearch } from "../../api/sources.js";
 import { stripAnsi } from "../../lib/sanitize.js";
 import { logger } from "@releases/lib/logger";
 import { isValidKind, KIND_VALUES, type Kind } from "@buildinternet/releases-core/kinds";
-import { isValidCategory, CATEGORIES } from "@buildinternet/releases-core/categories";
+import { CATEGORIES } from "@buildinternet/releases-core/categories";
 import type { LookupResultPayload, UnifiedSearchResponse } from "../../api/types.js";
 import { writeJson } from "../../lib/output.js";
 import { parseFieldsFlag, projectFields, unmatchedFields } from "../../lib/fields.js";
@@ -207,15 +207,11 @@ Examples:
         }
         const kind = opts.kind as Kind | undefined;
 
-        // Cheap client-side check against the canonical category slugs; the API
-        // is the source of truth (and also resolves curator aliases), but a
-        // typo shouldn't cost a round-trip. Aliases fall through to the API.
-        if (opts.category !== undefined && !isValidCategory(opts.category)) {
-          logger.error(
-            `Invalid --category value: "${opts.category}". Must be one of: ${CATEGORIES.join(", ")}`,
-          );
-          process.exit(1);
-        }
+        // No client-side --category gate: the API is the source of truth and
+        // resolves curator aliases (e.g. "e-commerce" → "commerce"), which the
+        // canonical `CATEGORIES` list here can't see. A local `isValidCategory`
+        // check would wrongly reject valid aliases, so we forward the value and
+        // let the API 400 on a genuinely unknown category.
 
         let types: readonly SearchSection[];
         try {
