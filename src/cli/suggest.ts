@@ -56,7 +56,7 @@ export function formatAmbiguousSourceError(err: AmbiguousSourceError): string {
 /**
  * Plain-text (no ANSI) sibling of {@link formatAmbiguousSourceError} for
  * surfaces that aren't a color terminal — chiefly the local MCP server's
- * `get_source` / `get_source_changelog` tools, where the string is returned as
+ * `get_source` / `get_catalog_entry` tools, where the string is returned as
  * tool content for an agent to read and self-correct against (#264).
  */
 export function describeAmbiguousSource(err: AmbiguousSourceError): string {

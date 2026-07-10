@@ -307,81 +307,6 @@ server.registerTool(
   },
 );
 
-// ── get_source_changelog ─────────────────────────────────────────────
-server.registerTool(
-  "get_source_changelog",
-  {
-    description:
-      "DEPRECATED — use get_catalog_entry with changelog_* params instead. Read a tracked CHANGELOG file for a GitHub source. Supports heading-aligned slicing by chars (`limit`) or tokens (`tokens`, cl100k_base). Chain successive calls via `nextOffset` to page through large files.",
-    inputSchema: {
-      source: z.string().describe("Source slug or ID (e.g. 'apollo-client' or 'src_...')"),
-      path: z
-        .string()
-        .optional()
-        .describe(
-          "Specific file path to read (e.g. 'packages/next/CHANGELOG.md'). Defaults to the root CHANGELOG.",
-        ),
-      offset: z
-        .number()
-        .optional()
-        .describe(
-          "Character offset into the selected file. Snapped forward to the next heading unless 0.",
-        ),
-      limit: z
-        .number()
-        .optional()
-        .describe(
-          "Target slice size in characters. Defaults to 40000 when slicing without a token budget.",
-        ),
-      tokens: z
-        .number()
-        .optional()
-        .describe(
-          "Target slice size in tokens (cl100k_base). Takes precedence over `limit`. Recommended brackets: 2000, 5000, 10000, 20000.",
-        ),
-    },
-  },
-  async ({ source: identifier, path: requestedPath, offset, limit, tokens }) => {
-    let response;
-    try {
-      response = await sourceChangelog(identifier, {
-        path: requestedPath,
-        offset,
-        limit,
-        tokens,
-      });
-    } catch (err) {
-      if (err instanceof AmbiguousSourceError) return textResult(describeAmbiguousSource(err));
-      throw err;
-    }
-
-    if (!response) {
-      return textResult(
-        `No CHANGELOG file is tracked for "${identifier}". Only GitHub sources expose this.`,
-      );
-    }
-
-    const lines: string[] = [
-      `**${response.path}**`,
-      `Source: ${response.url ?? ""}`,
-      `Offset: ${response.offset} | Total chars: ${response.totalChars} | Total tokens: ${response.totalTokens ?? "N/A"}`,
-    ];
-
-    if (response.truncated) {
-      lines.push(`WARNING: File truncated at 1MB cap.`);
-    }
-
-    if (response.nextOffset != null && response.nextOffset < response.totalChars) {
-      lines.push(`Next offset: ${response.nextOffset} (pass as offset to continue)`);
-    }
-
-    lines.push("");
-    lines.push(response.content);
-
-    return textResult(lines.join("\n"));
-  },
-);
-
 // ── list_organizations ───────────────────────────────────────────────
 server.registerTool(
   "list_organizations",
@@ -603,9 +528,8 @@ server.registerTool(
 
       if (!changelogRequested) return textResult(lines.join("\n"));
 
-      // Fetch the slice through the same REST route get_source_changelog
-      // uses, and inline it — matching how the hosted tool merges the two
-      // (#373).
+      // Fetch the slice through the /changelog REST route and inline it —
+      // matching how the hosted tool merges the two (#373).
       let changelog;
       try {
         changelog = await sourceChangelog(source.id, {
