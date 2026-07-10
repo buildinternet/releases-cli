@@ -169,38 +169,13 @@ describe("get_catalog_entry changelog params", () => {
   });
 });
 
-describe("get_source_changelog (deprecated but functional)", () => {
-  let originalFetch: typeof globalThis.fetch;
-
-  beforeEach(() => {
-    originalFetch = globalThis.fetch;
-    globalThis.fetch = (async (url: string) => {
-      const u = new URL(url);
-      if (u.pathname === "/v1/sources/src_abc123/changelog") {
-        return new Response(JSON.stringify(CHANGELOG_RESPONSE), { status: 200 });
-      }
-      return new Response("{}", { status: 200 });
-    }) as unknown as typeof globalThis.fetch;
-  });
-  afterEach(() => {
-    globalThis.fetch = originalFetch;
-  });
-
-  it("is still registered and marked deprecated in its description", () => {
+describe("get_source_changelog (removed)", () => {
+  it("is no longer registered", () => {
     const tools = (
       server as unknown as {
         _registeredTools: Record<string, { description?: string }>;
       }
     )._registeredTools;
-    expect(tools.get_source_changelog).toBeDefined();
-    expect(tools.get_source_changelog!.description).toMatch(/^DEPRECATED/);
-  });
-
-  it("still works end-to-end", async () => {
-    const handler = toolHandler("get_source_changelog");
-    const result = await handler({ source: "src_abc123" });
-    const text = result.content[0]!.text;
-    expect(text).toContain("**CHANGELOG.md**");
-    expect(text).toContain("## 15.1.0");
+    expect(tools.get_source_changelog).toBeUndefined();
   });
 });
