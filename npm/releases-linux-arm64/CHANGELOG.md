@@ -1,5 +1,7 @@
 # @buildinternet/releases-linux-arm64
 
+## 0.72.0
+
 ## 0.71.0
 
 ## 0.70.1

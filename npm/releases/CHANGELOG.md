@@ -1,5 +1,13 @@
 # @buildinternet/releases
 
+## 0.72.0
+
+### Minor Changes
+
+- 0b1a45e: Remove the deprecated `get_source_changelog` tool from the local stdio MCP bridge. It was deprecated in 0.71.0 in favor of `get_catalog_entry` with the `changelog_*` params (`include_changelog` / `changelog_path` / `changelog_offset` / `changelog_limit` / `changelog_tokens`); calling `get_source_changelog` by name now returns MCP's standard unknown-tool error. The REST helper `sourceChangelog()` is unchanged — `get_catalog_entry` and the `admin source changelog` CLI command still use it.
+- e7d50b4: `releases search` gains `--category <slug>` and `--collection <slug>` filters. `--category` scopes hits to organizations in a category (the API validates and resolves curator aliases like `e-commerce` → `commerce`, so the value is forwarded as-is); `--collection` scopes to a curated collection's member orgs (unknown slugs report "no collection matching …", mirroring `--domain`). Both forward to the new `/v1/search` params and compose with the existing `--domain` / `--product` / `--kind` / `--since` / `--until` scopes.
+- 2d4b707: Surface the registry's AI-scored release `importance` (1–5, `null` when unscored). `tail`/`latest` gains `--min-importance <1-5>` (forwarded as `?minImportance=`); the human table marks importance ≥4 with a quiet glyph (outline at 4, solid at 5), mirroring the web's render threshold, while `--json` output (`get`/`tail`/`latest`) passes the raw score through verbatim, including `null`. Bumps the `@buildinternet/releases-api-types` and `@buildinternet/releases-core` pins to the versions that carry the `importance` field.
+
 ## 0.71.0
 
 ### Minor Changes
