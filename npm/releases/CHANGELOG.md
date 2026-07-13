@@ -1,5 +1,15 @@
 # @buildinternet/releases
 
+## 0.73.0
+
+### Minor Changes
+
+- 88999c9: `releases search --json` now passes AI-scored `importance` (1–5) through in the slim search-hit shape, normalized to `null` when unscored — same norm as `get` / `tail` / `latest`. The TTY search table also marks importance ≥ 4 with the quiet glyph. Bumps `@buildinternet/releases-api-types` to `^0.48.0` for the search/related/digest wire field (monorepo #2135).
+
+### Patch Changes
+
+- e97462a: Surface a NODE_EXTRA_CA_CERTS / SSL_CERT_FILE hint on TLS certificate verification failures, and document custom-CA support (TLS-intercepting proxies) in the README.
+
 ## 0.72.0
 
 ### Minor Changes
