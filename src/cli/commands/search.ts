@@ -442,6 +442,9 @@ Examples:
             // this unset because the org is already established in context.
             orgName: r.orgName ?? null,
             orgSlug: r.orgSlug ?? null,
+            // TTY ≥4 glyph via importanceMarker(), same as tail/latest.
+            // Wire field from monorepo #2135 (api-types ≥ 0.48.0).
+            importance: r.importance ?? null,
           }));
           console.log(renderReleaseRows(rows, { mode: "search" }));
           console.log();

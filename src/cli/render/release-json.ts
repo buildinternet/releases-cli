@@ -88,6 +88,11 @@ export function slimSearchHit(hit: SearchReleaseHit, full: boolean): unknown {
     source: { slug: hit.sourceSlug, name: hit.sourceName },
     org: hit.orgSlug ? { slug: hit.orgSlug, name: hit.orgName ?? undefined } : undefined,
     contentChars: chars,
+    // Verbatim passthrough, including `null` for unscored — same norm as
+    // slimReleaseDetail / slimLatest. Older servers omit the key and we still
+    // emit `null` so machine consumers get a stable field. Wire field from
+    // monorepo #2135 (`@buildinternet/releases-api-types` ≥ 0.48.0).
+    importance: hit.importance ?? null,
   });
 }
 
