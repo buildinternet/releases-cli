@@ -68,7 +68,10 @@ import { writeJson } from "../lib/output.js";
 export { VERSION };
 
 const IS_DEV = !!process.argv[1]?.endsWith(".ts");
-const VERSION_DISPLAY = IS_DEV ? `${VERSION}-dev` : VERSION;
+const VERSION_SHORT = IS_DEV ? `${VERSION}-dev` : VERSION;
+// Include the runtime so agents in unfamiliar environments can tell this is a
+// Bun binary (and thus that NODE_EXTRA_CA_CERTS / SSL_CERT_FILE etc. apply).
+const VERSION_DISPLAY = `${VERSION_SHORT} (bun ${Bun.version}, ${process.platform}-${process.arch})`;
 
 function adminKeyError(name = "admin"): never {
   console.error(
@@ -133,7 +136,7 @@ function printStyledHelp(): string {
   const lines: string[] = [];
 
   lines.push("");
-  lines.push(`${chalk.bold("releases")} ${chalk.dim(`v${VERSION_DISPLAY}`)}`);
+  lines.push(`${chalk.bold("releases")} ${chalk.dim(`v${VERSION_SHORT}`)}`);
   lines.push(chalk.dim("The changelog & release-notes registry for developers and AI agents"));
   lines.push(chalk.dim("Web catalog: ") + chalk.cyan("https://releases.sh"));
   lines.push("");
