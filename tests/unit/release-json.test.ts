@@ -170,6 +170,13 @@ describe("slimSearchHit", () => {
     >;
     expect(absent).not.toHaveProperty("contentChars");
   });
+  it("passes importance through verbatim, including null for an unscored release (never omitted)", () => {
+    expect((slimSearchHit(hit, false) as Record<string, unknown>).importance).toBeNull();
+    expect(
+      (slimSearchHit({ ...hit, importance: 5 } as never, false) as Record<string, unknown>)
+        .importance,
+    ).toBe(5);
+  });
 });
 
 describe("slimLatest", () => {

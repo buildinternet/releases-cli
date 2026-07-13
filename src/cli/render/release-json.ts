@@ -78,6 +78,10 @@ export function slimSearchHit(hit: SearchReleaseHit, full: boolean): unknown {
   // `number | undefined`: keep 0 (present-but-empty body) but omit entirely when
   // the hit carries no content field (size unknown, not zero).
   const chars = hit.content?.length;
+  // `importance` is on the monorepo wire schema (#2132) but may not yet be on
+  // the published api-types pin this CLI resolves. Read loosely so slim JSON
+  // still carries the field once servers emit it, without a hard pin bump.
+  const importance = (hit as SearchReleaseHit & { importance?: number | null }).importance ?? null;
   return omitUndefined({
     id: hit.id,
     version: nullIfEmpty(hit.version) ?? undefined,
@@ -88,6 +92,10 @@ export function slimSearchHit(hit: SearchReleaseHit, full: boolean): unknown {
     source: { slug: hit.sourceSlug, name: hit.sourceName },
     org: hit.orgSlug ? { slug: hit.orgSlug, name: hit.orgName ?? undefined } : undefined,
     contentChars: chars,
+    // Verbatim passthrough, including `null` for unscored — same norm as
+    // slimReleaseDetail / slimLatest. Older servers omit the key and we still
+    // emit `null` so machine consumers get a stable field.
+    importance,
   });
 }
 
