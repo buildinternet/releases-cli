@@ -133,6 +133,18 @@ Reader access requires nothing. Useful overrides:
 
 See [`.env.example`](./.env.example) for the full list.
 
+### Custom CA certificates (TLS-intercepting proxies)
+
+The compiled binary ships with the standard Mozilla CA store. If your network re-terminates TLS with its own CA (corporate proxy, sandboxed agent environment), point the standard Node/OpenSSL variables at the proxy's CA certificate — the binary honors both:
+
+```sh
+NODE_EXTRA_CA_CERTS=/path/to/proxy-ca.pem releases search "bun"
+# or
+SSL_CERT_FILE=/path/to/proxy-ca.pem releases search "bun"
+```
+
+No `--ca-bundle` flag is needed; certificate errors from the CLI include this hint.
+
 ## Exit codes
 
 | Code  | Meaning                                                      |

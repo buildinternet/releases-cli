@@ -38,6 +38,23 @@ export type {
   OrgDependentsResponse,
 } from "./types.js";
 
+// OpenSSL verification-failure codes Bun's fetch surfaces when the server's
+// chain doesn't anchor to a trusted CA — the signature of a TLS-intercepting
+// proxy whose CA isn't in the bundled Mozilla store.
+const CERT_ERROR_CODES = new Set([
+  "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+  "UNABLE_TO_GET_ISSUER_CERT",
+  "UNABLE_TO_GET_ISSUER_CERT_LOCALLY",
+  "SELF_SIGNED_CERT_IN_CHAIN",
+  "DEPTH_ZERO_SELF_SIGNED_CERT",
+  "CERT_UNTRUSTED",
+]);
+
+function isCertVerificationError(err: unknown): boolean {
+  const code = (err as { code?: unknown } | null)?.code;
+  return typeof code === "string" && CERT_ERROR_CODES.has(code);
+}
+
 export async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T> {
   // Defense-in-depth: reject raw control characters in the assembled path. By
   // this point user identifiers are already percent-encoded, so a clean path
@@ -78,7 +95,10 @@ export async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T> 
       });
     }
     const detail = err instanceof Error ? err.message : String(err);
-    throw new Error(`API request failed on ${opts?.method ?? "GET"} ${path}: ${detail}`, {
+    const hint = isCertVerificationError(err)
+      ? " (TLS certificate verification failed — if you're behind a TLS-intercepting proxy, set NODE_EXTRA_CA_CERTS or SSL_CERT_FILE to the proxy's CA certificate)"
+      : "";
+    throw new Error(`API request failed on ${opts?.method ?? "GET"} ${path}: ${detail}${hint}`, {
       cause: err,
     });
   }
