@@ -426,30 +426,26 @@ Examples:
 
         if (types.includes("releases") && response.releases.length > 0) {
           console.log(chalk.bold.underline("Releases"));
-          const rows: ReleaseRow[] = response.releases.map((r) => {
-            // `importance` lands with the #2132 wire projection; read loosely
-            // until the published api-types pin includes it on SearchReleaseHit.
-            const importance = (r as typeof r & { importance?: number | null }).importance ?? null;
-            return {
-              id: r.id,
-              title: r.title,
-              version: r.version,
-              summary: r.summary ?? null,
-              titleGenerated: r.titleGenerated ?? null,
-              titleShort: r.titleShort ?? null,
-              content: r.content ?? null,
-              publishedAt: r.publishedAt,
-              sourceName: r.sourceName,
-              sourceSlug: r.sourceSlug,
-              // Cross-vendor surface: carry the owning org so the identity column
-              // renders `Org/Source` ("who ships this"). Feed-mode callers leave
-              // this unset because the org is already established in context.
-              orgName: r.orgName ?? null,
-              orgSlug: r.orgSlug ?? null,
-              // TTY ≥4 glyph via importanceMarker(), same as tail/latest.
-              importance,
-            };
-          });
+          const rows: ReleaseRow[] = response.releases.map((r) => ({
+            id: r.id,
+            title: r.title,
+            version: r.version,
+            summary: r.summary ?? null,
+            titleGenerated: r.titleGenerated ?? null,
+            titleShort: r.titleShort ?? null,
+            content: r.content ?? null,
+            publishedAt: r.publishedAt,
+            sourceName: r.sourceName,
+            sourceSlug: r.sourceSlug,
+            // Cross-vendor surface: carry the owning org so the identity column
+            // renders `Org/Source` ("who ships this"). Feed-mode callers leave
+            // this unset because the org is already established in context.
+            orgName: r.orgName ?? null,
+            orgSlug: r.orgSlug ?? null,
+            // TTY ≥4 glyph via importanceMarker(), same as tail/latest.
+            // Wire field from monorepo #2135 (api-types ≥ 0.48.0).
+            importance: r.importance ?? null,
+          }));
           console.log(renderReleaseRows(rows, { mode: "search" }));
           console.log();
           totalResults += response.releases.length;
