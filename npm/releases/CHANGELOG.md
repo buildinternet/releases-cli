@@ -1,5 +1,13 @@
 # @buildinternet/releases
 
+## 0.73.1
+
+### Patch Changes
+
+- 7fe55de: `source backfill --dry-run` now reports how much of the extracted history the source doesn't already have, as `N not yet stored`. Previously the dry-run line reported only how many entries were on the page, which said nothing about whether any of them were missing — during the 2026-07-23 ingest outage that gap let a run over a source missing its entire recent history read as uneventful. Requires an API worker carrying the new `notStored` field; against an older server the clause is omitted rather than guessed. The report type also catches up with the server: `inserted` is `null` on a dry run (nothing was written, no count computed) rather than a fabricated `0`.
+- b124608: Fix `getApiUrl()` memoizing the API base URL process-wide on first call. Under `bun test`, every test file shares one process, so whichever file called it first locked the base URL for the rest of the run — files that set `RELEASES_API_URL` afterward got the stale (production) URL instead and their assertions failed. This was silently CI-red on `main` (22 tests failing) because CI's clean environment produces a call order that trips the memoization, while a developer machine with real credentials hits a different, unrelated set of failures. `getApiUrl()` now re-resolves from the environment on every call instead of caching.
+- f7a1b54: Fix `releases stats` reporting every source as never-fetched with zero recent releases. The command composed its summary from the legacy flat fields of `/v1/stats` and hardcoded source health, `releasesInPeriod`, and every `lastFetchedAt` to `0`/`null` — a stale workaround from before the endpoint returned the full `StatsSummary` shape. It now reads the server's real values, so the output reflects actual ingestion health instead of implying the index is dead.
+
 ## 0.73.0
 
 ### Minor Changes
