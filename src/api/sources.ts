@@ -900,10 +900,16 @@ export interface SourceBackfillReport {
   /** Unique-by-url count submitted to ingest. */
   deduped: number;
   dateRange: { from: string | null; to: string | null };
-  /** Rows seen by ingest (0 on dryRun). */
+  /** Rows handed to ingest. Real on both paths — a dry run knows it without
+   *  ingesting, since it equals `deduped`. */
   found: number;
-  /** Rows actually inserted (0 on dryRun). */
-  inserted: number;
+  /** Rows actually inserted; `null` on a dry run, where nothing was written and
+   *  no count was computed. Never `0` there — see `notStored`. */
+  inserted: number | null;
+  /** Dry-run only: extracted URLs the source does not already have — an upper
+   *  bound on what a commit run would insert. `null`/absent on the commit path
+   *  (`inserted` is the measured answer) and on servers predating the field. */
+  notStored?: number | null;
   dryRun: boolean;
   /** Set only when the Firecrawl window ceiling reduced a deeper request and the
    *  run stopped with untouched tail — tells the caller how to go deeper. */
