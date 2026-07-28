@@ -4,8 +4,6 @@ import { readCredential } from "./credentials.js";
 
 const DEFAULT_API_URL = "https://api.releases.sh";
 
-let _apiUrl: string | null = null;
-
 export interface ResolvedCredential {
   token: string | null;
   source: "env" | "file" | "none";
@@ -39,12 +37,16 @@ export function isAuthenticated(): boolean {
 /** Back-compat alias — historically "admin mode" meant "a credential is present". */
 export const isAdminMode = isAuthenticated;
 
+// Deliberately NOT memoized. A previous version cached this into a
+// module-level `_apiUrl` on first call, which is harmless for a real CLI
+// invocation (one process, one env) but poisons `bun test`: all test files
+// share one process, so whichever file calls this first locks the base URL
+// for the entire run and any file that sets RELEASES_API_URL afterward gets
+// the stale value instead (see #388). Re-reading the env var per call is
+// cheap (string compare + a regex) and removes the whole class of bug.
 export function getApiUrl(): string {
-  if (!_apiUrl) {
-    const url = legacyEnv("RELEASES_API_URL", "RELEASED_API_URL") || DEFAULT_API_URL;
-    _apiUrl = url.replace(/\/$/, "");
-  }
-  return _apiUrl;
+  const url = legacyEnv("RELEASES_API_URL", "RELEASED_API_URL") || DEFAULT_API_URL;
+  return url.replace(/\/$/, "");
 }
 
 export function getApiKey(): string {
