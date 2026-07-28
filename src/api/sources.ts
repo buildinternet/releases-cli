@@ -296,7 +296,10 @@ export async function getStatsSummary(days: number): Promise<StatsSummary> {
 
   // Compose from existing endpoints
   const [statsData, fetchLogData, sourcesData] = await Promise.all([
-    apiFetch<Stats>("/v1/stats"),
+    // The endpoint serves the legacy flat counts merged with the richer
+    // StatsSummary shape. `Partial` because an older API (or a fork) may still
+    // send only the flat fields — the fallbacks below cover that.
+    apiFetch<Stats & Partial<StatsSummary>>("/v1/stats"),
     apiFetch<
       Array<{
         id: string;
@@ -321,28 +324,38 @@ export async function getStatsSummary(days: number): Promise<StatsSummary> {
     >("/v1/sources"),
   ]);
 
+  // `/v1/stats` now returns the full StatsSummary shape (period / totals /
+  // sourceHealth / sourceActivity) alongside the legacy flat counts. This used
+  // to read only the flat fields and hardcode the rest to 0/null, which made
+  // `releases stats` report every source as never-fetched with 0 releases in
+  // period — the exact opposite of the truth (341 up to date, 3911 releases at
+  // time of writing). An operator reading that would conclude ingestion was
+  // dead. Prefer the server's values and keep the zeros only as a fallback for
+  // an older API that genuinely doesn't send them.
   return {
-    period: { days, cutoff },
+    period: statsData.period ?? { days, cutoff },
     totals: {
       organizations: statsData.orgs,
       sources: statsData.sources,
       releases: statsData.releases,
-      releasesInPeriod: 0, // Not available from basic stats endpoint
+      releasesInPeriod: statsData.totals?.releasesInPeriod ?? 0,
     },
-    sourceHealth: {
+    sourceHealth: statsData.sourceHealth ?? {
       upToDate: 0,
       stale: 0,
       neverFetched: 0,
     },
-    sourceActivity: sourcesData.map((s) => ({
-      sourceName: s.name,
-      sourceSlug: s.slug,
-      sourceType: s.type,
-      orgName: s.orgSlug,
-      lastFetchedAt: null,
-      totalReleases: s.releaseCount,
-      recentReleases: 0,
-    })),
+    sourceActivity:
+      statsData.sourceActivity ??
+      sourcesData.map((s) => ({
+        sourceName: s.name,
+        sourceSlug: s.slug,
+        sourceType: s.type,
+        orgName: s.orgSlug,
+        lastFetchedAt: null,
+        totalReleases: s.releaseCount,
+        recentReleases: 0,
+      })),
     recentActivity: fetchLogData.map((f) => ({
       sourceName: "",
       sourceSlug: "",
