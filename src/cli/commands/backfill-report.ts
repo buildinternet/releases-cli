@@ -17,15 +17,20 @@ export function renderBackfillReport(report: SourceBackfillReport): void {
   const dates = `${shortDate(report.dateRange.from)} … ${shortDate(report.dateRange.to)}`;
 
   if (report.dryRun) {
+    // The whole point of a dry run is "is there content here we don't have?".
+    // Omitted rather than guessed when the server predates the field.
+    const missing = report.notStored == null ? "" : `, ${report.notStored} not yet stored`;
     logger.info(
-      `dry run: ${report.windows} window(s), ${report.extracted} extracted → ${report.deduped} unique, ` +
+      `dry run: ${report.windows} window(s), ${report.extracted} extracted → ${report.deduped} unique${missing}, ` +
         `dates ${dates}, via ${report.via} (nothing written)`,
     );
     logger.info(chalk.dim(`Re-run with --no-dry-run (or --commit) to write.`));
   } else {
     logger.info(
       chalk.green(
-        `backfilled ${report.inserted} release(s) (${report.deduped} submitted, ${report.found} seen) for ${report.source.slug}`,
+        // `?` not `0`: the commit path always sends a number, so a missing one
+        // means something went wrong upstream — not that nothing was inserted.
+        `backfilled ${report.inserted ?? "?"} release(s) (${report.deduped} submitted, ${report.found} seen) for ${report.source.slug}`,
       ),
     );
     logger.info(chalk.dim(`${report.windows} window(s), dates ${dates}, via ${report.via}`));
