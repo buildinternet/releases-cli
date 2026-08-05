@@ -72,8 +72,8 @@
     "husky": "^9.1.7",
     "lint-staged": "^17.0.7",
     "oxfmt": "^0.56.0",
-    "oxlint": "^1.68.0",
-    "oxlint-tsgolint": "^0.23.0",
-    "typescript": "^6.0.3"
+    "oxlint": "^1.76.0",
+    "oxlint-tsgolint": "^7.0.2001",
+    "typescript": "^7.0.2"
   }
 }
