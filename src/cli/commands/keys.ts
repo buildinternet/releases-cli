@@ -7,6 +7,8 @@ import type {
 } from "@buildinternet/releases-api-types";
 import { getApiUrl } from "../../lib/mode.js";
 import { getSessionToken, clearSessionToken } from "../../lib/session.js";
+import { newIdempotencyKey } from "../../lib/idempotency.js";
+import { apiErrorMessage } from "../../lib/errors.js";
 import { writeJson } from "../../lib/output.js";
 import { markDryRun } from "../../lib/dry-run.js";
 import { logger } from "@releases/lib/logger";
@@ -47,10 +49,19 @@ export async function keysRequest(
   deps: KeysRequestDeps,
 ): Promise<Response> {
   const fetchImpl = deps.fetchImpl ?? fetch;
+  // One key per logical call, generated up front so the 401 reauth retry
+  // below resends it unchanged — a mint that's retried after a stale session
+  // token replays the first attempt's response instead of minting twice.
+  const idempotencyKey = init.method === "POST" ? newIdempotencyKey() : undefined;
   const send = (t: string) =>
     fetchImpl(`${apiUrl}${path}`, {
       ...init,
-      headers: { ...init.headers, authorization: `Bearer ${t}`, "user-agent": UA },
+      headers: {
+        ...init.headers,
+        authorization: `Bearer ${t}`,
+        "user-agent": UA,
+        ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
+      },
     });
 
   let res = await send(await deps.getToken(apiUrl));
@@ -73,8 +84,12 @@ function liveDeps(): KeysRequestDeps {
 
 async function errMessage(res: Response, fallback: string): Promise<string> {
   try {
-    const body = (await res.json()) as { message?: string };
-    return body.message || fallback;
+    const body: unknown = await res.json();
+    const code = (body as { error?: { code?: unknown } } | null)?.error?.code;
+    if (res.status === 409 && code === "idempotency_conflict") {
+      return "This request was already submitted with a different payload. If you meant to retry, wait for the earlier request to finish or start a fresh invocation.";
+    }
+    return apiErrorMessage(body) ?? fallback;
   } catch {
     return fallback;
   }

@@ -5,6 +5,7 @@ import { getApiUrl } from "../../lib/mode.js";
 import { writeJson } from "../../lib/output.js";
 import { RELEASES_CLI_UA } from "../../lib/user-agent.js";
 import { apiFetch } from "../../api/core.js";
+import { newIdempotencyKey } from "../../lib/idempotency.js";
 import { stripAnsi } from "../../lib/sanitize.js";
 import { promptConfirm } from "../../lib/confirm.js";
 import { logger } from "@releases/lib/logger";
@@ -128,16 +129,34 @@ async function postRecommendation(
   try {
     const res = await fetch(`${getApiUrl()}/v1/recommendations`, {
       method: "POST",
-      headers: { "content-type": "application/json", "User-Agent": RELEASES_CLI_UA },
+      headers: {
+        "content-type": "application/json",
+        "User-Agent": RELEASES_CLI_UA,
+        "Idempotency-Key": newIdempotencyKey(),
+      },
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
     const json = (await res.json().catch(() => null)) as {
       ok?: boolean;
       id?: string;
-      error?: string;
+      error?: string | { code?: unknown };
     } | null;
-    if (!res.ok) return { ok: false, error: submitErrorMessage(json?.error, res.status) };
+    if (!res.ok) {
+      const errField = json?.error;
+      const nestedCode = typeof errField === "object" ? errField?.code : undefined;
+      if (res.status === 409 && nestedCode === "idempotency_conflict") {
+        return {
+          ok: false,
+          error:
+            "This submission was already sent with different content. If you meant to retry, run the command again.",
+        };
+      }
+      return {
+        ok: false,
+        error: submitErrorMessage(typeof errField === "string" ? errField : undefined, res.status),
+      };
+    }
     if (!json?.ok || !json.id) return { ok: false, error: "unexpected response" };
     return { ok: true, id: json.id };
   } catch (err) {

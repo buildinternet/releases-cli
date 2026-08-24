@@ -45,6 +45,12 @@ function isPlumbing(path: string): boolean {
   return PLUMBING_PATTERNS.some((p) => path.includes(p));
 }
 
+/** Shared with `lib/idempotency.ts` so both the mutation ledger and the
+ * idempotency-key gate agree on which POSTs are "just plumbing". */
+export function isPlumbingPath(path: string): boolean {
+  return isPlumbing(path);
+}
+
 /**
  * Cheap gate so `apiFetch` skips all work on the common path. Verb/plumbing
  * checks run first (pure, no I/O), so a GET short-circuits before we touch the
