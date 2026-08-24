@@ -8,14 +8,13 @@ import type {
 import { getApiUrl } from "../../lib/mode.js";
 import { getSessionToken, clearSessionToken } from "../../lib/session.js";
 import { newIdempotencyKey } from "../../lib/idempotency.js";
-import { apiErrorMessage } from "../../lib/errors.js";
+import { ApiError } from "../../lib/errors.js";
+import { apiFetch } from "../../api/core.js";
 import { writeJson } from "../../lib/output.js";
 import { markDryRun } from "../../lib/dry-run.js";
 import { logger } from "@releases/lib/logger";
 import { renderTable } from "../render/table.js";
 import { promptConfirm, defaultPromptReader } from "../../lib/confirm.js";
-
-const UA = "releases-cli";
 
 /**
  * Strict parser for `--expires-in-days`. `parseInt("abc")` yields NaN (which
@@ -34,41 +33,45 @@ export function parseExpiresInDays(raw: string): number {
 export interface KeysRequestDeps {
   getToken: (apiUrl: string) => Promise<string>;
   onReauth: (apiUrl: string) => Promise<string>;
-  fetchImpl?: typeof fetch;
 }
 
 /**
- * Session-authed request to the /v1/api-keys management surface. Sends the
- * stored session token as a Bearer credential; on a 401 it re-auths ONCE
- * (forcing the device flow) and retries, then surfaces whatever comes back.
+ * Session-authed request to the /v1/api-keys management surface, routed
+ * through the shared `apiFetch` transport. Sends the stored session token as
+ * a Bearer credential — `skipDefaultAuth` stops `apiFetch` from overwriting
+ * it with the static admin/API key when one happens to be configured too —
+ * and on a 401 re-auths ONCE (forcing the device flow) and retries, then
+ * surfaces whatever comes back (or throws, on a non-401 failure).
  */
-export async function keysRequest(
+export async function keysRequest<T>(
   apiUrl: string,
   path: string,
   init: RequestInit,
   deps: KeysRequestDeps,
-): Promise<Response> {
-  const fetchImpl = deps.fetchImpl ?? fetch;
+): Promise<T> {
   // One key per logical call, generated up front so the 401 reauth retry
   // below resends it unchanged — a mint that's retried after a stale session
   // token replays the first attempt's response instead of minting twice.
   const idempotencyKey = init.method === "POST" ? newIdempotencyKey() : undefined;
-  const send = (t: string) =>
-    fetchImpl(`${apiUrl}${path}`, {
+  const attempt = (token: string) =>
+    apiFetch<T>(path, {
       ...init,
       headers: {
         ...init.headers,
-        authorization: `Bearer ${t}`,
-        "user-agent": UA,
+        authorization: `Bearer ${token}`,
         ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
       },
+      skipDefaultAuth: true,
     });
 
-  let res = await send(await deps.getToken(apiUrl));
-  if (res.status === 401) {
-    res = await send(await deps.onReauth(apiUrl));
+  try {
+    return await attempt(await deps.getToken(apiUrl));
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 401) {
+      return await attempt(await deps.onReauth(apiUrl));
+    }
+    throw err;
   }
-  return res;
 }
 
 /** Production deps: stored token, and a re-auth that clears the stale one first. */
@@ -82,17 +85,12 @@ function liveDeps(): KeysRequestDeps {
   };
 }
 
-async function errMessage(res: Response, fallback: string): Promise<string> {
-  try {
-    const body: unknown = await res.json();
-    const code = (body as { error?: { code?: unknown } } | null)?.error?.code;
-    if (res.status === 409 && code === "idempotency_conflict") {
-      return "This request was already submitted with a different payload. If you meant to retry, wait for the earlier request to finish or start a fresh invocation.";
-    }
-    return apiErrorMessage(body) ?? fallback;
-  } catch {
-    return fallback;
-  }
+/** apiFetch/ApiError already resolve the standardized error envelope (and the
+ * 409 idempotency-conflict message) into a clean human message — surface
+ * that directly rather than re-deriving it. */
+function keysErrorMessage(err: unknown): string {
+  if (err instanceof ApiError) return err.serverMessage;
+  return err instanceof Error ? err.message : String(err);
 }
 
 export function registerKeysCommand(program: Command): void {
@@ -127,23 +125,18 @@ export function registerKeysCommand(program: Command): void {
           logger.warn(`[dry-run] Would create read-only API key "${opts.name}"${expiresHint}.`);
           return;
         }
-        const res = await keysRequest(
-          apiUrl,
-          "/v1/api-keys",
-          {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify(body),
-          },
-          liveDeps(),
-        );
-        if (!res.ok) {
-          console.error(
-            chalk.red(await errMessage(res, `Failed to create key (HTTP ${res.status})`)),
+        let created: CreatedUserApiKey;
+        try {
+          created = await keysRequest<CreatedUserApiKey>(
+            apiUrl,
+            "/v1/api-keys",
+            { method: "POST", body: JSON.stringify(body) },
+            liveDeps(),
           );
+        } catch (err) {
+          console.error(chalk.red(keysErrorMessage(err)));
           process.exit(1);
         }
-        const created = (await res.json()) as CreatedUserApiKey;
         if (opts.json) {
           await writeJson(created);
           return;
@@ -162,12 +155,22 @@ export function registerKeysCommand(program: Command): void {
     .option("--json", "Output as JSON")
     .action(async (opts: { json?: boolean }) => {
       const apiUrl = getApiUrl();
-      const res = await keysRequest(apiUrl, "/v1/api-keys", { method: "GET" }, liveDeps());
-      if (!res.ok) {
-        console.error(chalk.red(await errMessage(res, `Failed to list keys (HTTP ${res.status})`)));
+      let data: ListUserApiKeysResponse | null;
+      try {
+        data = await keysRequest<ListUserApiKeysResponse | null>(
+          apiUrl,
+          "/v1/api-keys",
+          { method: "GET" },
+          liveDeps(),
+        );
+      } catch (err) {
+        console.error(chalk.red(keysErrorMessage(err)));
         process.exit(1);
       }
-      const data = (await res.json()) as ListUserApiKeysResponse;
+      if (!data) {
+        console.error(chalk.red("Failed to list keys (HTTP 404)"));
+        process.exit(1);
+      }
       if (opts.json) {
         await writeJson(data);
         return;
@@ -222,20 +225,19 @@ export function registerKeysCommand(program: Command): void {
         }
       }
       const apiUrl = getApiUrl();
-      const res = await keysRequest(
-        apiUrl,
-        `/v1/api-keys/${encodeURIComponent(id)}`,
-        { method: "DELETE" },
-        liveDeps(),
-      );
-      if (res.status === 404) {
-        console.error(chalk.red("No such key (or not owned by you)."));
-        process.exit(1);
-      }
-      if (!res.ok) {
-        console.error(
-          chalk.red(await errMessage(res, `Failed to revoke key (HTTP ${res.status})`)),
+      try {
+        await keysRequest(
+          apiUrl,
+          `/v1/api-keys/${encodeURIComponent(id)}`,
+          { method: "DELETE" },
+          liveDeps(),
         );
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 404) {
+          console.error(chalk.red("No such key (or not owned by you)."));
+          process.exit(1);
+        }
+        console.error(chalk.red(keysErrorMessage(err)));
         process.exit(1);
       }
       console.log(chalk.green(`Revoked ${id}.`));

@@ -1,13 +1,11 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import { createInterface } from "node:readline/promises";
-import { getApiUrl } from "../../lib/mode.js";
 import { writeJson } from "../../lib/output.js";
-import { RELEASES_CLI_UA } from "../../lib/user-agent.js";
 import { VERSION } from "../version.js";
 import { isTelemetryEnabled, getOrCreateAnonId } from "../../lib/telemetry.js";
 import { apiFetch } from "../../api/core.js";
-import { newIdempotencyKey } from "../../lib/idempotency.js";
+import { ApiError } from "../../lib/errors.js";
 import { stripAnsi } from "../../lib/sanitize.js";
 import { promptConfirm } from "../../lib/confirm.js";
 import { logger } from "@releases/lib/logger";
@@ -128,36 +126,33 @@ async function postFeedback(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), POST_TIMEOUT_MS);
   try {
-    const res = await fetch(`${getApiUrl()}/v1/feedback`, {
+    const json = await apiFetch<{ ok?: boolean; id?: string }>("/v1/feedback", {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "User-Agent": RELEASES_CLI_UA,
-        "Idempotency-Key": newIdempotencyKey(),
-      },
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
-    if (!res.ok) {
-      const body: unknown = await res.json().catch(() => null);
-      const code = (body as { error?: { code?: unknown } } | null)?.error?.code;
-      if (res.status === 409 && code === "idempotency_conflict") {
-        return {
-          ok: false,
-          error:
-            "This feedback was already submitted with different content. If you meant to retry, run the command again.",
-        };
-      }
-      return { ok: false, error: `server returned ${res.status}` };
-    }
-    const json = (await res.json()) as { ok?: boolean; id?: string };
     if (!json.ok || !json.id) return { ok: false, error: "unexpected response" };
     return { ok: true, id: json.id };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    const error = err instanceof ApiError ? err.serverMessage : apiFetchErrorMessage(err);
+    return { ok: false, error };
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * apiFetch wraps transport-level failures (including an AbortController
+ * timeout) in a descriptive "API request failed on POST … : <detail>"
+ * envelope, preserving the original error as `cause`. Surface just that
+ * original detail, matching the previous raw `fetch` catch block's message.
+ */
+function apiFetchErrorMessage(err: unknown): string {
+  if (err instanceof Error) {
+    const cause = (err as { cause?: unknown }).cause;
+    return cause instanceof Error ? cause.message : err.message;
+  }
+  return String(err);
 }
 
 export function registerFeedbackCommand(parent: Command): void {
