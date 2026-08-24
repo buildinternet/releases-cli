@@ -1,5 +1,11 @@
 # @buildinternet/releases
 
+## 0.74.0
+
+### Minor Changes
+
+- a19a535: Send an `Idempotency-Key` header on effectful write requests (feedback submit, webhook create/rotate-secret/test, API-key mint) so a retry after a network failure replays the original response instead of double-submitting. A key reused with a different payload now surfaces a clear `idempotency_conflict` message instead of a raw 409.
+
 ## 0.73.1
 
 ### Patch Changes
