@@ -1,5 +1,7 @@
 # @buildinternet/releases-windows-x64
 
+## 0.74.1
+
 ## 0.74.0
 
 ## 0.73.1
