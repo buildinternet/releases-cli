@@ -7,6 +7,7 @@ import { RELEASES_CLI_UA } from "../../lib/user-agent.js";
 import { VERSION } from "../version.js";
 import { isTelemetryEnabled, getOrCreateAnonId } from "../../lib/telemetry.js";
 import { apiFetch } from "../../api/core.js";
+import { newIdempotencyKey } from "../../lib/idempotency.js";
 import { stripAnsi } from "../../lib/sanitize.js";
 import { promptConfirm } from "../../lib/confirm.js";
 import { logger } from "@releases/lib/logger";
@@ -129,11 +130,26 @@ async function postFeedback(
   try {
     const res = await fetch(`${getApiUrl()}/v1/feedback`, {
       method: "POST",
-      headers: { "content-type": "application/json", "User-Agent": RELEASES_CLI_UA },
+      headers: {
+        "content-type": "application/json",
+        "User-Agent": RELEASES_CLI_UA,
+        "Idempotency-Key": newIdempotencyKey(),
+      },
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
-    if (!res.ok) return { ok: false, error: `server returned ${res.status}` };
+    if (!res.ok) {
+      const body: unknown = await res.json().catch(() => null);
+      const code = (body as { error?: { code?: unknown } } | null)?.error?.code;
+      if (res.status === 409 && code === "idempotency_conflict") {
+        return {
+          ok: false,
+          error:
+            "This feedback was already submitted with different content. If you meant to retry, run the command again.",
+        };
+      }
+      return { ok: false, error: `server returned ${res.status}` };
+    }
     const json = (await res.json()) as { ok?: boolean; id?: string };
     if (!json.ok || !json.id) return { ok: false, error: "unexpected response" };
     return { ok: true, id: json.id };

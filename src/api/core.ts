@@ -1,5 +1,6 @@
 import { getApiUrl, getApiKey, isAdminMode } from "../lib/mode.js";
 import { shouldRecordMutation, recordMutation } from "../lib/mutation-log.js";
+import { newIdempotencyKey, shouldSendIdempotencyKey } from "../lib/idempotency.js";
 import { RELEASES_CLI_UA } from "../lib/user-agent.js";
 import { ApiError, apiErrorMessage } from "../lib/errors.js";
 import { assertSafePath } from "../lib/validate-input.js";
@@ -62,6 +63,9 @@ export async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T> 
   // raw-input validation in the entity resolvers.
   assertSafePath(path);
   const url = `${getApiUrl()}${path}`;
+  // Empty string when no method is set — `shouldRecordMutation` rejects it, so
+  // GETs never log and the `method` field is a real verb whenever we do.
+  const method = opts?.method ?? "";
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "User-Agent": RELEASES_CLI_UA,
@@ -71,10 +75,20 @@ export async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T> 
   if (isAdminMode()) {
     headers["Authorization"] = `Bearer ${getApiKey()}`;
   }
+  // One key per logical call to `apiFetch` — this function makes no internal
+  // retry attempts of its own, so "per invocation" and "per attempt" coincide
+  // here. A caller that retries the same logical write (e.g. `keysRequest`'s
+  // 401 reauth retry) generates its own key up front and reuses it instead of
+  // calling through this helper twice. Header names are case-insensitive on
+  // the wire, so match any casing — adding a second differently-cased header
+  // would make fetch send both values comma-joined.
+  const callerProvidedKey = Object.keys(headers).some(
+    (name) => name.toLowerCase() === "idempotency-key",
+  );
+  if (shouldSendIdempotencyKey(method, path) && !callerProvidedKey) {
+    headers["Idempotency-Key"] = newIdempotencyKey();
+  }
 
-  // Empty string when no method is set — `shouldRecordMutation` rejects it, so
-  // GETs never log and the `method` field is a real verb whenever we do.
-  const method = opts?.method ?? "";
   const logMutation = shouldRecordMutation(method, path);
 
   let res: Response;
@@ -107,7 +121,11 @@ export async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T> 
 
   if (!res.ok) {
     const body: unknown = await res.json().catch(() => null);
-    const message = apiErrorMessage(body) ?? res.statusText;
+    const code = (body as { error?: { code?: unknown } } | null)?.error?.code;
+    const message =
+      res.status === 409 && code === "idempotency_conflict"
+        ? "This request was already submitted with a different payload. If you meant to retry, wait for the earlier request to finish or start a fresh invocation."
+        : (apiErrorMessage(body) ?? res.statusText);
     if (logMutation) {
       recordMutation({ method, path, ok: false, status: res.status, error: message });
     }
