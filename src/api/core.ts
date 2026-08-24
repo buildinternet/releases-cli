@@ -56,7 +56,17 @@ function isCertVerificationError(err: unknown): boolean {
   return typeof code === "string" && CERT_ERROR_CODES.has(code);
 }
 
-export async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T> {
+export interface ApiFetchOpts extends RequestInit {
+  /**
+   * Skip the default admin-mode Authorization header even when a credential
+   * is configured. Set this when the caller supplies its own `Authorization`
+   * header (e.g. a session-scoped Bearer token) that must not be clobbered by
+   * the static admin/API key — see `keysRequest` in `cli/commands/keys.ts`.
+   */
+  skipDefaultAuth?: boolean;
+}
+
+export async function apiFetch<T>(path: string, opts?: ApiFetchOpts): Promise<T> {
   // Defense-in-depth: reject raw control characters in the assembled path. By
   // this point user identifiers are already percent-encoded, so a clean path
   // never contains them — this only catches anything that bypassed the
@@ -71,8 +81,11 @@ export async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T> 
     "User-Agent": RELEASES_CLI_UA,
     ...(opts?.headers as Record<string, string>),
   };
-  // Only send auth header when an API key is configured (admin mode)
-  if (isAdminMode()) {
+  // Only send auth header when an API key is configured (admin mode). A
+  // caller that already attached its own Authorization header (e.g. a
+  // session-scoped Bearer token) can opt out via skipDefaultAuth so it isn't
+  // clobbered by the static admin/API key.
+  if (isAdminMode() && !opts?.skipDefaultAuth) {
     headers["Authorization"] = `Bearer ${getApiKey()}`;
   }
   // One key per logical call to `apiFetch` — this function makes no internal
@@ -93,8 +106,10 @@ export async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T> 
 
   let res: Response;
   try {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- stripped before the spread below
+    const { skipDefaultAuth: _skipDefaultAuth, ...fetchOpts } = opts ?? {};
     res = await fetch(url, {
-      ...opts,
+      ...fetchOpts,
       headers,
     });
   } catch (err) {

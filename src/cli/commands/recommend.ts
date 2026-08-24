@@ -1,11 +1,9 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import { createInterface } from "node:readline/promises";
-import { getApiUrl } from "../../lib/mode.js";
 import { writeJson } from "../../lib/output.js";
-import { RELEASES_CLI_UA } from "../../lib/user-agent.js";
 import { apiFetch } from "../../api/core.js";
-import { newIdempotencyKey } from "../../lib/idempotency.js";
+import { ApiError } from "../../lib/errors.js";
 import { stripAnsi } from "../../lib/sanitize.js";
 import { promptConfirm } from "../../lib/confirm.js";
 import { logger } from "@releases/lib/logger";
@@ -104,6 +102,14 @@ async function resolveOptional(
   }
 }
 
+/**
+ * Legacy mapping from the API's old flat `{ error: "<code>" }` body to a
+ * friendly message. The API now returns the standardized nested envelope
+ * (`{ error: { code, type, message } }`), which `apiFetch`/`ApiError`
+ * already resolve to a human message directly — `postRecommendation` no
+ * longer calls this. Kept (and exported) for its existing characterization
+ * coverage; safe to remove once that coverage is retired.
+ */
 export function submitErrorMessage(error: string | undefined, status: number): string {
   switch (error) {
     case "url_required":
@@ -127,43 +133,33 @@ async function postRecommendation(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), POST_TIMEOUT_MS);
   try {
-    const res = await fetch(`${getApiUrl()}/v1/recommendations`, {
+    const json = await apiFetch<{ ok?: boolean; id?: string }>("/v1/recommendations", {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "User-Agent": RELEASES_CLI_UA,
-        "Idempotency-Key": newIdempotencyKey(),
-      },
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
-    const json = (await res.json().catch(() => null)) as {
-      ok?: boolean;
-      id?: string;
-      error?: string | { code?: unknown };
-    } | null;
-    if (!res.ok) {
-      const errField = json?.error;
-      const nestedCode = typeof errField === "object" ? errField?.code : undefined;
-      if (res.status === 409 && nestedCode === "idempotency_conflict") {
-        return {
-          ok: false,
-          error:
-            "This submission was already sent with different content. If you meant to retry, run the command again.",
-        };
-      }
-      return {
-        ok: false,
-        error: submitErrorMessage(typeof errField === "string" ? errField : undefined, res.status),
-      };
-    }
-    if (!json?.ok || !json.id) return { ok: false, error: "unexpected response" };
+    if (!json.ok || !json.id) return { ok: false, error: "unexpected response" };
     return { ok: true, id: json.id };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    const error = err instanceof ApiError ? err.serverMessage : apiFetchErrorMessage(err);
+    return { ok: false, error };
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * apiFetch wraps transport-level failures (including an AbortController
+ * timeout) in a descriptive "API request failed on POST … : <detail>"
+ * envelope, preserving the original error as `cause`. Surface just that
+ * original detail, matching the previous raw `fetch` catch block's message.
+ */
+function apiFetchErrorMessage(err: unknown): string {
+  if (err instanceof Error) {
+    const cause = (err as { cause?: unknown }).cause;
+    return cause instanceof Error ? cause.message : err.message;
+  }
+  return String(err);
 }
 
 export function registerSubmitCommand(parent: Command): void {
