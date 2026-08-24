@@ -79,8 +79,13 @@ export async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T> 
   // retry attempts of its own, so "per invocation" and "per attempt" coincide
   // here. A caller that retries the same logical write (e.g. `keysRequest`'s
   // 401 reauth retry) generates its own key up front and reuses it instead of
-  // calling through this helper twice.
-  if (shouldSendIdempotencyKey(method, path) && !headers["Idempotency-Key"]) {
+  // calling through this helper twice. Header names are case-insensitive on
+  // the wire, so match any casing — adding a second differently-cased header
+  // would make fetch send both values comma-joined.
+  const callerProvidedKey = Object.keys(headers).some(
+    (name) => name.toLowerCase() === "idempotency-key",
+  );
+  if (shouldSendIdempotencyKey(method, path) && !callerProvidedKey) {
     headers["Idempotency-Key"] = newIdempotencyKey();
   }
 
