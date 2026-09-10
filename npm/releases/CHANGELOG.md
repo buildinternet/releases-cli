@@ -1,5 +1,11 @@
 # @buildinternet/releases
 
+## 0.75.0
+
+### Minor Changes
+
+- a060d4d: Add `releases changelog` to print recent product updates from releases.sh (the self-published `releases-sh` feed) and a link to https://releases.sh/updates. Also available as the local MCP `changelog` tool.
+
 ## 0.74.1
 
 ### Patch Changes
