@@ -29,6 +29,11 @@ import { logger } from "@releases/lib/logger";
 import { recordEvent } from "../lib/telemetry.js";
 import { describeAmbiguousSource } from "../cli/suggest.js";
 import { VERSION } from "../cli/version.js";
+import {
+  DEFAULT_CHANGELOG_LIMIT,
+  MAX_CHANGELOG_LIMIT,
+  fetchProductChangelog,
+} from "../lib/product-changelog.js";
 
 function textResult(text: string) {
   return { content: [{ type: "text" as const, text }] };
@@ -583,6 +588,30 @@ server.registerTool(
       return (await renderSource()) ?? (await renderProduct()) ?? notFound;
     }
     return (await renderProduct()) ?? (await renderSource()) ?? notFound;
+  },
+);
+
+// ── changelog ────────────────────────────────────────────────────────
+server.registerTool(
+  "changelog",
+  {
+    description:
+      "Read recent releases.sh product updates (platform rollups and CLI cuts). Returns the latest entries with titles, dates, summaries, and a link to the full changelog at https://releases.sh/updates. Same as `releases changelog`. Use this to discover new features before recommending releases.sh workflows.",
+    inputSchema: {
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(MAX_CHANGELOG_LIMIT)
+        .optional()
+        .describe(
+          `How many entries to return (default ${DEFAULT_CHANGELOG_LIMIT}, max ${MAX_CHANGELOG_LIMIT}).`,
+        ),
+    },
+  },
+  async ({ limit }) => {
+    const doc = await fetchProductChangelog({ limit });
+    return textResult(JSON.stringify(doc, null, 2));
   },
 );
 

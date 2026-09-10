@@ -38,6 +38,7 @@ releases list --category ai
 releases get vercel                                # org, product, or source
 releases org overview vercel                       # full AI-generated org overview
 releases stats
+releases changelog                                 # recent product updates from releases.sh
 releases submit https://acme.dev/changelog         # suggest a source for the registry
 releases feedback "great tool — here's an idea…"   # message the maintainers
 ```

@@ -34,6 +34,7 @@ import { registerBlockCommand } from "./commands/block.js";
 import { registerImportCommand } from "./commands/import.js";
 import { registerTaskCommand } from "./commands/task.js";
 import { registerChangelogCommand } from "./commands/changelog.js";
+import { registerProductChangelogCommand } from "./commands/product-changelog.js";
 import { registerGetCommand } from "./commands/get.js";
 import { registerShowCommand } from "./commands/show.js";
 import { registerEmbedCommand } from "./commands/admin/embed.js";
@@ -152,6 +153,7 @@ function printStyledHelp(): string {
     `  - releases tail       : ${chalk.dim("Show the most recent releases (add -f to follow)")}`,
   );
   lines.push(`  - releases list       : ${chalk.dim("List and inspect sources")}`);
+  lines.push(`  - releases changelog  : ${chalk.dim("Recent product updates from releases.sh")}`);
   lines.push("");
 
   lines.push(chalk.cyan("Commands:"));
@@ -159,6 +161,7 @@ function printStyledHelp(): string {
   lines.push(row("tail [slug]", "Show the most recent releases (add -f to follow)"));
   lines.push(row("list [slug]", "List sources or inspect one"));
   lines.push(row("get <id|slug>", "Get any entity by ID or slug"));
+  lines.push(row("changelog", "Recent product updates from releases.sh"));
   lines.push(row("stats", "Show database statistics"));
   lines.push(row("categories", "List valid category values"));
   lines.push(row("admin", "Operator workflows"));
@@ -251,6 +254,7 @@ program.addHelpText("after", () => {
 registerSearchCommand(program);
 registerLookupCommand(program);
 registerTailCommand(program);
+registerProductChangelogCommand(program);
 registerStatsCommand(program);
 registerListCommand(program, { alias: "sources" });
 // Canonical verb: get. Deprecated alias: show (emits a warning).
