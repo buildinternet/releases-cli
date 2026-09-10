@@ -46,6 +46,7 @@ describe("CLI command gating (public mode)", () => {
     expect(stdout).toContain("list");
     expect(stdout).toContain("stats");
     expect(stdout).toContain("categories");
+    expect(stdout).toContain("changelog");
     expect(stdout).toContain("admin");
     // `summary` and `compare` are local-only AI tools — not shipped in OSS.
   });

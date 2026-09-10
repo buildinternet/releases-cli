@@ -108,6 +108,18 @@ releases stats --days 7     # adjust the activity window
 releases stats --json
 ```
 
+## Product changelog
+
+Recent updates to releases.sh itself — the same self-published feed the website renders at [releases.sh/updates](https://releases.sh/updates). Keyless; not the per-source `admin source changelog` wrapper.
+
+```bash
+releases changelog              # latest 5 entries, then a link to /updates
+releases changelog --limit 10
+releases changelog --json
+```
+
+`--limit` is 1–50 (default 5). `--json` is `{ url, feed, entries }` where each entry has `id`, `kind` (`platform` | `cli`), `title`, `date`, `url`, `tags`, `summary`, and `body`.
+
 ## Categories
 
 ```bash

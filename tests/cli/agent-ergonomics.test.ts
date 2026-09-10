@@ -69,6 +69,13 @@ describe("Examples in --help output (#2)", () => {
     expect(stdout).toContain("--kind sdk");
   });
 
+  it("releases changelog --help contains an Examples block", () => {
+    const { stdout, exitCode } = runCli(["changelog", "--help"]);
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("Examples:");
+    expect(stdout).toContain("releases changelog --json");
+  });
+
   it("releases search --help contains an Examples block", () => {
     const { stdout, exitCode } = runCli(["search", "--help"]);
     expect(exitCode).toBe(0);

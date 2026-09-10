@@ -32,6 +32,7 @@ releases lookup domain vercel.com      # resolve a domain/URL to its registry en
 releases collection list               # browse curated cross-org playlists
 releases collection releases frontier-ai-labs   # the feed for one collection
 releases stats                         # registry overview
+releases changelog                     # recent product updates from releases.sh
 releases categories                    # valid --category values (fixed taxonomy)
 ```
 
