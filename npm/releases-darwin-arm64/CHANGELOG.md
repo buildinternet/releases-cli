@@ -1,5 +1,7 @@
 # @buildinternet/releases-darwin-arm64
 
+## 0.75.0
+
 ## 0.74.1
 
 ## 0.74.0
