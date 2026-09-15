@@ -71,6 +71,20 @@ describe("me-webhooks client wire contract", () => {
     expect(calls[0]!.body).toEqual({ url: "https://ex.com/o", orgSlug: "vercel" });
   });
 
+  it("createMyWebhook POSTs format discord", async () => {
+    responder = () => json({ id: "whk_d", format: "discord", scope: "org" }, 201);
+    await client.createMyWebhook({
+      url: "https://discord.com/api/webhooks/1/token",
+      orgSlug: "acme",
+      format: "discord",
+    });
+    expect(calls[0]!.body).toEqual({
+      url: "https://discord.com/api/webhooks/1/token",
+      orgSlug: "acme",
+      format: "discord",
+    });
+  });
+
   it("createMyWebhook POSTs org filters and releaseType", async () => {
     responder = () => json({ id: "whk_7", signingKey: "ghi", scope: "org" });
     await client.createMyWebhook({
@@ -100,6 +114,19 @@ describe("me-webhooks client wire contract", () => {
       productSlug: "next-js",
       releaseType: "rollup",
       sourceId: null,
+    });
+  });
+
+  it("updateMyWebhook PATCHes format discord", async () => {
+    responder = () => json({ id: "whk_d2", format: "discord" });
+    await client.updateMyWebhook("whk_d2", {
+      format: "discord",
+      url: "https://discord.com/api/webhooks/2/token",
+    });
+    expect(calls[0]!.method).toBe("PATCH");
+    expect(calls[0]!.body).toEqual({
+      format: "discord",
+      url: "https://discord.com/api/webhooks/2/token",
     });
   });
 
