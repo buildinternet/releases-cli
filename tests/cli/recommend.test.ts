@@ -6,8 +6,8 @@ import { runCli } from "../utils.js";
  * `releases admin recommendations` review write-path. runCli spawns the CLI
  * with piped stdio, so `process.stdin.isTTY` is false in the child. We assert
  * the guard rails that fire BEFORE any network call — `--dry-run`, invalid
- * input, the required-status check, and the destructive-delete confirmation
- * gate — plus that the verbs and flags surface in --help.
+ * input, the required-status / required-org checks, and the destructive-delete
+ * confirmation gate — plus that the verbs and flags surface in --help.
  */
 describe("submit (public CLI integration)", () => {
   it("documents the command and its flags in help", () => {
@@ -78,13 +78,14 @@ describe("submit (public CLI integration)", () => {
 });
 
 describe("admin recommendations review write-path (CLI integration)", () => {
-  it("lists list / triage / archive / delete subcommands in help", () => {
+  it("lists list / triage / archive / delete / notify-added subcommands in help", () => {
     const { stdout, exitCode } = runCli(["admin", "recommendations", "--help"]);
     expect(exitCode).toBe(0);
     expect(stdout).toContain("list");
     expect(stdout).toContain("triage");
     expect(stdout).toContain("archive");
     expect(stdout).toContain("delete");
+    expect(stdout).toContain("notify-added");
   });
 
   it("requires --status on triage", () => {
@@ -120,5 +121,58 @@ describe("admin recommendations review write-path (CLI integration)", () => {
     const deleteHelp = runCli(["admin", "recommendations", "delete", "--help"]);
     expect(deleteHelp.exitCode).toBe(0);
     expect(deleteHelp.stdout).toContain("--yes");
+  });
+
+  it("documents notify-added flags in help", () => {
+    const { stdout, exitCode } = runCli(["admin", "recommendations", "notify-added", "--help"]);
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("--org");
+    expect(stdout).toContain("--source");
+    expect(stdout).toContain("--dry-run");
+    expect(stdout).toContain("--json");
+  });
+
+  it("requires --org on notify-added", () => {
+    const { stderr, exitCode } = runCli(["admin", "recommendations", "notify-added", "rec_x"]);
+    expect(exitCode).not.toBe(0);
+    expect(stderr.toLowerCase()).toContain("org");
+  });
+
+  it("previews notify-added with --dry-run --json and sends nothing", () => {
+    const { stdout, exitCode } = runCli([
+      "admin",
+      "recommendations",
+      "notify-added",
+      "rec_x",
+      "--org",
+      "acme",
+      "--source",
+      "changelog",
+      "--dry-run",
+      "--json",
+    ]);
+    expect(exitCode).toBe(0);
+    const parsed = JSON.parse(stdout) as {
+      dryRun: boolean;
+      wouldPost: string;
+      body: { orgSlug: string; sourceSlug?: string };
+    };
+    expect(parsed.dryRun).toBe(true);
+    expect(parsed.wouldPost).toBe("/v1/admin/recommendations/rec_x/notify-added");
+    expect(parsed.body).toEqual({ orgSlug: "acme", sourceSlug: "changelog" });
+  });
+
+  it("rejects a dirty notify-added identifier before any request", () => {
+    const { stderr, exitCode } = runCli([
+      "admin",
+      "recommendations",
+      "notify-added",
+      "rec_x/../etc",
+      "--org",
+      "acme",
+      "--dry-run",
+    ]);
+    expect(exitCode).not.toBe(0);
+    expect(stderr.toLowerCase()).toContain("path-traversal");
   });
 });
