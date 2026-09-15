@@ -187,12 +187,15 @@ releases webhook list
 releases webhook add --scope follows --url https://your.app/hook
 releases webhook add --org vercel --url https://your.app/hook
 releases webhook add --org vercel --product next-js --type feature --url https://your.app/hook
+releases webhook add --format slack --url https://hooks.slack.com/services/…
+releases webhook add --format discord --url https://discord.com/api/webhooks/…
 releases webhook edit <id> --type rollup
+releases webhook edit <id> --format discord --url https://discord.com/api/webhooks/…
 releases webhook test <id>
 releases webhook verify --key <hex> --signature … --timestamp … --body-file -
 ```
 
-`webhook verify` is local (no auth). Admin webhooks (`releases admin webhook …`) are a separate root-key operator surface.
+`--format slack` and `--format discord` post an unsigned chat card; the webhook URL is the secret (no signing key). `webhook verify` is local (no auth). Admin webhooks (`releases admin webhook …`) are a separate root-key operator surface.
 
 ## Agent self-discovery
 

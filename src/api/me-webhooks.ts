@@ -1,4 +1,4 @@
-import type { UserWebhookFormat, WebhookDeliveryRow } from "@buildinternet/releases-api-types";
+import type { WebhookDeliveryRow } from "@buildinternet/releases-api-types";
 import { apiFetch } from "./core.js";
 
 /**
@@ -7,6 +7,8 @@ import { apiFetch } from "./core.js";
  */
 export type UserWebhookScope = "org" | "follows";
 export type UserWebhookReleaseTypeFilter = "feature" | "rollup";
+/** `discord` is accepted by the API (releases#2278) ahead of the next api-types pin. */
+export type UserWebhookFormat = "json" | "slack" | "discord";
 
 export type WebhookDeliveryHealth =
   | "never_delivered"
@@ -50,7 +52,7 @@ export interface UserWebhookListItem extends Omit<UserWebhookSubscription, "user
 }
 
 export interface CreateUserWebhookResponse extends UserWebhookListItem {
-  /** Present for json-format webhooks; absent for slack-format (the URL is the secret). */
+  /** Present for json-format webhooks; absent for slack/discord (the URL is the secret). */
   signingKey?: string;
 }
 

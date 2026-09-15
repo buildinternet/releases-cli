@@ -8,7 +8,6 @@ import chalk from "chalk";
 import { logger } from "@releases/lib/logger";
 import { isAuthenticated } from "../../lib/mode.js";
 import { writeJson } from "../../lib/output.js";
-import type { UserWebhookFormat } from "@buildinternet/releases-api-types";
 import type { WebhookDeliveryRow } from "../../api/webhooks.js";
 import {
   createMyWebhook,
@@ -20,6 +19,7 @@ import {
   testMyWebhook,
   updateMyWebhook,
   type UpdateMyWebhookInput,
+  type UserWebhookFormat,
   type UserWebhookListItem,
   type UserWebhookSubscription,
 } from "../../api/me-webhooks.js";
@@ -61,7 +61,8 @@ function parseReleaseTypeOpt(value: string | undefined): "feature" | "rollup" | 
 function parseFormatOpt(format: string | undefined): UserWebhookFormat {
   if (!format || format === "json") return "json";
   if (format === "slack") return "slack";
-  logger.error("--format must be 'json' or 'slack'.");
+  if (format === "discord") return "discord";
+  logger.error("--format must be 'json', 'slack', or 'discord'.");
   process.exit(1);
 }
 
@@ -92,6 +93,7 @@ function printSubscription(sub: UserWebhookSubscription | UserWebhookListItem): 
   }
   if (sub.releaseType) logger.info(`  type:    ${sub.releaseType}`);
   if (sub.format === "slack") logger.info(`  format:  slack (Slack Block Kit, unsigned)`);
+  if (sub.format === "discord") logger.info(`  format:  discord (Discord embed, unsigned)`);
   if (sub.description) logger.info(`  desc:    ${sub.description}`);
   logger.info(`  secret:  v${sub.secretVersion}${chalk.dim(`  · created ${sub.createdAt}`)}`);
   logger.info(`  health:  ${sub.deliveryHealthSummary}`);
@@ -188,7 +190,7 @@ export function registerWebhookManageCommands(webhook: Command): void {
     .option("--product <slug>", "Limit to one product (org scope only)")
     .option("--type <kind>", "Limit to release type: feature or rollup")
     .option("--description <text>", "Human-readable label")
-    .option("--format <format>", "Delivery format: json (default) or slack")
+    .option("--format <format>", "Delivery format: json (default), slack, or discord")
     .option("--json", "Output JSON")
     .action(
       async (opts: {
@@ -239,7 +241,8 @@ export function registerWebhookManageCommands(webhook: Command): void {
           );
         } else {
           logger.info("");
-          logger.info(chalk.dim("  Slack webhook — no signing key (the URL is the secret)."));
+          const kind = format === "discord" ? "Discord" : "Slack";
+          logger.info(chalk.dim(`  ${kind} webhook — no signing key (the URL is the secret).`));
         }
       },
     );
@@ -289,7 +292,7 @@ export function registerWebhookManageCommands(webhook: Command): void {
     .option("--clear-type", "Remove release-type filter")
     .option("--enable", "Enable the subscription (resets the failure counter)")
     .option("--disable", "Disable the subscription")
-    .option("--format <format>", "Change delivery format: json or slack")
+    .option("--format <format>", "Change delivery format: json, slack, or discord")
     .option("--json", "Output JSON")
     .action(
       async (

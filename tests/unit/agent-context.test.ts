@@ -98,6 +98,15 @@ describe("buildAgentContext", () => {
     expect(showCmd!.deprecatedReplacement).toBe("get");
   });
 
+  it("webhook add --format documents json, slack, and discord", () => {
+    const cmd = doc.commands.find((c) => c.path.join(" ") === "webhook add");
+    expect(cmd).toBeDefined();
+    const opt = cmd!.options.find((o) => o.flags.includes("--format"));
+    expect(opt).toBeDefined();
+    expect(opt!.description).toContain("discord");
+    expect(opt!.description).toContain("slack");
+  });
+
   it("webhook verify --body-file is marked acceptsStdin", () => {
     const cmd = doc.commands.find((c) => c.path.at(-1) === "verify" && c.path.includes("webhook"));
     expect(cmd).toBeDefined();
