@@ -477,10 +477,13 @@ export function registerRecommendationAdminCommand(parent: Command): void {
         }
 
         let result: NotifyAddedResult;
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), POST_TIMEOUT_MS);
         try {
           result = await apiFetch<NotifyAddedResult>(path, {
             method: "POST",
             body: JSON.stringify(body),
+            signal: controller.signal,
           });
         } catch (err) {
           // 404 here can mean the recommendation, org, or source is missing —
@@ -493,6 +496,8 @@ export function registerRecommendationAdminCommand(parent: Command): void {
                 : String(err);
           logger.error(msg);
           process.exit(1);
+        } finally {
+          clearTimeout(timer);
         }
         if (opts.json) {
           await writeJson(result);
