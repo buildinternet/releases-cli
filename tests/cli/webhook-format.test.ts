@@ -8,6 +8,10 @@ describe("webhook --format discord", () => {
     expect(stdout).toContain("--format");
     expect(stdout).toContain("discord");
     expect(stdout).toContain("slack");
+    expect(stdout).toContain("JSON signing key shown once");
+    expect(stdout).toContain("Slack/Discord");
+    expect(stdout).toContain("URL as the secret");
+    expect(stdout).not.toContain("signing key shown once)");
   });
 
   it("documents discord on webhook edit --help", () => {

@@ -72,9 +72,28 @@ function parseLimit(value: string): number {
   return Math.min(100, Math.max(1, n));
 }
 
+/**
+ * Human-readable webhook URL. Slack/Discord treat the URL as the secret;
+ * JSON endpoints often bury a token in the last path segment too. Keep the
+ * host + path prefix, drop the last segment and any query/hash. `--json`
+ * still emits the raw URL.
+ */
+export function redactWebhookUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    const parts = parsed.pathname.split("/").filter(Boolean);
+    if (parts.length === 0) return parsed.origin;
+    const kept = parts.slice(0, -1);
+    const path = kept.length > 0 ? `/${kept.join("/")}/••••` : "/••••";
+    return `${parsed.origin}${path}`;
+  } catch {
+    return "••••";
+  }
+}
+
 function printSubscription(sub: UserWebhookSubscription | UserWebhookListItem): void {
   logger.info(`${chalk.bold(sub.id)}  ${statusLabel(sub.enabled)}  ${scopeLabel(sub)}`);
-  logger.info(`  url:     ${sub.url}`);
+  logger.info(`  url:     ${redactWebhookUrl(sub.url)}`);
   if (sub.scope === "org") {
     const product =
       "productSlug" in sub && sub.productSlug
@@ -172,7 +191,7 @@ export function registerWebhookManageCommands(webhook: Command): void {
             s.id,
             s.scope,
             subscriptionTitle(s),
-            s.url,
+            redactWebhookUrl(s.url),
             s.enabled ? "enabled" : "disabled",
             s.deliveryHealth,
           ]),
@@ -182,7 +201,9 @@ export function registerWebhookManageCommands(webhook: Command): void {
 
   webhook
     .command("add")
-    .description("Create a webhook subscription (signing key shown once)")
+    .description(
+      "Create a webhook subscription (JSON signing key shown once; Slack/Discord use the URL as the secret)",
+    )
     .requiredOption("--url <url>", "HTTPS delivery URL")
     .option("--scope <scope>", "org (default) or follows", "org")
     .option("--org <slug>", "Org slug or id (required for org scope)")
