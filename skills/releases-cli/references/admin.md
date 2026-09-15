@@ -24,6 +24,7 @@ Coverage:
 - **release**: `update`, `delete`, `suppress`, `unsuppress`
 - **policy**: `ignore add`, `block add`
 - **embed**: write paths
+- **recommendations**: `notify-added`
 
 Tag and alias `add` / `remove` on org/product are intentionally left without a preview — they're trivially reversible joins.
 
@@ -360,6 +361,9 @@ releases admin recommendations triage <id> --status closed   # new | triaged | c
 releases admin recommendations archive <id>                  # hide from default list
 releases admin recommendations archive <id> --undo           # restore
 releases admin recommendations delete <id>                   # permanent — type the id to confirm, or --yes
+releases admin recommendations notify-added <id> --org acme [--source changelog]
 ```
 
 `list` is cursor-paginated (`--limit`, follow `--cursor` from the previous page) and hides archived rows unless `--include-archived` is passed. Prefer `archive` over `delete` for a reversible removal. Recommendation ids are `rec_…`. Mirrors the `releases admin feedback …` triage surface.
+
+`notify-added` is opt-in: it emails the submitter’s contact address that their suggestion is now on the registry, and links the live org (or org/source) page. It does **not** run when you triage, close, or archive. A second call is a no-op (`already_notified`). Skip it when there is no contact email. `--org` is required (`orgSlug` on the wire); `--source` is optional.

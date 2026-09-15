@@ -3,7 +3,9 @@ import {
   validateUrl,
   buildRecommendationPayload,
   submitErrorMessage,
+  buildNotifyAddedBody,
 } from "../../src/cli/commands/recommend.js";
+import { InvalidInputError } from "../../src/lib/errors.js";
 
 describe("validateUrl", () => {
   it("rejects an empty url", () => {
@@ -82,5 +84,24 @@ describe("submitErrorMessage", () => {
   it("falls back to the raw status for an unknown code", () => {
     expect(submitErrorMessage("something_new", 500)).toBe("server returned 500");
     expect(submitErrorMessage(undefined, 502)).toBe("server returned 502");
+  });
+});
+
+describe("buildNotifyAddedBody", () => {
+  it("requires a trimmed org slug and omits a blank source", () => {
+    expect(buildNotifyAddedBody("  acme  ")).toEqual({ orgSlug: "acme" });
+    expect(buildNotifyAddedBody("acme", "   ")).toEqual({ orgSlug: "acme" });
+  });
+
+  it("includes a trimmed source slug when provided", () => {
+    expect(buildNotifyAddedBody("acme", "  changelog  ")).toEqual({
+      orgSlug: "acme",
+      sourceSlug: "changelog",
+    });
+  });
+
+  it("rejects a dirty org or source identifier", () => {
+    expect(() => buildNotifyAddedBody("acme?x")).toThrow(InvalidInputError);
+    expect(() => buildNotifyAddedBody("acme", "src_../x")).toThrow(InvalidInputError);
   });
 });

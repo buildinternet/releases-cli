@@ -6,6 +6,8 @@ import { apiFetch } from "../../api/core.js";
 import { ApiError } from "../../lib/errors.js";
 import { stripAnsi } from "../../lib/sanitize.js";
 import { promptConfirm } from "../../lib/confirm.js";
+import { markDryRun } from "../../lib/dry-run.js";
+import { assertCleanIdentifier } from "../../lib/validate-input.js";
 import { logger } from "@releases/lib/logger";
 
 const MAX_URL = 2048;
@@ -260,6 +262,35 @@ function failFromApiError(err: unknown, id: string): never {
   process.exit(1);
 }
 
+/** `POST /v1/admin/recommendations/:id/notify-added` request body. */
+export interface NotifyAddedBody {
+  orgSlug: string;
+  sourceSlug?: string;
+}
+
+/** `POST /v1/admin/recommendations/:id/notify-added` success body. */
+export interface NotifyAddedResult {
+  ok: true;
+  sent: boolean;
+  reason?: "already_notified";
+  notifiedAt: number | null;
+  registryUrl?: string;
+  contactEmail?: string;
+}
+
+/**
+ * Build the notify-added request body. `orgSlug` is required by the API so
+ * the email can link a live registry URL; `sourceSlug` is optional and
+ * omitted when blank so we don't send an empty string.
+ */
+export function buildNotifyAddedBody(orgSlug: string, sourceSlug?: string): NotifyAddedBody {
+  const org = orgSlug.trim();
+  assertCleanIdentifier(org, "org");
+  const source = sourceSlug?.trim();
+  if (source) assertCleanIdentifier(source, "source");
+  return source ? { orgSlug: org, sourceSlug: source } : { orgSlug: org };
+}
+
 export function registerRecommendationAdminCommand(parent: Command): void {
   const cmd = parent
     .command("recommendations")
@@ -413,4 +444,77 @@ export function registerRecommendationAdminCommand(parent: Command): void {
       }
       logger.info(chalk.green(`Deleted ${chalk.bold(result.id)}`));
     });
+
+  cmd
+    .command("notify-added")
+    .description(
+      "Email the submitter that their suggested source was added (opt-in; never sent by triage/close/archive)",
+    )
+    .argument("<id>", "Recommendation id (rec_…)")
+    .requiredOption("--org <org>", "Org slug or org_… id of the onboarded listing")
+    .option("--source <source>", "Optional source slug or src_… id under that org")
+    .option("--json", "Output as JSON")
+    .option("--dry-run", "Show what would be sent without emailing")
+    .action(
+      async (
+        id: string,
+        opts: { org: string; source?: string; json?: boolean; dryRun?: boolean },
+      ) => {
+        assertCleanIdentifier(id, "recommendation id");
+        const body = buildNotifyAddedBody(opts.org, opts.source);
+        const path = `/v1/admin/recommendations/${encodeURIComponent(id)}/notify-added`;
+
+        if (opts.dryRun) {
+          if (opts.json) {
+            await writeJson(markDryRun({ wouldPost: path, body }));
+            return;
+          }
+          const listing = body.sourceSlug ? `${body.orgSlug}/${body.sourceSlug}` : body.orgSlug;
+          logger.info(
+            chalk.dim(`[dry-run] Would email the submitter of ${id} that ${listing} was added.`),
+          );
+          return;
+        }
+
+        let result: NotifyAddedResult;
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), POST_TIMEOUT_MS);
+        try {
+          result = await apiFetch<NotifyAddedResult>(path, {
+            method: "POST",
+            body: JSON.stringify(body),
+            signal: controller.signal,
+          });
+        } catch (err) {
+          // 404 here can mean the recommendation, org, or source is missing —
+          // surface the API message instead of assuming a bad rec id.
+          const msg =
+            err instanceof ApiError
+              ? err.serverMessage
+              : err instanceof Error
+                ? err.message
+                : String(err);
+          logger.error(msg);
+          process.exit(1);
+        } finally {
+          clearTimeout(timer);
+        }
+        if (opts.json) {
+          await writeJson(result);
+          return;
+        }
+        if (result.sent) {
+          const dest = result.contactEmail ? ` ${chalk.bold(result.contactEmail)}` : "";
+          const url = result.registryUrl ? chalk.dim(` — ${result.registryUrl}`) : "";
+          logger.info(chalk.green(`Notified${dest}`) + url);
+          return;
+        }
+        if (result.reason === "already_notified") {
+          const dest = result.contactEmail ? ` ${result.contactEmail}` : "";
+          logger.info(chalk.yellow(`Already notified${dest} — not sent again`));
+          return;
+        }
+        logger.info(chalk.yellow(result.reason ? `Not sent (${result.reason})` : "Not sent"));
+      },
+    );
 }
