@@ -112,7 +112,7 @@ describe("translateWebhookApiError", () => {
 
   it("turns a workspace 404 into the not-a-member message", () => {
     expect(() => translateWebhookApiError(apiErr(404), { kind: "workspace", id: "ws_1" })).toThrow(
-      "Workspace not found, or you're not a member.",
+      "Webhook not found in this workspace.",
     );
   });
 

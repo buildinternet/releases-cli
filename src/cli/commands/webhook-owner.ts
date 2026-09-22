@@ -5,7 +5,7 @@
  * path is parameterized in `src/api/me-webhooks.ts` (`WebhookOwner`), and
  * this module resolves the flag into that owner and turns the two
  * workspace-specific failure modes (403 = member without manage rights, 404
- * = not a member / bad id) into the plain messages the CLI wants instead of
+ * = webhook id not in that workspace) into the plain messages the CLI wants instead of
  * a raw API error passthrough.
  */
 import { CliError, ApiError } from "../../lib/errors.js";
@@ -61,9 +61,13 @@ export function assertWorkspaceScopeSupported(
 }
 
 /**
- * Translate a 403/404 from a workspace-scoped write into the CLI's own
+ * Translate a 403/404 from a workspace-scoped call into the CLI's own
  * plain-language message instead of passing the raw API error through. Any
  * other status, or a user-owned (`/v1/me/webhooks`) call, rethrows as-is.
+ *
+ * `--workspace` is resolved against the caller's own workspace list before
+ * any webhook request, so membership is already confirmed by the time a 404
+ * comes back: it means the webhook id isn't in that workspace.
  */
 export function translateWebhookApiError(err: unknown, owner: WebhookOwner): never {
   if (owner.kind === "workspace" && err instanceof ApiError) {
@@ -71,7 +75,9 @@ export function translateWebhookApiError(err: unknown, owner: WebhookOwner): nev
       throw new CliError("Only workspace owners and admins can change workspace webhooks.");
     }
     if (err.status === 404) {
-      throw new CliError("Workspace not found, or you're not a member.");
+      throw new CliError(
+        "Webhook not found in this workspace. Run `releases webhook list --workspace <workspace>` to see its webhooks.",
+      );
     }
   }
   throw err;
