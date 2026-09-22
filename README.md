@@ -74,6 +74,16 @@ releases webhook verify --key … --signature … --timestamp … --body-file ca
 
 Org-scoped: up to 10 (`--org`, optional `--source`, `--product`, `--type feature|rollup`). Follows-scoped: one webhook (`--scope follows`) that tracks your current follow graph; optional `--type` narrows delivery. Signing keys are shown once on `add` / `rotate-secret`. You can also manage webhooks in the browser at [releases.sh/account/notifications](https://releases.sh/account/notifications). Operator/admin webhooks (`releases admin webhook …`) are a separate root-key surface.
 
+Add `--workspace <id-or-slug>` to `list`, `add`, `show`, `edit`, `remove`, `test`, or `rotate-secret` to manage a shared workspace webhook instead of your own — see one you belong to, and its role and id, with `releases workspace list`:
+
+```bash
+releases workspace list
+releases webhook add --workspace acme --org vercel --url https://your.app/hook
+releases webhook list --workspace acme
+```
+
+Workspace webhooks are org-scoped only (`--scope follows` isn't supported with `--workspace`). Only workspace owners and admins can create, edit, rotate, or delete them; any member can list, view, and test.
+
 ### Contribute to the registry
 
 None of these need an account or API key:

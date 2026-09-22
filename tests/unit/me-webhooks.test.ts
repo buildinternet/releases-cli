@@ -151,3 +151,96 @@ describe("me-webhooks client wire contract", () => {
     expect(calls[0]!.url.endsWith("/test")).toBe(true);
   });
 });
+
+describe("workspace-owned webhooks share the same functions via a parameterized base path", () => {
+  let originalFetch: typeof globalThis.fetch;
+  let calls: Array<{ url: string; method: string; body: unknown }> = [];
+  let responder: (url: string) => Response;
+  const owner = { kind: "workspace" as const, id: "ws_abc123" };
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    calls = [];
+    responder = () => json({});
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      const u = String(url);
+      calls.push({
+        url: u,
+        method: init?.method ?? "GET",
+        body: init?.body ? JSON.parse(String(init.body)) : null,
+      });
+      return responder(u);
+    }) as unknown as typeof globalThis.fetch;
+  });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it("listWebhooks GETs /v1/workspaces/:id/webhooks and surfaces role + canManage", async () => {
+    responder = () =>
+      json({ subscriptions: [{ id: "whk_1", scope: "org" }], role: "member", canManage: false });
+    const res = await client.listWebhooks(owner);
+    expect(calls[0]!.method).toBe("GET");
+    expect(calls[0]!.url.endsWith("/v1/workspaces/ws_abc123/webhooks")).toBe(true);
+    expect(res.subscriptions).toHaveLength(1);
+    expect(res.role).toBe("member");
+    expect(res.canManage).toBe(false);
+  });
+
+  it("listWebhooks passes the enabled filter through", async () => {
+    responder = () => json({ subscriptions: [], role: "owner", canManage: true });
+    await client.listWebhooks(owner, { enabled: true });
+    expect(calls[0]!.url).toContain("/v1/workspaces/ws_abc123/webhooks?enabled=true");
+  });
+
+  it("createWebhook POSTs /v1/workspaces/:id/webhooks", async () => {
+    responder = () => json({ id: "whk_w1", scope: "org", signingKey: "wsecret" }, 201);
+    const res = await client.createWebhook(owner, { url: "https://ex.com/w", orgSlug: "acme" });
+    expect(calls[0]!.method).toBe("POST");
+    expect(calls[0]!.url.endsWith("/v1/workspaces/ws_abc123/webhooks")).toBe(true);
+    expect(res.signingKey).toBe("wsecret");
+  });
+
+  it("getWebhook GETs /v1/workspaces/:id/webhooks/:whid", async () => {
+    responder = () => json({ id: "whk_w2", scope: "org" });
+    await client.getWebhook(owner, "whk_w2");
+    expect(calls[0]!.url.endsWith("/v1/workspaces/ws_abc123/webhooks/whk_w2")).toBe(true);
+  });
+
+  it("updateWebhook PATCHes /v1/workspaces/:id/webhooks/:whid", async () => {
+    responder = () => json({ id: "whk_w3", enabled: false });
+    await client.updateWebhook(owner, "whk_w3", { enabled: false });
+    expect(calls[0]!.method).toBe("PATCH");
+    expect(calls[0]!.url.endsWith("/v1/workspaces/ws_abc123/webhooks/whk_w3")).toBe(true);
+  });
+
+  it("deleteWebhook DELETEs /v1/workspaces/:id/webhooks/:whid", async () => {
+    responder = () => new Response(null, { status: 204 });
+    await client.deleteWebhook(owner, "whk_w4");
+    expect(calls[0]!.method).toBe("DELETE");
+    expect(calls[0]!.url.endsWith("/v1/workspaces/ws_abc123/webhooks/whk_w4")).toBe(true);
+  });
+
+  it("rotateWebhookSecret POSTs the workspace rotate-secret route", async () => {
+    responder = () => json({ secretVersion: 2, signingKey: "newkey" });
+    await client.rotateWebhookSecret(owner, "whk_w5");
+    expect(calls[0]!.method).toBe("POST");
+    expect(calls[0]!.url.endsWith("/v1/workspaces/ws_abc123/webhooks/whk_w5/rotate-secret")).toBe(
+      true,
+    );
+  });
+
+  it("testWebhook POSTs the workspace test route", async () => {
+    responder = () => json({ enqueued: true, eventId: "evt_w1" });
+    await client.testWebhook(owner, "whk_w6");
+    expect(calls[0]!.url.endsWith("/v1/workspaces/ws_abc123/webhooks/whk_w6/test")).toBe(true);
+  });
+
+  it("getWebhookDeliveries GETs the workspace deliveries route", async () => {
+    responder = () => json({ data: [{ event_id: "evt_1" }] });
+    const rows = await client.getWebhookDeliveries(owner, "whk_w7", { limit: 5 });
+    expect(rows).toHaveLength(1);
+    expect(calls[0]!.url).toContain("/v1/workspaces/ws_abc123/webhooks/whk_w7/deliveries");
+    expect(calls[0]!.url).toContain("limit=5");
+  });
+});
