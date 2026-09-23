@@ -31,10 +31,10 @@
   "lint-staged": {
     "*.{js,jsx,ts,tsx,mjs,cjs}": [
       "oxlint --no-error-on-unmatched-pattern",
-      "oxfmt --write"
+      "oxfmt --write --no-error-on-unmatched-pattern"
     ],
     "*.{json,jsonc,md,yml,yaml,css}": [
-      "oxfmt --write"
+      "oxfmt --write --no-error-on-unmatched-pattern"
     ]
   },
   "workspaces": [
