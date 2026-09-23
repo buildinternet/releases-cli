@@ -29,8 +29,12 @@ The hosted server exposes these tools. There is no AI summarization or compariso
 - `get_release` — fetch one release in full by its `rel_` id (ids come from `search` / `get_latest_releases`).
 - `list_collections` / `get_collection` / `get_collection_releases` — curated cross-org "playlists" (e.g. "Frontier AI Labs", "Coding Agents") independent of the category taxonomy.
 - `lookup_domain` — resolve a URL/domain to the org that owns it. Use when you have a URL-shaped input rather than a name.
+- `whats_changed` (**beta**) — the changelog entries between two versions of a package: `whats_changed(package, from, to)` returns the releases in `(from, to]` with summaries, breaking-change verdicts, and migration notes. Use it to plan an upgrade instead of reading many changelog pages. `package` is a tracked source slug or a GitHub `owner/repo`. No sign-in needed.
 
-The server also exposes **signed-in personal-account tools** — `follow` / `unfollow` / `list_follows`, `get_personalized_feed`, and `whats_changed` (releases since the user's last check across their follows). They require an authenticated connection (OAuth or a user API key) and error for anonymous clients; the reader tools above need no auth. Reach for them only when the user asks about *their* follows or feed — for general "what's new in X" questions, the reader tools answer without sign-in.
+The server also exposes **signed-in account tools**. They act on the user's own account, need an authenticated connection (a "Sign in with Releases" OAuth token or a `relu_` user API key), and return an error for anonymous clients. The reader tools above need no auth.
+
+- `follow` / `unfollow` / `list_follows` and `get_personalized_feed` — the user's follows and their feed. Reach for these only when the user asks about *their* follows or feed. For general "what's new in X" questions, the reader tools answer without sign-in.
+- `list_webhooks` (read-only) and `manage_webhook` (`create` / `update` / `delete` / `test` / `rotate_secret`) — the user's release webhooks. Pass `workspace` (an id or slug) to work on a shared workspace's webhooks instead; `list_webhooks` with no `workspace` also lists the user's workspaces. Workspace owners and admins can change workspace webhooks; members can list and test them. Workspace webhooks target one org (no follows scope). `create` needs `format` (`json`, `slack`, or `discord`). A `json` webhook's signing key is shown only once, on create or rotate — tell the user to store it right away. Slack and Discord webhooks have no signing key. Only create, change, or delete a webhook when the user asks for it.
 
 ## How to Look Up Releases
 
