@@ -51,6 +51,7 @@ import { registerServeCommand } from "./commands/serve.js";
 import { registerWhoamiCommand } from "./commands/whoami.js";
 import { registerWebhookCommand } from "./commands/webhook.js";
 import { registerWebhookAdminCommand } from "./commands/admin/webhook.js";
+import { registerWorkspaceCommand } from "./commands/workspace.js";
 import { registerAgentContextCommand } from "./commands/agent-context.js";
 import { registerJsonCommand } from "./commands/json.js";
 import { registerCompletionCommand } from "./commands/completion.js";
@@ -276,6 +277,8 @@ registerSkillsCommand(program);
 // `webhook {list,add,…}` — self-serve `/v1/me/webhooks` (auth required).
 // `webhook verify` — local signature check, no auth. Admin CRUD under `admin webhook`.
 registerWebhookCommand(program);
+// `workspace list` — the caller's Better Auth workspaces (auth required).
+registerWorkspaceCommand(program);
 
 const admin = program
   .command("admin")

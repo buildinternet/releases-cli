@@ -81,9 +81,13 @@ releases webhook add --format slack --url https://hooks.slack.com/services/…
 releases webhook add --format discord --url https://discord.com/api/webhooks/…
 releases webhook test <id>        # enqueue a signed test delivery
 releases webhook verify --key …   # local HMAC check (no auth)
+
+releases workspace list           # workspaces you belong to (name, slug, id, role)
+releases webhook list --workspace acme         # a workspace's shared webhooks instead of your own
+releases webhook add --workspace acme --org vercel --url https://your.app/hook
 ```
 
-Org-scoped webhooks: up to 10 per account (`--org`, optional `--source`, `--product`, `--type feature|rollup`). Follows-scoped: one webhook that tracks your current follow graph (real-time sibling to `feed` + digest email); optional `--type` narrows delivery. `webhook edit` can update filters (`--clear-source`, `--clear-product`, `--clear-type`). `--format slack` / `--format discord` post an unsigned chat card (the URL is the secret). JSON webhooks show a signing key once on `add` / `rotate-secret`. Operator/admin webhooks (`releases admin webhook …`) are a separate root-key surface.
+Org-scoped webhooks: up to 10 per account (`--org`, optional `--source`, `--product`, `--type feature|rollup`). Follows-scoped: one webhook that tracks your current follow graph (real-time sibling to `feed` + digest email); optional `--type` narrows delivery. `webhook edit` can update filters (`--clear-source`, `--clear-product`, `--clear-type`). `--format slack` / `--format discord` post an unsigned chat card (the URL is the secret). JSON webhooks show a signing key once on `add` / `rotate-secret`. `--workspace <id-or-slug>` on `list`/`add`/`show`/`edit`/`remove`/`test`/`rotate-secret` manages a shared workspace webhook instead — org-scoped only, and only owners/admins can write (members can list/view/test). Operator/admin webhooks (`releases admin webhook …`) are a separate root-key surface.
 
 ## Admin surface (invite-only — reads never need it)
 

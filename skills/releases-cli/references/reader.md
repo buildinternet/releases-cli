@@ -193,9 +193,13 @@ releases webhook edit <id> --type rollup
 releases webhook edit <id> --format discord --url https://discord.com/api/webhooks/…
 releases webhook test <id>
 releases webhook verify --key <hex> --signature … --timestamp … --body-file -
+
+releases workspace list
+releases webhook list --workspace acme
+releases webhook add --workspace acme --org vercel --url https://your.app/hook
 ```
 
-`--format slack` and `--format discord` post an unsigned chat card; the webhook URL is the secret (no signing key). `webhook verify` is local (no auth). Admin webhooks (`releases admin webhook …`) are a separate root-key operator surface.
+`--format slack` and `--format discord` post an unsigned chat card; the webhook URL is the secret (no signing key). `webhook verify` is local (no auth). `--workspace <id-or-slug>` on `list`/`add`/`show`/`edit`/`remove`/`test`/`rotate-secret` targets a shared workspace webhook (org-scoped only) instead of your own; `releases workspace list` finds the id/slug. Only workspace owners/admins can write; members can list/view/test. Admin webhooks (`releases admin webhook …`) are a separate root-key operator surface.
 
 ## Agent self-discovery
 
