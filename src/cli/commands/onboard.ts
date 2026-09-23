@@ -1,258 +1,36 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import { logger } from "@releases/lib/logger";
-import { legacyEnv } from "@releases/lib/legacy-env";
-import { registerOnboardApplyCommand } from "./onboard-apply.js";
-import { apiFetch } from "../../api/core.js";
-import { getApiUrl } from "../../lib/mode.js";
-import { writeJson } from "../../lib/output.js";
-import { trySaveSessionTrace } from "../../lib/trace.js";
-import type { Session } from "@buildinternet/releases-api-types";
 
-interface OnboardOpts {
-  domain?: string;
-  githubOrg?: string;
-  intoOrg?: string;
-  intoProduct?: string;
-  json?: boolean;
-  managedAgents?: boolean;
-  sandbox?: boolean;
-  traceDir?: string;
-}
-
-type DiscoveryEngine = "managed-agents" | "sandbox";
-
-function resolveDiscoveryEngine(opts: OnboardOpts): DiscoveryEngine {
-  if (opts.managedAgents) return "managed-agents";
-  if (opts.sandbox) return "sandbox";
-  const env = legacyEnv("RELEASES_DISCOVERY_ENGINE", "RELEASED_DISCOVERY_ENGINE")?.toLowerCase();
-  if (env === "sandbox") return "sandbox";
-  return "managed-agents";
-}
-
-interface DiscoverySource {
-  slug: string;
-  url: string;
-  type: string;
-  confidence: "high" | "medium" | "low";
-  validated?: boolean;
-  validationError?: string;
-  releaseCount?: number;
-  duplicateOf?: string;
-}
-
-interface DiscoveryState {
-  product: string;
-  domain?: string;
-  githubOrg?: string;
-  sources: DiscoverySource[];
-  status: string;
-}
-
+/**
+ * `releases admin discovery onboard` used to start a remote Managed-Agents
+ * discovery session through `POST /v1/workflows/discover`. That route and the
+ * discovery worker were retired (buildinternet/releases#2352). The command
+ * stays for one release window so old habits and scripts get a pointer instead
+ * of an unexplained 404.
+ */
 export function registerOnboardCommand(program: Command) {
-  const onboard = program
+  program
     .command("onboard")
-    .description("Discover and onboard changelog sources for a company (remote)")
-    .argument("<company>", "Company or product name to discover sources for")
-    .option("--domain <domain>", "Seed with the company's domain")
-    .option("--github-org <org>", "Seed with the company's GitHub organization")
-    .option(
-      "--into-org <slug>",
-      "Attach discovered sources to this existing org (skips org creation; agent will not call manage_org(add))",
+    .description(
+      "Retired. Onboard sources with the admin create commands or the local-ingest skill",
     )
-    .option(
-      "--into-product <slug>",
-      "Attach discovered sources to this existing product (requires --into-org; product slug is per-org)",
-    )
-    .option("--managed-agents", "Use the managed-agents discovery engine (default)")
-    .option("--sandbox", "Use the legacy sandbox discovery engine")
-    .option(
-      "--trace-dir <dir>",
-      "Write the terminal session as <dir>/<sessionId>/{trace.json,summary.md} (default: ~/.releases/work/runs)",
-    )
-    .option("--json", "Output results as JSON")
-    .action(async (company: string, opts: OnboardOpts) => {
-      if (opts.managedAgents && opts.sandbox) {
-        logger.error("Cannot specify both --managed-agents and --sandbox");
-        process.exit(1);
-      }
-      if (opts.intoProduct && !opts.intoOrg) {
-        logger.error("--into-product requires --into-org (product slugs are per-org)");
-        process.exit(1);
-      }
-
-      const engine = resolveDiscoveryEngine(opts);
-      await runRemoteDiscovery(company, opts, engine);
-    });
-
-  registerOnboardApplyCommand(onboard);
-}
-
-async function runRemoteDiscovery(
-  company: string,
-  opts: OnboardOpts,
-  engine: DiscoveryEngine = "managed-agents",
-): Promise<void> {
-  if (!opts.json) {
-    process.stderr.write(
-      chalk.bold(`Onboarding "${company}"`) +
-        chalk.gray(` — starting remote discovery on ${getApiUrl()}...\n\n`),
-    );
-  }
-
-  let sessionId: string;
-  try {
-    const result = await apiFetch<{ sessionId: string }>("/v1/workflows/discover", {
-      method: "POST",
-      body: JSON.stringify({
-        company,
-        domain: opts.domain,
-        githubOrg: opts.githubOrg,
-        intoOrgSlug: opts.intoOrg,
-        intoProductSlug: opts.intoProduct,
-        engine,
-      }),
-    });
-    sessionId = result.sessionId;
-  } catch (err) {
-    logger.error(
-      `Failed to start remote discovery: ${err instanceof Error ? err.message : String(err)}`,
-    );
-    process.exit(1);
-  }
-
-  if (!opts.json) {
-    process.stderr.write(chalk.gray(`  Session: ${sessionId}\n`));
-  }
-
-  const POLL_INTERVAL = 5_000;
-  const MAX_POLL_TIME = 15 * 60 * 1000;
-  const startTime = Date.now();
-  let lastStep = "";
-
-  // Persist a terminal session as runs/<sessionId>/{trace.json,summary.md}.
-  // Fail-open; a trace breadcrumb only prints in non-JSON mode.
-  const saveTrace = (session: Session): void => {
-    const dir = trySaveSessionTrace(session, opts.traceDir);
-    if (dir && !opts.json) process.stderr.write(chalk.dim(`  Trace: ${dir}\n`));
-  };
-
-  // Polling loop — each tick depends on the prior sleep + status fetch.
-  while (Date.now() - startTime < MAX_POLL_TIME) {
-    // eslint-disable-next-line no-await-in-loop
-    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL));
-
-    let status: Session | null;
-    try {
-      // eslint-disable-next-line no-await-in-loop
-      status = await apiFetch<Session>(`/v1/sessions/${sessionId}`);
-    } catch (err) {
-      logger.error(`Failed to poll status: ${err instanceof Error ? err.message : String(err)}`);
-      process.exit(1);
-    }
-
-    if (!status) continue;
-
-    if (status.status === "complete") {
-      saveTrace(status);
-      if (!opts.json) process.stderr.write(chalk.green("\n  Discovery complete.\n"));
-
-      if (status.result) {
-        if (opts.json) {
-          // eslint-disable-next-line no-await-in-loop
-          await writeJson(status.result);
-          return;
-        }
-
-        const result = status.result as Record<string, unknown>;
-        if (result.sources && Array.isArray(result.sources)) {
-          printSummary(result as unknown as DiscoveryState);
-        } else {
-          const found = result.sourcesFound ?? 0;
-          const validated = result.sourcesValidated ?? 0;
-          process.stderr.write(chalk.gray(`  ${found} source(s) found, ${validated} validated\n`));
-        }
-      }
-      return;
-    }
-
-    if (status.status === "error") {
-      saveTrace(status);
-      logger.error(`Remote discovery failed: ${status.error ?? "Unknown error"}`);
-      process.exit(1);
-    }
-
-    if (status.status === "cancelled") {
-      saveTrace(status);
-      logger.error("Remote discovery was cancelled.");
-      process.exit(1);
-    }
-
-    if (!opts.json && status.step && status.step !== lastStep) {
-      const elapsed = Math.round((Date.now() - startTime) / 1000);
-      const found = status.sourcesFound ?? 0;
-      const validated = status.sourcesValidated ?? 0;
-      process.stderr.write(
-        chalk.gray(`  [${elapsed}s] `) +
-          chalk.dim(status.step) +
-          chalk.gray(` — ${found} found, ${validated} validated`) +
-          (status.currentAction ? chalk.dim(` — ${status.currentAction}`) : "") +
-          "\n",
+    .argument("[company]", "Ignored")
+    .allowUnknownOption()
+    .allowExcessArguments()
+    .action(() => {
+      console.error(chalk.yellow("Remote onboarding sessions were retired."));
+      console.error("");
+      console.error("Onboard an organization and its sources directly:");
+      console.error(`  ${chalk.cyan("releases admin org create <name> --domain <domain>")}`);
+      console.error(`  ${chalk.cyan("releases admin source create --org <org> --url <url>")}`);
+      console.error("");
+      console.error(
+        "Or let an agent do the discovery: the `local-ingest` skill in the releases monorepo",
       );
-      lastStep = status.step;
-    }
-  }
-
-  logger.error("Remote discovery timed out after 15 minutes.");
-  process.exit(1);
-}
-
-function write(s: string): void {
-  process.stderr.write(s + "\n");
-}
-
-function printSummary(state: DiscoveryState): void {
-  const { sources } = state;
-
-  write("");
-  write(chalk.bold(`Discovery results for ${state.product}`));
-  write("");
-
-  if (state.domain) write(chalk.gray(`  Domain: ${state.domain}`));
-  if (state.githubOrg) write(chalk.gray(`  GitHub: ${state.githubOrg}`));
-
-  if (sources.length === 0) {
-    write(chalk.yellow("\n  No sources discovered."));
-    return;
-  }
-
-  const validated = sources.filter((s) => s.validated);
-  const failed = sources.filter((s) => s.validationError);
-
-  write(
-    chalk.gray(
-      `  ${sources.length} source(s) found, ${validated.length} validated, ${failed.length} failed`,
-    ),
-  );
-  write("");
-
-  for (const s of sources) {
-    const conf =
-      s.confidence === "high"
-        ? chalk.green(s.confidence)
-        : s.confidence === "medium"
-          ? chalk.yellow(s.confidence)
-          : chalk.red(s.confidence);
-    const status = s.validationError
-      ? chalk.red("failed")
-      : s.validated
-        ? chalk.green(`${s.releaseCount ?? 0} releases`)
-        : chalk.gray("not validated");
-    const dup = s.duplicateOf ? chalk.dim(` (dup of ${s.duplicateOf})`) : "";
-
-    write(`  ${chalk.cyan(s.slug)} ${chalk.dim(s.type)} ${conf} — ${status}${dup}`);
-    write(chalk.dim(`    ${s.url}`));
-  }
-
-  write(chalk.dim(`\n  Status: ${state.status}`));
+      console.error(
+        "fetches, extracts, and writes releases through the batch API without a remote session.",
+      );
+      console.error("Vendors can also declare sources themselves with a `releases.json` manifest.");
+      process.exitCode = 1;
+    });
 }
