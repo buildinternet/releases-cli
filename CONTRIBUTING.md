@@ -95,7 +95,7 @@ The CLI walks you through picking the affected packages, a bump type, and a shor
 
 A few things to know about how versioning works here:
 
-- The eight `@buildinternet/releases*` packages (meta + 5 platform binaries + `-lib` + `-skills`) live in a **fixed group** — they bump together. Targeting any one of them in a changeset cascades to all eight.
+- The seven `@buildinternet/releases*` packages (meta + 5 platform binaries + `-lib`) live in a **fixed group** — they bump together. Targeting any one of them in a changeset cascades to all seven. The retired `-skills` shim is not in the group.
 - **Target `@buildinternet/releases`**, not `releases-cli`. The package isn't named `releases-cli` on npm.
 - `@buildinternet/releases-core` is published from the [backend monorepo](https://github.com/buildinternet/releases) and is **not** in the fixed group — don't include it in a changeset here.
 
