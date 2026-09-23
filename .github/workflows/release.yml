@@ -13,10 +13,40 @@ permissions:
   id-token: write # OIDC: mint a short-lived npm publish credential (no NPM_TOKEN)
 
 jobs:
+  build-darwin:
+    name: Build + sign macOS binaries
+    # Darwin targets must be built and signed on macOS — see
+    # scripts/build-darwin.sh. The release job below ships these exact files.
+    runs-on: macos-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.0
+
+      - run: bun install --frozen-lockfile
+
+      - name: Build, sign, and verify
+        run: scripts/build-darwin.sh
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: darwin-binaries
+          path: |
+            npm/releases-darwin-arm64/releases
+            npm/releases-darwin-x64/releases
+          if-no-files-found: error
+          retention-days: 7
+
   release:
     name: Version or Publish
+    needs: build-darwin
     runs-on: ubuntu-latest
-    # Cross-compile (5 targets) + npm publish + GitHub release + tap push.
+    # Cross-compile (3 targets) + npm publish + GitHub release + tap push.
+    # The darwin binaries come signed from the build-darwin job.
     # Generous, but bounded — a hung publish step shouldn't burn the 6h default.
     timeout-minutes: 30
 
@@ -45,16 +75,21 @@ jobs:
       - name: Type-check
         run: npx tsc --noEmit
 
+      - name: Download signed macOS binaries
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: darwin-binaries
+          path: npm
+
       - name: Build binaries
         run: |
-          bun build --compile src/index.ts --outfile npm/releases-darwin-arm64/releases --target=bun-darwin-arm64
-          bun build --compile src/index.ts --outfile npm/releases-darwin-x64/releases --target=bun-darwin-x64
           bun build --compile src/index.ts --outfile npm/releases-linux-x64/releases --target=bun-linux-x64
           bun build --compile src/index.ts --outfile npm/releases-linux-arm64/releases --target=bun-linux-arm64
           bun build --compile src/index.ts --outfile npm/releases-windows-x64/releases.exe --target=bun-windows-x64
           # bun --compile on a Linux runner produces 0644 outputs for cross-targets;
           # set +x so gzip preserves the bit and downstream installers (Homebrew,
-          # curl|sh, manual gunzip) get an executable file.
+          # curl|sh, manual gunzip) get an executable file. Artifact downloads
+          # drop the bit too, so the darwin binaries need it as well.
           chmod +x npm/releases-darwin-arm64/releases
           chmod +x npm/releases-darwin-x64/releases
           chmod +x npm/releases-linux-x64/releases

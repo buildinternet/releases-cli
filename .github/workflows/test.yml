@@ -78,6 +78,26 @@ jobs:
         # isolate on the 2-vCPU runner, hanging the job to the 10m cap (#211).
         run: bun test
 
+  smoke-macos:
+    name: macOS binary sign + smoke test
+    # Runs the same script release.yml ships darwin binaries from, so a
+    # signing regression fails the PR, not `brew upgrade` (v0.77/v0.78).
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.0 # pinned to match release.yml — see the test job
+
+      - run: bun install --frozen-lockfile
+
+      - name: Build, sign, verify, and run
+        run: scripts/build-darwin.sh
+
   smoke-windows:
     name: Windows binary smoke test
     runs-on: windows-latest
