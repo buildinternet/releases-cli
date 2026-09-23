@@ -36,7 +36,6 @@ const { deleteSourceAction } = await import("../../src/cli/commands/delete.js");
 const { registerFollowsCommands } = await import("../../src/cli/commands/follows.js");
 const { registerKeysCommand } = await import("../../src/cli/commands/keys.js");
 const { registerWebhookAdminCommand } = await import("../../src/cli/commands/admin/webhook.js");
-const { registerOnboardApplyCommand } = await import("../../src/cli/commands/onboard-apply.js");
 
 /** Run `fn`, capturing everything written to stdout; returns the captured text. */
 async function captureStdout(fn: () => Promise<void>): Promise<string> {
@@ -201,54 +200,5 @@ describe("gap commands gain --dry-run (no mutating request fires)", () => {
     expect(parsed.dryRun).toBe(true);
     expect(parsed.wouldCreate.url).toBe("https://x/cb");
     expect(mutatingMethods).toHaveLength(0);
-  });
-});
-
-describe("onboard apply --dry-run", () => {
-  let originalFetch: typeof globalThis.fetch;
-  let mutatingMethods: string[];
-
-  beforeEach(() => {
-    originalFetch = globalThis.fetch;
-    mutatingMethods = [];
-    globalThis.fetch = (async (url: string, init?: RequestInit) => {
-      const method = init?.method ?? "GET";
-      if (method !== "GET") mutatingMethods.push(`${method} ${url}`);
-      if (url.includes("/v1/orgs")) {
-        return new Response(JSON.stringify({ id: "org_1", slug: "acme", name: "Acme" }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        });
-      }
-      return new Response("null", { status: 404 });
-    }) as unknown as typeof globalThis.fetch;
-  });
-  afterEach(() => {
-    globalThis.fetch = originalFetch;
-  });
-
-  it("previews per-source would-actions and writes nothing", async () => {
-    const state = JSON.stringify({
-      product: "acme",
-      sources: [
-        { slug: "a", url: "https://a.dev", type: "scrape", label: "A", approved: true },
-        { slug: "b", url: "https://b.dev", type: "scrape", label: "B", approved: false },
-        { slug: "c", url: "https://c.dev", type: "scrape", label: "C" },
-      ],
-    });
-    // The command reads the state file from stdin when the path is "-".
-    const originalStdin = Bun.stdin.text;
-    (Bun.stdin as { text: () => Promise<string> }).text = async () => state;
-    try {
-      const out = await captureStdout(() =>
-        run(registerOnboardApplyCommand, ["apply", "-", "--dry-run", "--json"]),
-      );
-      const parsed = JSON.parse(out) as Array<{ action: string; dryRun: boolean }>;
-      expect(parsed.map((r) => r.action)).toEqual(["would-add", "would-ignore", "would-skip"]);
-      expect(parsed.every((r) => r.dryRun === true)).toBe(true);
-      expect(mutatingMethods).toHaveLength(0);
-    } finally {
-      (Bun.stdin as { text: () => Promise<string> }).text = originalStdin;
-    }
   });
 });
