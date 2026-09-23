@@ -1,5 +1,7 @@
 # @buildinternet/releases-lib
 
+## 0.79.0
+
 ## 0.78.1
 
 ## 0.78.0
