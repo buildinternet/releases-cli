@@ -132,6 +132,14 @@ releases login --no-browser # print the URL + code to open yourself (headless / 
 
 This uses the OAuth 2.0 Device Authorization Grant (RFC 8628): approve a short code at [releases.sh/device](https://releases.sh/device) in a signed-in browser, and a read-only key is saved to `~/.releases/credentials` (`0600`). Manage keys with `releases keys list` / `create` / `revoke`.
 
+If you've verified ownership of a source's domain, mint a `publish-token` scoped to that one source — used by the [`publish-changelog` GitHub Action](https://releases.sh/docs/integrations/github-actions) as `RELEASES_API_TOKEN`:
+
+```bash
+releases publish-token create --source src_… | gh secret set RELEASES_API_TOKEN
+releases publish-token list
+releases publish-token revoke <id>
+```
+
 Already issued a token (e.g. a write/admin key during the closed beta)? Store it without the browser flow via `releases auth login` (interactive, `--token <token>`, or `--token -` for stdin); it's verified before being saved. `releases auth status` shows the current state (`whoami` is an alias). `RELEASES_API_KEY` in the environment overrides any stored credential — handy for CI.
 
 ## Environment

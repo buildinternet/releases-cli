@@ -197,9 +197,15 @@ releases webhook verify --key <hex> --signature … --timestamp … --body-file 
 releases workspace list
 releases webhook list --workspace acme
 releases webhook add --workspace acme --org vercel --url https://your.app/hook
+
+releases publish-token create --source src_… --name "GitHub Actions"
+releases publish-token list
+releases publish-token revoke <id>
 ```
 
 `--format slack` and `--format discord` post an unsigned chat card; the webhook URL is the secret (no signing key). `webhook verify` is local (no auth). `--workspace <id-or-slug>` on `list`/`add`/`show`/`edit`/`remove`/`test`/`rotate-secret` targets a shared workspace webhook (org-scoped only) instead of your own; `releases workspace list` finds the id/slug. Only workspace owners/admins can write; members can list/view/test. Admin webhooks (`releases admin webhook …`) are a separate root-key operator surface.
+
+`publish-token create` requires a verified domain ownership claim on the source's org (see the [GitHub Actions integration doc](https://releases.sh/docs/integrations/github-actions)); it mints a `relk_` token scoped to ONE source, printing only the token to stdout (so it pipes straight into `gh secret set`) with setup guidance on stderr.
 
 ## Agent self-discovery
 
