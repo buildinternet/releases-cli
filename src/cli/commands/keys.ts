@@ -78,8 +78,15 @@ export function registerKeysCommand(program: Command): void {
     .option("--expires-in-days <n>", "Expiry in days (1-365)", parseExpiresInDays)
     .option("--json", "Output as JSON")
     .option("--dry-run", "Show what would be created without minting a key")
+    .option("--no-browser", "Print the device-approval URL instead of opening a browser")
     .action(
-      async (opts: { name: string; expiresInDays?: number; json?: boolean; dryRun?: boolean }) => {
+      async (opts: {
+        name: string;
+        expiresInDays?: number;
+        json?: boolean;
+        dryRun?: boolean;
+        browser?: boolean;
+      }) => {
         const apiUrl = getApiUrl();
         const body: Record<string, unknown> = { name: opts.name, scope: "read" };
         // parseExpiresInDays guarantees a valid integer or commander exits before
@@ -100,12 +107,16 @@ export function registerKeysCommand(program: Command): void {
         }
         let created: CreatedUserApiKey;
         try {
-          created = await withSession(apiUrl, "keys", (sessionToken) =>
-            keysRequest<CreatedUserApiKey>(
-              "/v1/api-keys",
-              { method: "POST", body: JSON.stringify(body) },
-              sessionToken,
-            ),
+          created = await withSession(
+            apiUrl,
+            "keys",
+            (sessionToken) =>
+              keysRequest<CreatedUserApiKey>(
+                "/v1/api-keys",
+                { method: "POST", body: JSON.stringify(body) },
+                sessionToken,
+              ),
+            { openInBrowser: opts.browser !== false },
           );
         } catch (err) {
           console.error(chalk.red(keysErrorMessage(err)));
@@ -127,16 +138,21 @@ export function registerKeysCommand(program: Command): void {
     .command("list")
     .description("List your API keys")
     .option("--json", "Output as JSON")
-    .action(async (opts: { json?: boolean }) => {
+    .option("--no-browser", "Print the device-approval URL instead of opening a browser")
+    .action(async (opts: { json?: boolean; browser?: boolean }) => {
       const apiUrl = getApiUrl();
       let data: ListUserApiKeysResponse | null;
       try {
-        data = await withSession(apiUrl, "keys", (sessionToken) =>
-          keysRequest<ListUserApiKeysResponse | null>(
-            "/v1/api-keys",
-            { method: "GET" },
-            sessionToken,
-          ),
+        data = await withSession(
+          apiUrl,
+          "keys",
+          (sessionToken) =>
+            keysRequest<ListUserApiKeysResponse | null>(
+              "/v1/api-keys",
+              { method: "GET" },
+              sessionToken,
+            ),
+          { openInBrowser: opts.browser !== false },
         );
       } catch (err) {
         console.error(chalk.red(keysErrorMessage(err)));
@@ -183,7 +199,8 @@ export function registerKeysCommand(program: Command): void {
     .description("Revoke (delete) an API key by id")
     .option("--yes", "Skip the confirmation prompt")
     .option("--dry-run", "Show what would be revoked without deleting")
-    .action(async (id: string, opts: { yes?: boolean; dryRun?: boolean }) => {
+    .option("--no-browser", "Print the device-approval URL instead of opening a browser")
+    .action(async (id: string, opts: { yes?: boolean; dryRun?: boolean; browser?: boolean }) => {
       if (opts.dryRun) {
         logger.warn(`[dry-run] Would revoke API key ${id}.`);
         return;
@@ -201,8 +218,16 @@ export function registerKeysCommand(program: Command): void {
       }
       const apiUrl = getApiUrl();
       try {
-        await withSession(apiUrl, "keys", (sessionToken) =>
-          keysRequest(`/v1/api-keys/${encodeURIComponent(id)}`, { method: "DELETE" }, sessionToken),
+        await withSession(
+          apiUrl,
+          "keys",
+          (sessionToken) =>
+            keysRequest(
+              `/v1/api-keys/${encodeURIComponent(id)}`,
+              { method: "DELETE" },
+              sessionToken,
+            ),
+          { openInBrowser: opts.browser !== false },
         );
       } catch (err) {
         if (err instanceof ApiError && err.status === 404) {

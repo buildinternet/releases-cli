@@ -307,6 +307,62 @@ describe("runDeviceAuth", () => {
     expect(calls.some((u) => u.endsWith("/v1/api-keys"))).toBe(false);
     expect(printed.some((l) => l.includes("manage your API keys"))).toBe(true);
   });
+
+  /**
+   * Regression guard: a manual run of `releases keys list` against a local
+   * stub server once launched the REAL default browser (via `openBrowser`
+   * from `../lib/open-browser.js`, which shells out to `open`/`xdg-open`)
+   * because no `--no-browser` flag existed on `keys`/`publish-token`. Every
+   * command now threads `openInBrowser` through to here — this test pins
+   * down that `openInBrowser: false` means `deps.openBrowser` is NEVER
+   * invoked, even when one is supplied, so an injected stub (or the real
+   * opener, in production) can't fire when the caller asked not to.
+   */
+  it("never calls deps.openBrowser when openInBrowser is false, even if one is supplied", async () => {
+    const fakeFetch = (async (url: string) => {
+      const u = String(url);
+      if (u.endsWith("/device/code"))
+        return new Response(
+          JSON.stringify({
+            device_code: "d",
+            user_code: "U",
+            verification_uri: "https://x/device",
+            verification_uri_complete: "https://x/device?user_code=U",
+            expires_in: 900,
+            interval: 0,
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      if (u.endsWith("/device/token"))
+        return new Response(JSON.stringify({ access_token: "sess_tok" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      if (u.endsWith("/get-session"))
+        return new Response(JSON.stringify({ user: null }), { status: 200 });
+      throw new Error(`unexpected ${u}`);
+    }) as unknown as typeof fetch;
+
+    let openBrowserCalled = false;
+    const printed: string[] = [];
+    await runDeviceAuth({
+      apiUrl: "https://test.example.com",
+      purpose: "keys",
+      openInBrowser: false,
+      deps: {
+        fetchImpl: fakeFetch,
+        sleep: async () => {},
+        print: (l) => printed.push(l),
+        openBrowser: () => {
+          openBrowserCalled = true;
+          return true;
+        },
+      },
+    });
+
+    expect(openBrowserCalled).toBe(false);
+    expect(printed.some((l) => l.includes("Opening your browser"))).toBe(false);
+  });
 });
 
 describe("createUserApiKey", () => {

@@ -19,6 +19,14 @@ export interface SessionDeps {
   print?: (line: string) => void;
   readCredential?: () => StoredCredential | null;
   writeCredential?: (cred: StoredCredential) => void;
+  /**
+   * Whether the DEFAULT device-auth flow should try to launch a real browser
+   * (`releases keys ... --no-browser` etc. thread their flag through here).
+   * Defaults to true. Ignored when `deviceAuth` is overridden — an injected
+   * `deviceAuth` (every test in this repo) never reaches the real opener at
+   * all, since it replaces `defaultDeviceAuth` entirely.
+   */
+  openInBrowser?: boolean;
 }
 
 // `withSession` backs commands whose stdout must stay machine-readable
@@ -32,11 +40,15 @@ const defaultPrint = (line: string): void => {
   process.stderr.write(`${line}\n`);
 };
 
-function defaultDeviceAuth(apiUrl: string, purpose: DevicePurpose): Promise<string> {
+function defaultDeviceAuth(
+  apiUrl: string,
+  purpose: DevicePurpose,
+  openInBrowser: boolean,
+): Promise<string> {
   return runDeviceAuth({
     apiUrl,
     purpose,
-    openInBrowser: true,
+    openInBrowser,
     deps: { openBrowser, print: defaultPrint },
   }).then((r) => r.sessionToken);
 }
@@ -60,7 +72,10 @@ export async function withSession<T>(
 ): Promise<T> {
   await retireStoredSession(deps);
 
-  const sessionToken = await (deps.deviceAuth ?? defaultDeviceAuth)(apiUrl, purpose);
+  const sessionToken = await (
+    deps.deviceAuth ??
+    ((u: string, p: DevicePurpose) => defaultDeviceAuth(u, p, deps.openInBrowser ?? true))
+  )(apiUrl, purpose);
   try {
     return await fn(sessionToken);
   } finally {
