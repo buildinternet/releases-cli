@@ -4,6 +4,10 @@ import {
   pollForToken,
   runDeviceLogin,
   runDeviceAuth,
+  createUserApiKey,
+  listUserApiKeys,
+  revokeUserApiKey,
+  ApiKeyLimitError,
 } from "../../src/lib/device-auth.js";
 
 const BASE = "https://test.example.com";
@@ -235,5 +239,110 @@ describe("runDeviceLogin returns sessionToken", () => {
     });
     expect(res.token).toBe("relu_new");
     expect(res.sessionToken).toBe("sess_tok");
+  });
+});
+
+describe("createUserApiKey", () => {
+  it("returns the created key's id alongside the secret", async () => {
+    const fakeFetch = (async () =>
+      new Response(
+        JSON.stringify({
+          key: "relu_secret",
+          id: "ak_1",
+          name: "releases-cli (host)",
+          scope: "read",
+        }),
+        { status: 201, headers: { "content-type": "application/json" } },
+      )) as unknown as typeof fetch;
+
+    const created = await createUserApiKey(BASE, "sess_tok", "releases-cli (host)", fakeFetch);
+    expect(created.key).toBe("relu_secret");
+    expect(created.id).toBe("ak_1");
+  });
+
+  it("throws a plain Error on a generic failure", async () => {
+    const fakeFetch = (async () =>
+      new Response(JSON.stringify({ error: { code: "internal_error" } }), {
+        status: 500,
+        headers: { "content-type": "application/json" },
+      })) as unknown as typeof fetch;
+
+    await expect(createUserApiKey(BASE, "sess_tok", "name", fakeFetch)).rejects.toThrow(/HTTP 500/);
+  });
+
+  it("throws ApiKeyLimitError on a 409 api_key_limit response", async () => {
+    const fakeFetch = (async () =>
+      new Response(
+        JSON.stringify({
+          error: {
+            code: "api_key_limit",
+            message: "API key limit reached (max 5 active keys). Revoke one and try again.",
+          },
+        }),
+        { status: 409, headers: { "content-type": "application/json" } },
+      )) as unknown as typeof fetch;
+
+    const err = await createUserApiKey(BASE, "sess_tok", "name", fakeFetch).catch((e) => e);
+    expect(err).toBeInstanceOf(ApiKeyLimitError);
+    expect((err as Error).message).toMatch(/limit reached/i);
+  });
+
+  it("throws a plain Error on a 409 that isn't the key-limit code (e.g. idempotency conflict)", async () => {
+    const fakeFetch = (async () =>
+      new Response(JSON.stringify({ error: { code: "idempotency_conflict" } }), {
+        status: 409,
+        headers: { "content-type": "application/json" },
+      })) as unknown as typeof fetch;
+
+    const err = await createUserApiKey(BASE, "sess_tok", "name", fakeFetch).catch((e) => e);
+    expect(err).not.toBeInstanceOf(ApiKeyLimitError);
+    expect(err).toBeInstanceOf(Error);
+  });
+});
+
+describe("listUserApiKeys", () => {
+  it("returns the apiKeys array from the envelope", async () => {
+    let seenAuth = "";
+    const fakeFetch = (async (_url: string, init?: RequestInit) => {
+      seenAuth = String((init?.headers as Record<string, string>)?.authorization ?? "");
+      return new Response(
+        JSON.stringify({ apiKeys: [{ id: "ak_1", name: "releases-cli (host)" }] }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    }) as unknown as typeof fetch;
+
+    const keys = await listUserApiKeys(BASE, "sess_tok", fakeFetch);
+    expect(keys).toHaveLength(1);
+    expect(keys[0]?.id).toBe("ak_1");
+    expect(seenAuth).toBe("Bearer sess_tok");
+  });
+
+  it("throws on a non-ok response", async () => {
+    const fakeFetch = (async () => new Response("{}", { status: 500 })) as unknown as typeof fetch;
+    await expect(listUserApiKeys(BASE, "sess_tok", fakeFetch)).rejects.toThrow(/HTTP 500/);
+  });
+});
+
+describe("revokeUserApiKey", () => {
+  it("DELETEs the key by id with the session token as Bearer", async () => {
+    let seen: { url: string; method?: string; auth: string } | null = null;
+    const fakeFetch = (async (url: string, init?: RequestInit) => {
+      seen = {
+        url: String(url),
+        method: init?.method,
+        auth: String((init?.headers as Record<string, string>)?.authorization ?? ""),
+      };
+      return new Response(null, { status: 204 });
+    }) as unknown as typeof fetch;
+
+    await revokeUserApiKey(BASE, "sess_tok", "ak_1", fakeFetch);
+    expect(seen!.url).toBe(`${BASE}/v1/api-keys/ak_1`);
+    expect(seen!.method).toBe("DELETE");
+    expect(seen!.auth).toBe("Bearer sess_tok");
+  });
+
+  it("throws on a non-ok response", async () => {
+    const fakeFetch = (async () => new Response("{}", { status: 404 })) as unknown as typeof fetch;
+    await expect(revokeUserApiKey(BASE, "sess_tok", "ak_1", fakeFetch)).rejects.toThrow(/HTTP 404/);
   });
 });

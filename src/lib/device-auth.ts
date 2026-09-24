@@ -9,6 +9,8 @@
  * read key that can search and read the catalog but not modify it.
  */
 
+import type { UserApiKey, ListUserApiKeysResponse } from "@buildinternet/releases-api-types";
+
 // Must match DEVICE_AUTH_CLIENT_ID in @buildinternet/releases-core/api-token — the
 // worker's validateClient allow-list rejects any other client_id (fail closed).
 // Hard-coded until a published core version exposing that constant is adopted; keep
@@ -127,9 +129,25 @@ export async function getSessionUser(
 
 export interface CreatedKey {
   key: string;
+  /** Server-side id of the minted key — absent only if an old server predates it. */
+  id?: string;
   name?: string | null;
   /** Ladder label the server granted — "read" for the user lane today. */
   scope?: string;
+}
+
+/**
+ * Thrown by `createUserApiKey` when the server refuses the mint with its
+ * active-key cap (409 `api_key_limit`, `USER_API_KEY_MAX_ACTIVE` in the
+ * monorepo). Distinguished from a plain mint failure so callers (`releases
+ * login`) can offer a way forward — list keys, revoke one, retry — instead of
+ * just failing.
+ */
+export class ApiKeyLimitError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ApiKeyLimitError";
+  }
 }
 
 /**
@@ -157,9 +175,59 @@ export async function createUserApiKey(
     body: JSON.stringify({ name, scope: "read" }),
   });
   if (!res.ok) {
+    if (res.status === 409) {
+      const body = (await res.json().catch(() => null)) as {
+        error?: { code?: string; message?: string };
+      } | null;
+      if (body?.error?.code === "api_key_limit") {
+        throw new ApiKeyLimitError(body.error?.message ?? "Active user API key limit reached.");
+      }
+    }
     throw new Error(`Login succeeded but issuing an API key failed (HTTP ${res.status}).`);
   }
   return (await res.json()) as CreatedKey;
+}
+
+/**
+ * List the signed-in user's API keys via the session-gated `GET /v1/api-keys`
+ * — the same read `releases keys list` uses, called here with the device-flow
+ * session token directly (no stored-credential lookup) so it can run
+ * mid-login, before any credential has been written.
+ */
+export async function listUserApiKeys(
+  apiUrl: string,
+  sessionToken: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<UserApiKey[]> {
+  const res = await fetchImpl(`${apiUrl}/v1/api-keys`, {
+    headers: { authorization: `Bearer ${sessionToken}`, "user-agent": CLIENT_ID },
+  });
+  if (!res.ok) {
+    throw new Error(`Could not list API keys (HTTP ${res.status}).`);
+  }
+  const data = (await res.json().catch(() => null)) as ListUserApiKeysResponse | null;
+  return data?.apiKeys ?? [];
+}
+
+/**
+ * Revoke one API key via the session-gated `DELETE /v1/api-keys/:id` — the
+ * same delete `releases keys revoke` uses. Used both by `releases login` (to
+ * drop the key it's replacing, and to free up room under the active-key cap)
+ * and `releases auth logout` (to revoke server-side, best-effort).
+ */
+export async function revokeUserApiKey(
+  apiUrl: string,
+  sessionToken: string,
+  id: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<void> {
+  const res = await fetchImpl(`${apiUrl}/v1/api-keys/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: { authorization: `Bearer ${sessionToken}`, "user-agent": CLIENT_ID },
+  });
+  if (!res.ok) {
+    throw new Error(`Could not revoke API key ${id} (HTTP ${res.status}).`);
+  }
 }
 
 export interface DeviceLoginDeps {
@@ -179,6 +247,8 @@ export interface DeviceLoginArgs {
 
 export interface DeviceLoginResult {
   token: string;
+  /** Server-side id of `token` — see `CreatedKey.id`. */
+  id?: string;
   sessionToken: string;
   name?: string;
   scopes?: string[];
@@ -242,6 +312,7 @@ export async function runDeviceLogin(args: DeviceLoginArgs): Promise<DeviceLogin
 
   return {
     token: created.key,
+    id: created.id,
     sessionToken,
     name: created.name ?? keyName,
     scopes: [created.scope ?? "read"],

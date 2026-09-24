@@ -14,9 +14,13 @@ import { openBrowser } from "./open-browser.js";
  */
 export interface SessionDeps {
   deviceAuth?: (apiUrl: string) => Promise<string>;
-  deviceLogin?: (
-    apiUrl: string,
-  ) => Promise<{ token: string; sessionToken: string; name?: string; scopes?: string[] }>;
+  deviceLogin?: (apiUrl: string) => Promise<{
+    token: string;
+    id?: string;
+    sessionToken: string;
+    name?: string;
+    scopes?: string[];
+  }>;
 }
 
 function defaultDeviceAuth(apiUrl: string): Promise<string> {
@@ -63,6 +67,7 @@ export async function getSessionToken(apiUrl: string, deps: SessionDeps = {}): P
   const res = await (deps.deviceLogin ?? defaultDeviceLogin)(apiUrl);
   writeCredential({
     token: res.token,
+    keyId: res.id,
     sessionToken: res.sessionToken,
     name: res.name,
     scopes: res.scopes,

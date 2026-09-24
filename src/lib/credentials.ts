@@ -21,6 +21,15 @@ export interface StoredCredential {
    * `auth logout` / `clearCredential()`.
    */
   sessionToken?: string;
+  /**
+   * Server-side id of `token`, when it was minted via the device flow
+   * (`releases login`). Lets a later `releases login` revoke the exact key
+   * it's replacing instead of leaking a new one every run (#418). Absent on
+   * credentials predating this field, or on a manually-pasted `auth login`
+   * token — never guess it from `start`, which is only a few characters and
+   * not unique enough to match safely.
+   */
+  keyId?: string;
   name?: string;
   scopes?: string[];
   /** API URL the token was verified against (prod/staging tokens don't cross DBs). */
@@ -48,6 +57,9 @@ export function readCredential(): StoredCredential | null {
       parsed.sessionToken !== undefined &&
       (typeof parsed.sessionToken !== "string" || !parsed.sessionToken)
     ) {
+      return null;
+    }
+    if (parsed.keyId !== undefined && (typeof parsed.keyId !== "string" || !parsed.keyId)) {
       return null;
     }
     // `scopes` is optional, but if present it must be a string array — a malformed

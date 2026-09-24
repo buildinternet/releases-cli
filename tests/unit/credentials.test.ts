@@ -129,4 +129,43 @@ describe("credentials", () => {
     expect(readCredential()).toBeNull();
     clearCredential();
   });
+
+  it("round-trips an optional keyId (#418)", () => {
+    writeCredential({
+      token: "relu_abc",
+      keyId: "ak_123",
+      apiUrl: "https://api.releases.sh",
+      savedAt: "2026-09-24T00:00:00.000Z",
+    });
+    expect(readCredential()?.keyId).toBe("ak_123");
+    clearCredential();
+  });
+
+  it("accepts a credential with no keyId (legacy, pre-#418)", () => {
+    writeCredential({
+      token: "relu_abc",
+      apiUrl: "https://api.releases.sh",
+      savedAt: "2026-09-24T00:00:00.000Z",
+    });
+    expect(readCredential()?.keyId).toBeUndefined();
+    clearCredential();
+  });
+
+  it("rejects a credential whose keyId is a non-string or empty", () => {
+    writeCredential({
+      token: "relu_abc",
+      apiUrl: "https://api.releases.sh",
+      savedAt: "2026-09-24T00:00:00.000Z",
+    });
+    const path = join(dir, "credentials");
+    const obj = JSON.parse(readFileSync(path, "utf8"));
+    obj.keyId = 123;
+    writeFileSync(path, JSON.stringify(obj));
+    expect(readCredential()).toBeNull();
+
+    obj.keyId = "";
+    writeFileSync(path, JSON.stringify(obj));
+    expect(readCredential()).toBeNull();
+    clearCredential();
+  });
 });
