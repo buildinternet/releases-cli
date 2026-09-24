@@ -6,18 +6,20 @@ import type {
   ListPublishTokensResponse,
 } from "@buildinternet/releases-api-types";
 import { getApiUrl } from "../../lib/mode.js";
+import { withSession } from "../../lib/session.js";
 import { ApiError } from "../../lib/errors.js";
 import { writeJson } from "../../lib/output.js";
 import { markDryRun } from "../../lib/dry-run.js";
 import { logger } from "@releases/lib/logger";
 import { renderTable } from "../render/table.js";
 import { promptConfirm, defaultPromptReader } from "../../lib/confirm.js";
-// Reuse the exact session-acquisition machinery `releases keys` uses for its
-// own /v1/api-keys management surface — the device-flow session token, the
-// 401-reauth-and-retry-once wrapper, and the server-message passthrough. This
-// endpoint accepts the SAME login session Bearer token (not a `relu_` key),
-// so there's nothing publish-token-specific to add here.
-import { keysRequest, liveDeps, keysErrorMessage } from "./keys.js";
+// Reuse the exact session-authed request machinery `releases keys` uses for
+// its own /v1/api-keys management surface — the shared `apiFetch` transport,
+// the Idempotency-Key handling, and the server-message passthrough. This
+// endpoint accepts the SAME kind of device-flow session Bearer token (not a
+// `relk_` key), so there's nothing publish-token-specific to add here beyond
+// a distinct approval purpose ("publish-tokens") passed to `withSession`.
+import { keysRequest, keysErrorMessage } from "./keys.js";
 
 const DEFAULT_TOKEN_NAME = "GitHub Actions";
 
@@ -120,11 +122,12 @@ export function registerPublishTokenCommand(program: Command): void {
       }
       let created: CreatedPublishToken;
       try {
-        created = await keysRequest<CreatedPublishToken>(
-          apiUrl,
-          "/v1/me/publish-tokens",
-          { method: "POST", body: JSON.stringify(body) },
-          liveDeps(),
+        created = await withSession(apiUrl, "publish-tokens", (sessionToken) =>
+          keysRequest<CreatedPublishToken>(
+            "/v1/me/publish-tokens",
+            { method: "POST", body: JSON.stringify(body) },
+            sessionToken,
+          ),
         );
       } catch (err) {
         console.error(chalk.red(keysErrorMessage(err)));
@@ -141,11 +144,12 @@ export function registerPublishTokenCommand(program: Command): void {
       const apiUrl = getApiUrl();
       let data: ListPublishTokensResponse | null;
       try {
-        data = await keysRequest<ListPublishTokensResponse | null>(
-          apiUrl,
-          "/v1/me/publish-tokens",
-          { method: "GET" },
-          liveDeps(),
+        data = await withSession(apiUrl, "publish-tokens", (sessionToken) =>
+          keysRequest<ListPublishTokensResponse | null>(
+            "/v1/me/publish-tokens",
+            { method: "GET" },
+            sessionToken,
+          ),
         );
       } catch (err) {
         console.error(chalk.red(keysErrorMessage(err)));
@@ -181,11 +185,12 @@ export function registerPublishTokenCommand(program: Command): void {
       }
       const apiUrl = getApiUrl();
       try {
-        await keysRequest(
-          apiUrl,
-          `/v1/me/publish-tokens/${encodeURIComponent(id)}`,
-          { method: "DELETE" },
-          liveDeps(),
+        await withSession(apiUrl, "publish-tokens", (sessionToken) =>
+          keysRequest(
+            `/v1/me/publish-tokens/${encodeURIComponent(id)}`,
+            { method: "DELETE" },
+            sessionToken,
+          ),
         );
       } catch (err) {
         if (err instanceof ApiError && err.status === 404) {

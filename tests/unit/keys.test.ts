@@ -1,17 +1,14 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "bun:test";
 import { InvalidArgumentError } from "commander";
 import { keysRequest, parseExpiresInDays } from "../../src/cli/commands/keys.js";
-import { ApiError } from "../../src/lib/errors.js";
 
 const BASE = "https://test.example.com";
 
 // keysRequest routes through the shared apiFetch transport, which resolves
-// its base URL from RELEASES_API_URL (see api/core.ts) rather than the
-// `apiUrl` argument passed here (that argument only scopes the session-token
-// storage lookups in KeysRequestDeps). Point the env at BASE so the mocked
-// `fetch` below actually observes the requests. No admin credential is set,
-// so apiFetch's own Authorization header stays out of the way of the
-// session-token Bearer header keysRequest attaches itself.
+// its base URL from RELEASES_API_URL (see api/core.ts). Point the env at
+// BASE so the mocked `fetch` below actually observes the requests. No admin
+// credential is set, so apiFetch's own Authorization header stays out of the
+// way of the session-token Bearer header keysRequest attaches itself.
 const prevEnv: { url?: string; key?: string } = {};
 beforeAll(() => {
   prevEnv.url = process.env.RELEASES_API_URL;
@@ -58,7 +55,7 @@ describe("keysRequest", () => {
     globalThis.fetch = originalFetch;
   });
 
-  it("sends the session token as a Bearer credential", async () => {
+  it("sends the given session token as a Bearer credential", async () => {
     let seenAuth = "";
     globalThis.fetch = (async (_url: string, init?: RequestInit) => {
       seenAuth = String((init?.headers as Record<string, string>)?.authorization ?? "");
@@ -68,84 +65,25 @@ describe("keysRequest", () => {
       });
     }) as unknown as typeof fetch;
 
-    await keysRequest(
-      BASE,
-      "/v1/api-keys",
-      { method: "GET" },
-      {
-        getToken: async () => "sess_tok",
-        onReauth: async () => "sess_tok2",
-      },
-    );
+    await keysRequest("/v1/api-keys", { method: "GET" }, "sess_tok");
     expect(seenAuth).toBe("Bearer sess_tok");
   });
 
-  it("re-auths and retries once on 401", async () => {
-    let call = 0;
-    globalThis.fetch = (async () => {
-      call += 1;
-      if (call === 1)
-        return new Response(JSON.stringify({ error: "unauthorized" }), {
-          status: 401,
-          headers: { "content-type": "application/json" },
-        });
-      return new Response(JSON.stringify({ apiKeys: [] }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      });
-    }) as unknown as typeof fetch;
-
-    let reauthed = false;
-    const result = await keysRequest<{ apiKeys: unknown[] }>(
-      BASE,
-      "/v1/api-keys",
-      { method: "GET" },
-      {
-        getToken: async () => "sess_old",
-        onReauth: async () => {
-          reauthed = true;
-          return "sess_new";
-        },
-      },
-    );
-    expect(reauthed).toBe(true);
-    expect(call).toBe(2);
-    expect(result.apiKeys).toEqual([]);
-  });
-
-  it("does not retry more than once (second 401 surfaces)", async () => {
+  it("surfaces a non-ok response as an ApiError (no retry — there is no stale token to refresh)", async () => {
     let call = 0;
     globalThis.fetch = (async () => {
       call += 1;
       return new Response("{}", { status: 401, headers: { "content-type": "application/json" } });
     }) as unknown as typeof fetch;
 
-    let caught: unknown;
-    try {
-      await keysRequest(
-        BASE,
-        "/v1/api-keys",
-        { method: "GET" },
-        {
-          getToken: async () => "a",
-          onReauth: async () => "b",
-        },
-      );
-    } catch (err) {
-      caught = err;
-    }
-    expect(call).toBe(2);
-    expect(caught).toBeInstanceOf(ApiError);
-    expect((caught as ApiError).status).toBe(401);
+    await expect(keysRequest("/v1/api-keys", { method: "GET" }, "sess_tok")).rejects.toThrow();
+    expect(call).toBe(1);
   });
 
-  it("reuses the same Idempotency-Key across the 401 reauth retry", async () => {
-    const seenKeys: string[] = [];
+  it("attaches an Idempotency-Key on POST", async () => {
+    let seenKey = "";
     globalThis.fetch = (async (_url: string, init?: RequestInit) => {
-      seenKeys.push(String((init?.headers as Record<string, string>)?.["Idempotency-Key"] ?? ""));
-      if (seenKeys.length === 1) {
-        return new Response("{}", { status: 401, headers: { "content-type": "application/json" } });
-      }
+      seenKey = String((init?.headers as Record<string, string>)?.["Idempotency-Key"] ?? "");
       return new Response(JSON.stringify({ id: "key_1" }), {
         status: 200,
         headers: { "content-type": "application/json" },
@@ -153,16 +91,24 @@ describe("keysRequest", () => {
     }) as unknown as typeof fetch;
 
     await keysRequest(
-      BASE,
       "/v1/api-keys",
       { method: "POST", body: JSON.stringify({ name: "x" }) },
-      {
-        getToken: async () => "sess_old",
-        onReauth: async () => "sess_new",
-      },
+      "sess_tok",
     );
-    expect(seenKeys).toHaveLength(2);
-    expect(seenKeys[0]).not.toBe("");
-    expect(seenKeys[0]).toBe(seenKeys[1]);
+    expect(seenKey).not.toBe("");
+  });
+
+  it("does not attach an Idempotency-Key on GET", async () => {
+    let seenKey: string | undefined;
+    globalThis.fetch = (async (_url: string, init?: RequestInit) => {
+      seenKey = (init?.headers as Record<string, string>)?.["Idempotency-Key"];
+      return new Response(JSON.stringify({ apiKeys: [] }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }) as unknown as typeof fetch;
+
+    await keysRequest("/v1/api-keys", { method: "GET" }, "sess_tok");
+    expect(seenKey).toBeUndefined();
   });
 });

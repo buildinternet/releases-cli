@@ -15,10 +15,13 @@ import { logger } from "@releases/lib/logger";
 export interface StoredCredential {
   token: string;
   /**
-   * Device-flow session token, used ONLY for the session-gated /v1/api-keys
-   * management endpoints (the `releases keys` verbs). Broader than `token` — it
-   * can manage the account — so it shares the same 0600 file and is cleared by
-   * `auth logout` / `clearCredential()`.
+   * @deprecated No longer written. A device-flow session token is a
+   * full-account credential (broader than `token` — it can manage the
+   * account), so it is never persisted: `releases login`/`keys`/
+   * `publish-token` establish one, use it, and sign it out in the same
+   * command (see `withSession` in `./session.js`). This field is read-only
+   * tolerance for a credential file saved before that change —
+   * `retireStoredSession()` signs out and strips any value found here.
    */
   sessionToken?: string;
   /**

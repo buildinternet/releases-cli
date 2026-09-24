@@ -1,12 +1,16 @@
 /**
- * RFC 8628 device-authorization client for `releases login`. Plain `fetch`
- * against the API worker's Better Auth handler — no `better-auth` dependency, so
- * the thin client stays thin. The flow: request a device+user code, have the
- * human approve it in a browser, poll for a session access token, then exchange
- * that session for a durable `relu_` API key and hand it back to the caller to
- * store. User keys are READ-ONLY: the server caps the relu_ lane at read
- * (USER_API_KEY_MAX_SCOPE), so there is no scope choice here — login mints a
- * read key that can search and read the catalog but not modify it.
+ * RFC 8628 device-authorization client for `releases login`, `releases keys`,
+ * and `releases publish-token`. Plain `fetch` against the API worker's Better
+ * Auth handler — no `better-auth` dependency, so the thin client stays thin.
+ *
+ * The session token this flow produces is a full-account credential (it can
+ * do anything a signed-in browser can), so it is never written to disk. The
+ * flow: request a device+user code, have the human approve it in a browser,
+ * poll for a session access token, use it for exactly the work at hand, then
+ * sign it out. `releases login` additionally exchanges the session for a
+ * durable, READ-ONLY `relu_` API key before signing out — the server caps
+ * the relu_ lane at read (USER_API_KEY_MAX_SCOPE), so there is no scope
+ * choice there.
  */
 
 // Must match DEVICE_AUTH_CLIENT_ID in @buildinternet/releases-core/api-token — the
@@ -15,6 +19,19 @@
 // the literal in lockstep until then.
 const CLIENT_ID = "releases-cli";
 const GRANT_TYPE = "urn:ietf:params:oauth:grant-type:device_code";
+
+/**
+ * What the browser approval is for — sent as `scope` on the device-code
+ * request so the web approval page can show a purpose-specific description.
+ * The server rejects any other value with a 400 (fail closed).
+ */
+export type DevicePurpose = "login" | "keys" | "publish-tokens";
+
+const PURPOSE_DESCRIPTIONS: Record<DevicePurpose, string> = {
+  login: "Approve in your browser to sign in.",
+  keys: "Approve in your browser to manage your API keys.",
+  "publish-tokens": "Approve in your browser to manage your publish tokens.",
+};
 
 export interface DeviceCodeResponse {
   device_code: string;
@@ -27,14 +44,13 @@ export interface DeviceCodeResponse {
 
 export async function requestDeviceCode(
   apiUrl: string,
+  purpose: DevicePurpose,
   fetchImpl: typeof fetch = fetch,
 ): Promise<DeviceCodeResponse> {
   const res = await fetchImpl(`${apiUrl}/api/auth/device/code`, {
     method: "POST",
     headers: { "content-type": "application/json", "user-agent": CLIENT_ID },
-    // No OAuth scope on the device-grant request: the minted key's scope is fixed
-    // read-only server-side, so there is nothing to request here.
-    body: JSON.stringify({ client_id: CLIENT_ID }),
+    body: JSON.stringify({ client_id: CLIENT_ID, scope: purpose }),
   });
   if (!res.ok) {
     throw new Error(`Could not start device login (HTTP ${res.status}).`);
@@ -181,7 +197,7 @@ export async function createUserApiKey(
 /**
  * Revoke one API key via the session-gated `DELETE /v1/api-keys/:id` — the
  * same delete `releases keys revoke` uses, called with a session token in hand
- * (mid-login or at logout) rather than through the stored-credential lookup.
+ * (mid-login) rather than through a stored-credential lookup.
  */
 export async function revokeUserApiKey(
   apiUrl: string,
@@ -200,8 +216,8 @@ export async function revokeUserApiKey(
 
 /**
  * Best-effort revoke of a key the CLI no longer holds (the one a new login
- * replaced, or the stored one at logout). Never throws: returns the failure
- * message, or null on success, for the caller to print however it prints.
+ * replaced). Never throws: returns the failure message, or null on success,
+ * for the caller to print however it prints.
  */
 export async function revokeKeyQuietly(
   apiUrl: string,
@@ -217,6 +233,64 @@ export async function revokeKeyQuietly(
   }
 }
 
+/**
+ * Best-effort sign-out of a device-flow session (`POST /api/auth/sign-out`).
+ * Never throws: returns the failure message, or null on success. Called in a
+ * `finally` everywhere a session gets established, so a one-shot browser
+ * approval never lingers as a live, revocable session after the command that
+ * needed it is done.
+ */
+export async function signOutSession(
+  apiUrl: string,
+  sessionToken: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<string | null> {
+  try {
+    const res = await fetchImpl(`${apiUrl}/api/auth/sign-out`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${sessionToken}`,
+        "content-type": "application/json",
+        "user-agent": CLIENT_ID,
+      },
+      body: JSON.stringify({}),
+    });
+    if (!res.ok) return `Could not sign out (HTTP ${res.status}).`;
+    return null;
+  } catch (err) {
+    return (err as Error).message;
+  }
+}
+
+export type RevokePresentedKeyResult =
+  | { ok: true; alreadyRevoked: boolean }
+  | { ok: false; error: string };
+
+/**
+ * Self-revoke the presented `relu_` key via `DELETE /v1/tokens/me` — used by
+ * `releases auth logout`, which has the key itself in hand but no session (no
+ * browser approval needed to sign yourself out). A 401 means the key is
+ * already gone (expired, or revoked elsewhere); the caller treats that as a
+ * success-ish outcome, not a failure, and can note it was already revoked.
+ */
+export async function revokePresentedKey(
+  apiUrl: string,
+  key: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<RevokePresentedKeyResult> {
+  try {
+    const res = await fetchImpl(`${apiUrl}/v1/tokens/me`, {
+      method: "DELETE",
+      headers: { authorization: `Bearer ${key}`, "user-agent": CLIENT_ID },
+    });
+    if (res.status === 401) return { ok: true, alreadyRevoked: true };
+    if (!res.ok) return { ok: false, error: `Could not revoke the key (HTTP ${res.status}).` };
+    return { ok: true, alreadyRevoked: false };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message };
+  }
+}
+
 export interface DeviceLoginDeps {
   fetchImpl?: typeof fetch;
   sleep?: (ms: number) => Promise<void>;
@@ -226,20 +300,11 @@ export interface DeviceLoginDeps {
   keyName?: string;
 }
 
-export interface DeviceLoginArgs {
+export interface DeviceAuthArgs {
   apiUrl: string;
+  purpose: DevicePurpose;
   openInBrowser: boolean;
   deps?: DeviceLoginDeps;
-}
-
-export interface DeviceLoginResult {
-  token: string;
-  /** Server-side id of `token` — see `CreatedKey.id`. */
-  id?: string;
-  sessionToken: string;
-  name?: string;
-  scopes?: string[];
-  apiUrl: string;
 }
 
 export interface DeviceAuthResult {
@@ -248,16 +313,18 @@ export interface DeviceAuthResult {
 }
 
 /**
- * Run the RFC 8628 device flow and return the session token only — mints NO key.
- * Used by `releases keys` to (re)establish a session for the management endpoints
- * without polluting the user's key list.
+ * Run the RFC 8628 device flow and return the session token only — mints NO
+ * key. Used by `releases keys`/`releases publish-token` (via `withSession`) to
+ * establish a fresh, one-shot session for the management endpoints, and by
+ * `releases login` as the first step before minting a key.
  */
-export async function runDeviceAuth(args: DeviceLoginArgs): Promise<DeviceAuthResult> {
+export async function runDeviceAuth(args: DeviceAuthArgs): Promise<DeviceAuthResult> {
   const fetchImpl = args.deps?.fetchImpl ?? fetch;
   const print = args.deps?.print ?? ((l: string) => console.log(l));
 
-  const code = await requestDeviceCode(args.apiUrl, fetchImpl);
+  const code = await requestDeviceCode(args.apiUrl, args.purpose, fetchImpl);
 
+  print(PURPOSE_DESCRIPTIONS[args.purpose]);
   print(`\nTo connect the CLI, visit:\n  ${code.verification_uri}`);
   print(`and enter the code:\n  ${code.user_code}\n`);
 
@@ -284,25 +351,63 @@ export async function runDeviceAuth(args: DeviceLoginArgs): Promise<DeviceAuthRe
   return { sessionToken, user };
 }
 
+export interface DeviceLoginResult {
+  token: string;
+  /** Server-side id of `token` — see `CreatedKey.id`. */
+  id?: string;
+  name?: string;
+  scopes?: string[];
+  apiUrl: string;
+}
+
+export interface DeviceLoginArgs {
+  apiUrl: string;
+  openInBrowser: boolean;
+  deps?: DeviceLoginDeps;
+  /**
+   * Called once the key is minted, with the fresh key and the session token
+   * that minted it, so the caller can persist the credential and revoke
+   * whatever it's replacing — all BEFORE the session gets signed out. Order
+   * is always mint → `onMinted` (write, then revoke-previous) → sign-out,
+   * with sign-out in a `finally` so it runs even if minting or `onMinted`
+   * throws.
+   */
+  onMinted: (created: CreatedKey, sessionToken: string) => Promise<void>;
+}
+
 /**
- * Orchestrate the full device-login flow and return a credential payload for the
- * caller to persist. Pure of I/O specifics via injectable deps (fetch, sleep,
- * browser, print) so it's unit-testable. Does NOT write to disk — the command
- * layer owns persistence so storage stays in one place.
+ * Orchestrate the full device-login flow: device auth (purpose "login"), mint
+ * a read-only key, hand it to the caller via `onMinted` to persist (and
+ * revoke whatever it replaced), then always sign the session out. Pure of I/O
+ * specifics via injectable deps (fetch, sleep, browser, print) so it's
+ * unit-testable. Does NOT write to disk itself — `onMinted` owns persistence
+ * so storage stays in one place (`releases login`'s command layer) — and
+ * never hands the session token back to the caller to store.
  */
 export async function runDeviceLogin(args: DeviceLoginArgs): Promise<DeviceLoginResult> {
   const fetchImpl = args.deps?.fetchImpl ?? fetch;
+  const print = args.deps?.print ?? ((l: string) => console.log(l));
   const keyName = args.deps?.keyName ?? "releases-cli";
 
-  const { sessionToken } = await runDeviceAuth(args);
-  const created = await createUserApiKey(args.apiUrl, sessionToken, keyName, fetchImpl);
-
-  return {
-    token: created.key,
-    id: created.id,
-    sessionToken,
-    name: created.name ?? keyName,
-    scopes: [created.scope ?? "read"],
+  const { sessionToken } = await runDeviceAuth({
     apiUrl: args.apiUrl,
-  };
+    purpose: "login",
+    openInBrowser: args.openInBrowser,
+    deps: args.deps,
+  });
+
+  try {
+    const created = await createUserApiKey(args.apiUrl, sessionToken, keyName, fetchImpl);
+    await args.onMinted(created, sessionToken);
+    return {
+      token: created.key,
+      id: created.id,
+      name: created.name ?? keyName,
+      scopes: [created.scope ?? "read"],
+      apiUrl: args.apiUrl,
+    };
+  } finally {
+    const failure = await signOutSession(args.apiUrl, sessionToken, fetchImpl);
+    if (failure) print(`Could not sign out: ${failure}`);
+  }
 }
