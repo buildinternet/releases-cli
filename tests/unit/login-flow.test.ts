@@ -265,53 +265,18 @@ describe("runLoginFlow", () => {
     expect(printed.some((l) => l.includes("Could not revoke the previous key"))).toBe(true);
   });
 
-  it("on the 409 active-key-limit response, prints guidance and fails without a TTY", async () => {
-    const { fetchImpl, calls } = makeFakeFetch((_url, init) => {
-      if (init?.method === "DELETE") throw new Error("should not be called");
-      if (init?.method === undefined || init.method === "GET") {
-        return jsonResponse({
-          apiKeys: [
-            {
-              id: "ak_1",
-              name: "releases-cli (old-host)",
-              start: "relu_ab",
-              scope: "read",
-              enabled: true,
-              remaining: null,
-              lastRequest: null,
-              createdAt: "2026-01-01T00:00:00.000Z",
-              expiresAt: null,
-            },
-            {
-              id: "ak_2",
-              name: "releases-cli (other-host)",
-              start: "relu_cd",
-              scope: "read",
-              enabled: true,
-              remaining: null,
-              lastRequest: "2026-06-01T00:00:00.000Z",
-              createdAt: "2026-02-01T00:00:00.000Z",
-              expiresAt: null,
-            },
-          ],
-        });
-      }
-      // POST create — always over the limit here.
-      return jsonResponse(
+  it("on the 409 active-key-limit response, fails with the way out and writes nothing", async () => {
+    const { fetchImpl, calls } = makeFakeFetch(() =>
+      jsonResponse(
         {
           error: {
             code: "api_key_limit",
-            message: "API key limit reached (max 5 active keys). Revoke one and try again.",
+            message: "API key limit reached (max 25 active keys). Revoke one and try again.",
           },
         },
         409,
-      );
-    });
-
-    const printed: string[] = [];
-    // Simulates a non-TTY caller: the reader never resolves to a confirming
-    // answer, exactly like `defaultPromptReader` on a piped/non-TTY stdin.
-    const nonTtyReader = async () => null;
+      ),
+    );
 
     await expect(
       runLoginFlow({
@@ -321,74 +286,14 @@ describe("runLoginFlow", () => {
         deps: {
           fetchImpl,
           sleep: async () => {},
-          print: (l) => printed.push(l),
-          promptReader: nonTtyReader,
+          print: () => {},
           readCredential: () => null,
           writeCredential: () => {
             throw new Error("writeCredential should not be reached");
           },
         },
       }),
-    ).rejects.toThrow(/limit reached/i);
-
+    ).rejects.toThrow(/limit reached.*releases keys list.*releases keys revoke <id>/is);
     expect(calls.some((c) => c.method === "DELETE")).toBe(false);
-    const out = printed.join("\n");
-    expect(out).toMatch(/active API key/i);
-    expect(out).toContain("releases keys list");
-    expect(out).toContain("releases keys revoke <id>");
-    // Oldest never-used CLI key is surfaced by id.
-    expect(out).toContain("ak_1");
-  });
-
-  it("on the 409 response, offers to revoke the oldest unused key and retries once when confirmed", async () => {
-    let mintCount = 0;
-    const { fetchImpl, calls } = makeFakeFetch((_url, init) => {
-      if (init?.method === "DELETE") return new Response(null, { status: 204 });
-      if (init?.method === undefined || init.method === "GET") {
-        return jsonResponse({
-          apiKeys: [
-            {
-              id: "ak_1",
-              name: "releases-cli (old-host)",
-              start: "relu_ab",
-              scope: "read",
-              enabled: true,
-              remaining: null,
-              lastRequest: null,
-              createdAt: "2026-01-01T00:00:00.000Z",
-              expiresAt: null,
-            },
-          ],
-        });
-      }
-      mintCount += 1;
-      if (mintCount === 1) {
-        return jsonResponse({ error: { code: "api_key_limit", message: "limit reached" } }, 409);
-      }
-      return jsonResponse({ key: "relu_new", id: "ak_new", name: "n", scope: "read" }, 201);
-    });
-
-    const printed: string[] = [];
-    const confirmingReader = async (_q: string) => "ak_1";
-
-    const cred = await runLoginFlow({
-      apiUrl: BASE,
-      openInBrowser: false,
-      keyName: "releases-cli (host)",
-      deps: {
-        fetchImpl,
-        sleep: async () => {},
-        print: (l) => printed.push(l),
-        promptReader: confirmingReader,
-        readCredential: () => null,
-        writeCredential: () => {},
-      },
-    });
-
-    expect(mintCount).toBe(2);
-    expect(cred.keyId).toBe("ak_new");
-    expect(calls.some((c) => c.method === "DELETE" && c.url.endsWith("/v1/api-keys/ak_1"))).toBe(
-      true,
-    );
   });
 });

@@ -5,9 +5,8 @@ import {
   runDeviceLogin,
   runDeviceAuth,
   createUserApiKey,
-  listUserApiKeys,
   revokeUserApiKey,
-  ApiKeyLimitError,
+  revokeKeyQuietly,
 } from "../../src/lib/device-auth.js";
 
 const BASE = "https://test.example.com";
@@ -270,56 +269,37 @@ describe("createUserApiKey", () => {
     await expect(createUserApiKey(BASE, "sess_tok", "name", fakeFetch)).rejects.toThrow(/HTTP 500/);
   });
 
-  it("throws ApiKeyLimitError on a 409 api_key_limit response", async () => {
+  it("turns the 409 key-limit response into a message with the way out", async () => {
     const fakeFetch = (async () =>
       new Response(
         JSON.stringify({
           error: {
             code: "api_key_limit",
-            message: "API key limit reached (max 5 active keys). Revoke one and try again.",
+            message: "API key limit reached (max 25 active keys). Revoke one and try again.",
           },
         }),
         { status: 409, headers: { "content-type": "application/json" } },
       )) as unknown as typeof fetch;
 
-    const err = await createUserApiKey(BASE, "sess_tok", "name", fakeFetch).catch((e) => e);
-    expect(err).toBeInstanceOf(ApiKeyLimitError);
-    expect((err as Error).message).toMatch(/limit reached/i);
+    const err = (await createUserApiKey(BASE, "sess_tok", "name", fakeFetch).catch(
+      (e) => e,
+    )) as Error;
+    expect(err.message).toMatch(/limit reached/i);
+    expect(err.message).toContain("releases keys revoke <id>");
   });
 
-  it("throws a plain Error on a 409 that isn't the key-limit code (e.g. idempotency conflict)", async () => {
+  it("keeps the plain message on a 409 that isn't the key-limit code (e.g. idempotency conflict)", async () => {
     const fakeFetch = (async () =>
       new Response(JSON.stringify({ error: { code: "idempotency_conflict" } }), {
         status: 409,
         headers: { "content-type": "application/json" },
       })) as unknown as typeof fetch;
 
-    const err = await createUserApiKey(BASE, "sess_tok", "name", fakeFetch).catch((e) => e);
-    expect(err).not.toBeInstanceOf(ApiKeyLimitError);
-    expect(err).toBeInstanceOf(Error);
-  });
-});
-
-describe("listUserApiKeys", () => {
-  it("returns the apiKeys array from the envelope", async () => {
-    let seenAuth = "";
-    const fakeFetch = (async (_url: string, init?: RequestInit) => {
-      seenAuth = String((init?.headers as Record<string, string>)?.authorization ?? "");
-      return new Response(
-        JSON.stringify({ apiKeys: [{ id: "ak_1", name: "releases-cli (host)" }] }),
-        { status: 200, headers: { "content-type": "application/json" } },
-      );
-    }) as unknown as typeof fetch;
-
-    const keys = await listUserApiKeys(BASE, "sess_tok", fakeFetch);
-    expect(keys).toHaveLength(1);
-    expect(keys[0]?.id).toBe("ak_1");
-    expect(seenAuth).toBe("Bearer sess_tok");
-  });
-
-  it("throws on a non-ok response", async () => {
-    const fakeFetch = (async () => new Response("{}", { status: 500 })) as unknown as typeof fetch;
-    await expect(listUserApiKeys(BASE, "sess_tok", fakeFetch)).rejects.toThrow(/HTTP 500/);
+    const err = (await createUserApiKey(BASE, "sess_tok", "name", fakeFetch).catch(
+      (e) => e,
+    )) as Error;
+    expect(err.message).toMatch(/HTTP 409/);
+    expect(err.message).not.toContain("releases keys revoke");
   });
 });
 
@@ -344,5 +324,14 @@ describe("revokeUserApiKey", () => {
   it("throws on a non-ok response", async () => {
     const fakeFetch = (async () => new Response("{}", { status: 404 })) as unknown as typeof fetch;
     await expect(revokeUserApiKey(BASE, "sess_tok", "ak_1", fakeFetch)).rejects.toThrow(/HTTP 404/);
+  });
+});
+
+describe("revokeKeyQuietly", () => {
+  it("returns null on success and the failure message instead of throwing", async () => {
+    const ok = (async () => new Response(null, { status: 204 })) as unknown as typeof fetch;
+    const bad = (async () => new Response("{}", { status: 404 })) as unknown as typeof fetch;
+    expect(await revokeKeyQuietly(BASE, "sess_tok", "ak_1", ok)).toBeNull();
+    expect(await revokeKeyQuietly(BASE, "sess_tok", "ak_1", bad)).toMatch(/HTTP 404/);
   });
 });

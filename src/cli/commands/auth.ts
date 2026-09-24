@@ -10,7 +10,7 @@ import {
   clearCredential,
   type StoredCredential,
 } from "../../lib/credentials.js";
-import { revokeUserApiKey } from "../../lib/device-auth.js";
+import { revokeKeyQuietly } from "../../lib/device-auth.js";
 import { hiddenPromptReader } from "../../lib/prompt-hidden.js";
 import type { PromptReader } from "../../lib/confirm.js";
 import { writeJson } from "../../lib/output.js";
@@ -155,12 +155,9 @@ export function registerAuthCommand(parent: Command): void {
       // act with. Never fatal: local logout must always succeed.
       const stored = readCredential();
       if (stored?.keyId && stored.sessionToken) {
-        try {
-          await revokeUserApiKey(stored.apiUrl, stored.sessionToken, stored.keyId);
-        } catch (err) {
-          console.error(
-            chalk.dim(`Could not revoke the stored key server-side: ${(err as Error).message}`),
-          );
+        const failure = await revokeKeyQuietly(stored.apiUrl, stored.sessionToken, stored.keyId);
+        if (failure) {
+          console.error(chalk.dim(`Could not revoke the stored key server-side: ${failure}`));
         }
       }
       const removed = clearCredential();

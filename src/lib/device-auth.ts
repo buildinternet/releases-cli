@@ -9,8 +9,6 @@
  * read key that can search and read the catalog but not modify it.
  */
 
-import type { UserApiKey, ListUserApiKeysResponse } from "@buildinternet/releases-api-types";
-
 // Must match DEVICE_AUTH_CLIENT_ID in @buildinternet/releases-core/api-token — the
 // worker's validateClient allow-list rejects any other client_id (fail closed).
 // Hard-coded until a published core version exposing that constant is adopted; keep
@@ -137,20 +135,6 @@ export interface CreatedKey {
 }
 
 /**
- * Thrown by `createUserApiKey` when the server refuses the mint with its
- * active-key cap (409 `api_key_limit`, `USER_API_KEY_MAX_ACTIVE` in the
- * monorepo). Distinguished from a plain mint failure so callers (`releases
- * login`) can offer a way forward — list keys, revoke one, retry — instead of
- * just failing.
- */
-export class ApiKeyLimitError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ApiKeyLimitError";
-  }
-}
-
-/**
  * Exchange the device-flow session for a durable `relu_` API key. Hits the API
  * worker's own `/v1/api-keys` route — the SAME surface the web panel uses, NOT
  * Better Auth's raw `/api/auth/api-key/create` — so the server injects the owner,
@@ -179,8 +163,14 @@ export async function createUserApiKey(
       const body = (await res.json().catch(() => null)) as {
         error?: { code?: string; message?: string };
       } | null;
+      // The server's active-key cap. Every mint path surfaces this message,
+      // so it carries the way out rather than a bare status code.
       if (body?.error?.code === "api_key_limit") {
-        throw new ApiKeyLimitError(body.error?.message ?? "Active user API key limit reached.");
+        throw new Error(
+          `${body.error?.message ?? "API key limit reached."} ` +
+            "See your keys with `releases keys list`, revoke unused ones with " +
+            "`releases keys revoke <id>`, then sign in again.",
+        );
       }
     }
     throw new Error(`Login succeeded but issuing an API key failed (HTTP ${res.status}).`);
@@ -189,31 +179,9 @@ export async function createUserApiKey(
 }
 
 /**
- * List the signed-in user's API keys via the session-gated `GET /v1/api-keys`
- * — the same read `releases keys list` uses, called here with the device-flow
- * session token directly (no stored-credential lookup) so it can run
- * mid-login, before any credential has been written.
- */
-export async function listUserApiKeys(
-  apiUrl: string,
-  sessionToken: string,
-  fetchImpl: typeof fetch = fetch,
-): Promise<UserApiKey[]> {
-  const res = await fetchImpl(`${apiUrl}/v1/api-keys`, {
-    headers: { authorization: `Bearer ${sessionToken}`, "user-agent": CLIENT_ID },
-  });
-  if (!res.ok) {
-    throw new Error(`Could not list API keys (HTTP ${res.status}).`);
-  }
-  const data = (await res.json().catch(() => null)) as ListUserApiKeysResponse | null;
-  return data?.apiKeys ?? [];
-}
-
-/**
  * Revoke one API key via the session-gated `DELETE /v1/api-keys/:id` — the
- * same delete `releases keys revoke` uses. Used both by `releases login` (to
- * drop the key it's replacing, and to free up room under the active-key cap)
- * and `releases auth logout` (to revoke server-side, best-effort).
+ * same delete `releases keys revoke` uses, called with a session token in hand
+ * (mid-login or at logout) rather than through the stored-credential lookup.
  */
 export async function revokeUserApiKey(
   apiUrl: string,
@@ -227,6 +195,25 @@ export async function revokeUserApiKey(
   });
   if (!res.ok) {
     throw new Error(`Could not revoke API key ${id} (HTTP ${res.status}).`);
+  }
+}
+
+/**
+ * Best-effort revoke of a key the CLI no longer holds (the one a new login
+ * replaced, or the stored one at logout). Never throws: returns the failure
+ * message, or null on success, for the caller to print however it prints.
+ */
+export async function revokeKeyQuietly(
+  apiUrl: string,
+  sessionToken: string,
+  id: string,
+  fetchImpl?: typeof fetch,
+): Promise<string | null> {
+  try {
+    await revokeUserApiKey(apiUrl, sessionToken, id, fetchImpl);
+    return null;
+  } catch (err) {
+    return (err as Error).message;
   }
 }
 
