@@ -12,14 +12,14 @@ import {
 import { openBrowser } from "../../lib/open-browser.js";
 import { retireStoredSession } from "../../lib/session.js";
 import {
-  runDeviceLogin,
+  runDeviceAuth,
+  createUserApiKey,
   revokeKeyQuietly,
   signOutSession,
-  type CreatedKey,
   type DeviceLoginDeps,
 } from "../../lib/device-auth.js";
 
-export interface LoginFlowDeps extends Omit<DeviceLoginDeps, "keyName"> {
+export interface LoginFlowDeps extends DeviceLoginDeps {
   readCredential?: () => StoredCredential | null;
   writeCredential?: (cred: StoredCredential) => void;
 }
@@ -33,75 +33,69 @@ export interface LoginFlowArgs {
 }
 
 /**
- * `releases login`: device-authorize and mint a fresh read key, persist it
- * (WITHOUT the session token — that's a full-account credential and is never
- * written to disk), then revoke the key the PREVIOUS credential for this same
- * apiUrl pointed at, then sign the session out. The revoke runs only after
- * the new key is minted and stored, so a failed login never leaves the user
- * keyless; the sign-out always runs last (in a `finally` inside
- * `runDeviceLogin`), even if minting or the revoke fails. The revoke is
- * best-effort: a failure prints a dim note and never fails the login. A
- * credential with no `keyId` (saved before #418, or via `auth login`) is left
- * alone rather than guessed at.
+ * `releases login`: device-authorize, mint a fresh read key, persist it
+ * WITHOUT the session token (a full-account credential that never touches
+ * disk), revoke the key the PREVIOUS credential for this same apiUrl pointed
+ * at, then sign the session out. The revoke runs only after the new key is
+ * stored, so a failed login never leaves the user keyless, and it's
+ * best-effort. The sign-out is in a `finally`, so it runs even when minting,
+ * the write, or the revoke fails. A credential with no `keyId` (saved before
+ * #418, or via `auth login`) is left alone rather than guessed at.
  */
 export async function runLoginFlow(args: LoginFlowArgs): Promise<StoredCredential> {
   const { readCredential = readCredentialFromDisk, writeCredential = writeCredentialToDisk } =
     args.deps ?? {};
+  const fetchImpl = args.deps?.fetchImpl ?? fetch;
   const print = args.deps?.print ?? ((l: string) => console.log(l));
 
   await retireStoredSession({
     print,
     readCredential,
     writeCredential,
-    signOut: (apiUrl, sessionToken) => signOutSession(apiUrl, sessionToken, args.deps?.fetchImpl),
+    signOut: (apiUrl, sessionToken) => signOutSession(apiUrl, sessionToken, fetchImpl),
   });
 
   const previous = readCredential();
-  let cred: StoredCredential | null = null;
-
-  await runDeviceLogin({
+  const { sessionToken } = await runDeviceAuth({
     apiUrl: args.apiUrl,
+    purpose: "login",
     openInBrowser: args.openInBrowser,
-    deps: { ...args.deps, print, keyName: args.keyName },
-    onMinted: async (created: CreatedKey, sessionToken: string) => {
-      cred = {
-        token: created.key,
-        keyId: created.id,
-        name: created.name ?? args.keyName,
-        scopes: [created.scope ?? "read"],
-        apiUrl: args.apiUrl,
-        savedAt: new Date().toISOString(),
-      };
-      writeCredential(cred);
-
-      print(
-        `${chalk.green("Signed in")} ${chalk.dim(`(scopes: ${(cred.scopes ?? []).join(", ")})`)}`,
-      );
-      print(chalk.dim(`  Saved to ${join(getDataDir(), "credentials")}`));
-
-      const replaced = previous?.apiUrl === args.apiUrl ? previous.keyId : undefined;
-      if (replaced && replaced !== created.id) {
-        const failure = await revokeKeyQuietly(
-          args.apiUrl,
-          sessionToken,
-          replaced,
-          args.deps?.fetchImpl,
-        );
-        print(
-          chalk.dim(
-            failure
-              ? `  Could not revoke the previous key (${replaced}): ${failure}`
-              : `  Revoked previous key ${replaced}.`,
-          ),
-        );
-      }
-    },
+    deps: { ...args.deps, print },
   });
 
-  // `onMinted` always runs (and sets `cred`) before `runDeviceLogin` resolves
-  // successfully — it only fails to run when minting itself throws, which
-  // propagates out of `runDeviceLogin` and never reaches this line.
-  return cred!;
+  try {
+    const created = await createUserApiKey(args.apiUrl, sessionToken, args.keyName, fetchImpl);
+    const cred: StoredCredential = {
+      token: created.key,
+      keyId: created.id,
+      name: created.name ?? args.keyName,
+      scopes: [created.scope ?? "read"],
+      apiUrl: args.apiUrl,
+      savedAt: new Date().toISOString(),
+    };
+    writeCredential(cred);
+
+    print(
+      `${chalk.green("Signed in")} ${chalk.dim(`(scopes: ${(cred.scopes ?? []).join(", ")})`)}`,
+    );
+    print(chalk.dim(`  Saved to ${join(getDataDir(), "credentials")}`));
+
+    const replaced = previous?.apiUrl === args.apiUrl ? previous.keyId : undefined;
+    if (replaced && replaced !== created.id) {
+      const failure = await revokeKeyQuietly(args.apiUrl, sessionToken, replaced, fetchImpl);
+      print(
+        chalk.dim(
+          failure
+            ? `  Could not revoke the previous key (${replaced}): ${failure}`
+            : `  Revoked previous key ${replaced}.`,
+        ),
+      );
+    }
+    return cred;
+  } finally {
+    const failure = await signOutSession(args.apiUrl, sessionToken, fetchImpl);
+    if (failure) print(chalk.dim(`  Could not sign out: ${failure}`));
+  }
 }
 
 export function registerLoginCommand(program: Command): void {

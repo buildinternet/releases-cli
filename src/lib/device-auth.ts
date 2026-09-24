@@ -296,8 +296,6 @@ export interface DeviceLoginDeps {
   sleep?: (ms: number) => Promise<void>;
   openBrowser?: (url: string) => boolean;
   print?: (line: string) => void;
-  /** Name recorded on the minted key (defaults to `releases-cli (<hostname>)`). */
-  keyName?: string;
 }
 
 export interface DeviceAuthArgs {
@@ -349,65 +347,4 @@ export async function runDeviceAuth(args: DeviceAuthArgs): Promise<DeviceAuthRes
   if (user) print(`Authorized as ${user.name ?? user.email}.`);
 
   return { sessionToken, user };
-}
-
-export interface DeviceLoginResult {
-  token: string;
-  /** Server-side id of `token` — see `CreatedKey.id`. */
-  id?: string;
-  name?: string;
-  scopes?: string[];
-  apiUrl: string;
-}
-
-export interface DeviceLoginArgs {
-  apiUrl: string;
-  openInBrowser: boolean;
-  deps?: DeviceLoginDeps;
-  /**
-   * Called once the key is minted, with the fresh key and the session token
-   * that minted it, so the caller can persist the credential and revoke
-   * whatever it's replacing — all BEFORE the session gets signed out. Order
-   * is always mint → `onMinted` (write, then revoke-previous) → sign-out,
-   * with sign-out in a `finally` so it runs even if minting or `onMinted`
-   * throws.
-   */
-  onMinted: (created: CreatedKey, sessionToken: string) => Promise<void>;
-}
-
-/**
- * Orchestrate the full device-login flow: device auth (purpose "login"), mint
- * a read-only key, hand it to the caller via `onMinted` to persist (and
- * revoke whatever it replaced), then always sign the session out. Pure of I/O
- * specifics via injectable deps (fetch, sleep, browser, print) so it's
- * unit-testable. Does NOT write to disk itself — `onMinted` owns persistence
- * so storage stays in one place (`releases login`'s command layer) — and
- * never hands the session token back to the caller to store.
- */
-export async function runDeviceLogin(args: DeviceLoginArgs): Promise<DeviceLoginResult> {
-  const fetchImpl = args.deps?.fetchImpl ?? fetch;
-  const print = args.deps?.print ?? ((l: string) => console.log(l));
-  const keyName = args.deps?.keyName ?? "releases-cli";
-
-  const { sessionToken } = await runDeviceAuth({
-    apiUrl: args.apiUrl,
-    purpose: "login",
-    openInBrowser: args.openInBrowser,
-    deps: args.deps,
-  });
-
-  try {
-    const created = await createUserApiKey(args.apiUrl, sessionToken, keyName, fetchImpl);
-    await args.onMinted(created, sessionToken);
-    return {
-      token: created.key,
-      id: created.id,
-      name: created.name ?? keyName,
-      scopes: [created.scope ?? "read"],
-      apiUrl: args.apiUrl,
-    };
-  } finally {
-    const failure = await signOutSession(args.apiUrl, sessionToken, fetchImpl);
-    if (failure) print(`Could not sign out: ${failure}`);
-  }
 }

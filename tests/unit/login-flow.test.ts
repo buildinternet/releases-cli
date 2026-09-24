@@ -407,4 +407,73 @@ describe("runLoginFlow", () => {
 
     expect(retiredWith).toBe("Bearer legacy_sess");
   });
+
+  it("signs the session out even when minting fails", async () => {
+    const { fetchImpl, calls } = makeFakeFetch(() =>
+      jsonResponse({ error: { code: "internal_error" } }, 500),
+    );
+    await expect(
+      runLoginFlow({
+        apiUrl: BASE,
+        openInBrowser: false,
+        keyName: "releases-cli (host)",
+        deps: {
+          fetchImpl,
+          sleep: async () => {},
+          print: () => {},
+          readCredential: () => null,
+          writeCredential: () => {},
+        },
+      }),
+    ).rejects.toThrow(/HTTP 500/);
+    expect(calls.at(-1)?.url).toBe(`${BASE}/api/auth/sign-out`);
+  });
+
+  it("signs the session out even when storing the key fails", async () => {
+    const { fetchImpl, calls } = makeFakeFetch(() =>
+      jsonResponse({ key: "relu_new", id: "ak_new", name: "n", scope: "read" }, 201),
+    );
+    await expect(
+      runLoginFlow({
+        apiUrl: BASE,
+        openInBrowser: false,
+        keyName: "releases-cli (host)",
+        deps: {
+          fetchImpl,
+          sleep: async () => {},
+          print: () => {},
+          readCredential: () => null,
+          writeCredential: () => {
+            throw new Error("disk full");
+          },
+        },
+      }),
+    ).rejects.toThrow(/disk full/);
+    expect(calls.at(-1)?.url).toBe(`${BASE}/api/auth/sign-out`);
+  });
+
+  it("still succeeds, with a note, when the sign-out itself fails", async () => {
+    const { fetchImpl: inner } = makeFakeFetch(() =>
+      jsonResponse({ key: "relu_new", id: "ak_new", name: "n", scope: "read" }, 201),
+    );
+    const fetchImpl = (async (url: string, init?: RequestInit) =>
+      String(url).endsWith("/api/auth/sign-out")
+        ? new Response(null, { status: 500 })
+        : inner(url, init)) as unknown as typeof fetch;
+    const printed: string[] = [];
+    const cred = await runLoginFlow({
+      apiUrl: BASE,
+      openInBrowser: false,
+      keyName: "releases-cli (host)",
+      deps: {
+        fetchImpl,
+        sleep: async () => {},
+        print: (l) => printed.push(l),
+        readCredential: () => null,
+        writeCredential: () => {},
+      },
+    });
+    expect(cred.token).toBe("relu_new");
+    expect(printed.some((l) => l.includes("Could not sign out"))).toBe(true);
+  });
 });
