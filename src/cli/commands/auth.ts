@@ -4,7 +4,13 @@ import { join } from "node:path";
 import { getDataDir } from "@releases/lib/config";
 import { legacyEnv } from "@releases/lib/legacy-env";
 import { getApiUrl, resolveCredential } from "../../lib/mode.js";
-import { writeCredential, clearCredential, type StoredCredential } from "../../lib/credentials.js";
+import {
+  writeCredential,
+  readCredential,
+  clearCredential,
+  type StoredCredential,
+} from "../../lib/credentials.js";
+import { revokeKeyQuietly } from "../../lib/device-auth.js";
 import { hiddenPromptReader } from "../../lib/prompt-hidden.js";
 import type { PromptReader } from "../../lib/confirm.js";
 import { writeJson } from "../../lib/output.js";
@@ -143,7 +149,17 @@ export function registerAuthCommand(parent: Command): void {
   auth
     .command("logout")
     .description("Remove the stored API token")
-    .action(() => {
+    .action(async () => {
+      // Best-effort server-side revoke of the key `releases login` minted —
+      // only possible when we know its id and still hold a session token to
+      // act with. Never fatal: local logout must always succeed.
+      const stored = readCredential();
+      if (stored?.keyId && stored.sessionToken) {
+        const failure = await revokeKeyQuietly(stored.apiUrl, stored.sessionToken, stored.keyId);
+        if (failure) {
+          console.error(chalk.dim(`Could not revoke the stored key server-side: ${failure}`));
+        }
+      }
       const removed = clearCredential();
       if (legacyEnv("RELEASES_API_KEY", "RELEASED_API_KEY")) {
         console.log(

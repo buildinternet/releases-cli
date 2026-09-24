@@ -127,6 +127,8 @@ export async function getSessionUser(
 
 export interface CreatedKey {
   key: string;
+  /** Server-side id of the minted key — absent only if an old server predates it. */
+  id?: string;
   name?: string | null;
   /** Ladder label the server granted — "read" for the user lane today. */
   scope?: string;
@@ -157,9 +159,62 @@ export async function createUserApiKey(
     body: JSON.stringify({ name, scope: "read" }),
   });
   if (!res.ok) {
+    if (res.status === 409) {
+      const body = (await res.json().catch(() => null)) as {
+        error?: { code?: string; message?: string };
+      } | null;
+      // The server's active-key cap. Every mint path surfaces this message,
+      // so it carries the way out rather than a bare status code.
+      if (body?.error?.code === "api_key_limit") {
+        throw new Error(
+          `${body.error?.message ?? "API key limit reached."} ` +
+            "See your keys with `releases keys list`, revoke unused ones with " +
+            "`releases keys revoke <id>`, then sign in again.",
+        );
+      }
+    }
     throw new Error(`Login succeeded but issuing an API key failed (HTTP ${res.status}).`);
   }
   return (await res.json()) as CreatedKey;
+}
+
+/**
+ * Revoke one API key via the session-gated `DELETE /v1/api-keys/:id` — the
+ * same delete `releases keys revoke` uses, called with a session token in hand
+ * (mid-login or at logout) rather than through the stored-credential lookup.
+ */
+export async function revokeUserApiKey(
+  apiUrl: string,
+  sessionToken: string,
+  id: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<void> {
+  const res = await fetchImpl(`${apiUrl}/v1/api-keys/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: { authorization: `Bearer ${sessionToken}`, "user-agent": CLIENT_ID },
+  });
+  if (!res.ok) {
+    throw new Error(`Could not revoke API key ${id} (HTTP ${res.status}).`);
+  }
+}
+
+/**
+ * Best-effort revoke of a key the CLI no longer holds (the one a new login
+ * replaced, or the stored one at logout). Never throws: returns the failure
+ * message, or null on success, for the caller to print however it prints.
+ */
+export async function revokeKeyQuietly(
+  apiUrl: string,
+  sessionToken: string,
+  id: string,
+  fetchImpl?: typeof fetch,
+): Promise<string | null> {
+  try {
+    await revokeUserApiKey(apiUrl, sessionToken, id, fetchImpl);
+    return null;
+  } catch (err) {
+    return (err as Error).message;
+  }
 }
 
 export interface DeviceLoginDeps {
@@ -179,6 +234,8 @@ export interface DeviceLoginArgs {
 
 export interface DeviceLoginResult {
   token: string;
+  /** Server-side id of `token` — see `CreatedKey.id`. */
+  id?: string;
   sessionToken: string;
   name?: string;
   scopes?: string[];
@@ -242,6 +299,7 @@ export async function runDeviceLogin(args: DeviceLoginArgs): Promise<DeviceLogin
 
   return {
     token: created.key,
+    id: created.id,
     sessionToken,
     name: created.name ?? keyName,
     scopes: [created.scope ?? "read"],
