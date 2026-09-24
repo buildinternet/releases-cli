@@ -74,8 +74,13 @@ export async function keysRequest<T>(
   }
 }
 
-/** Production deps: stored token, and a re-auth that clears the stale one first. */
-function liveDeps(): KeysRequestDeps {
+/**
+ * Production deps: stored token, and a re-auth that clears the stale one
+ * first. Generic over any `/v1/me/*` session-authed surface — exported so
+ * other session-authed commands (e.g. `publish-token`) reuse the exact same
+ * device-flow session acquisition instead of reimplementing it.
+ */
+export function liveDeps(): KeysRequestDeps {
   return {
     getToken: (apiUrl) => getSessionToken(apiUrl),
     onReauth: async (apiUrl) => {
@@ -87,8 +92,9 @@ function liveDeps(): KeysRequestDeps {
 
 /** apiFetch/ApiError already resolve the standardized error envelope (and the
  * 409 idempotency-conflict message) into a clean human message — surface
- * that directly rather than re-deriving it. */
-function keysErrorMessage(err: unknown): string {
+ * that directly rather than re-deriving it. Exported for reuse by other
+ * session-authed commands (e.g. `publish-token`). */
+export function keysErrorMessage(err: unknown): string {
   if (err instanceof ApiError) return err.serverMessage;
   return err instanceof Error ? err.message : String(err);
 }
