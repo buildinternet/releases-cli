@@ -6,18 +6,20 @@ import type {
   ListPublishTokensResponse,
 } from "@buildinternet/releases-api-types";
 import { getApiUrl } from "../../lib/mode.js";
+import { withSession } from "../../lib/session.js";
 import { ApiError } from "../../lib/errors.js";
 import { writeJson } from "../../lib/output.js";
 import { markDryRun } from "../../lib/dry-run.js";
 import { logger } from "@releases/lib/logger";
 import { renderTable } from "../render/table.js";
 import { promptConfirm, defaultPromptReader } from "../../lib/confirm.js";
-// Reuse the exact session-acquisition machinery `releases keys` uses for its
-// own /v1/api-keys management surface — the device-flow session token, the
-// 401-reauth-and-retry-once wrapper, and the server-message passthrough. This
-// endpoint accepts the SAME login session Bearer token (not a `relu_` key),
-// so there's nothing publish-token-specific to add here.
-import { keysRequest, liveDeps, keysErrorMessage } from "./keys.js";
+// Reuse the exact session-authed request machinery `releases keys` uses for
+// its own /v1/api-keys management surface — the shared `apiFetch` transport,
+// the Idempotency-Key handling, and the server-message passthrough. This
+// endpoint accepts the SAME kind of device-flow session Bearer token (not a
+// `relk_` key), so there's nothing publish-token-specific to add here beyond
+// a distinct approval purpose ("publish-tokens") passed to `withSession`.
+import { keysRequest, keysErrorMessage } from "./keys.js";
 
 const DEFAULT_TOKEN_NAME = "GitHub Actions";
 
@@ -107,45 +109,65 @@ export function registerPublishTokenCommand(program: Command): void {
     .option("--name <name>", "Label for the token", DEFAULT_TOKEN_NAME)
     .option("--json", "Output as JSON")
     .option("--dry-run", "Show what would be created without minting a token")
-    .action(async (opts: { source: string; name: string; json?: boolean; dryRun?: boolean }) => {
-      const apiUrl = getApiUrl();
-      const body = { sourceId: opts.source, name: opts.name };
-      if (opts.dryRun) {
-        if (opts.json) {
-          await writeJson(markDryRun({ wouldCreate: body }));
+    .option("--no-browser", "Print the device-approval URL instead of opening a browser")
+    .action(
+      async (opts: {
+        source: string;
+        name: string;
+        json?: boolean;
+        dryRun?: boolean;
+        browser?: boolean;
+      }) => {
+        const apiUrl = getApiUrl();
+        const body = { sourceId: opts.source, name: opts.name };
+        if (opts.dryRun) {
+          if (opts.json) {
+            await writeJson(markDryRun({ wouldCreate: body }));
+            return;
+          }
+          logger.warn(`[dry-run] Would create publish token "${opts.name}" for ${opts.source}.`);
           return;
         }
-        logger.warn(`[dry-run] Would create publish token "${opts.name}" for ${opts.source}.`);
-        return;
-      }
-      let created: CreatedPublishToken;
-      try {
-        created = await keysRequest<CreatedPublishToken>(
-          apiUrl,
-          "/v1/me/publish-tokens",
-          { method: "POST", body: JSON.stringify(body) },
-          liveDeps(),
-        );
-      } catch (err) {
-        console.error(chalk.red(keysErrorMessage(err)));
-        process.exit(1);
-      }
-      await printCreatedPublishToken(created, opts.json);
-    });
+        let created: CreatedPublishToken;
+        try {
+          created = await withSession(
+            apiUrl,
+            "publish-tokens",
+            (sessionToken) =>
+              keysRequest<CreatedPublishToken>(
+                "/v1/me/publish-tokens",
+                { method: "POST", body: JSON.stringify(body) },
+                sessionToken,
+              ),
+            { openInBrowser: opts.browser !== false },
+          );
+        } catch (err) {
+          console.error(chalk.red(keysErrorMessage(err)));
+          process.exit(1);
+        }
+        await printCreatedPublishToken(created, opts.json);
+      },
+    );
 
   publishToken
     .command("list")
     .description("List your publish tokens")
     .option("--json", "Output as JSON")
-    .action(async (opts: { json?: boolean }) => {
+    .option("--no-browser", "Print the device-approval URL instead of opening a browser")
+    .action(async (opts: { json?: boolean; browser?: boolean }) => {
       const apiUrl = getApiUrl();
       let data: ListPublishTokensResponse | null;
       try {
-        data = await keysRequest<ListPublishTokensResponse | null>(
+        data = await withSession(
           apiUrl,
-          "/v1/me/publish-tokens",
-          { method: "GET" },
-          liveDeps(),
+          "publish-tokens",
+          (sessionToken) =>
+            keysRequest<ListPublishTokensResponse | null>(
+              "/v1/me/publish-tokens",
+              { method: "GET" },
+              sessionToken,
+            ),
+          { openInBrowser: opts.browser !== false },
         );
       } catch (err) {
         console.error(chalk.red(keysErrorMessage(err)));
@@ -163,7 +185,8 @@ export function registerPublishTokenCommand(program: Command): void {
     .description("Revoke a publish token by id")
     .option("--yes", "Skip the confirmation prompt")
     .option("--dry-run", "Show what would be revoked without deleting")
-    .action(async (id: string, opts: { yes?: boolean; dryRun?: boolean }) => {
+    .option("--no-browser", "Print the device-approval URL instead of opening a browser")
+    .action(async (id: string, opts: { yes?: boolean; dryRun?: boolean; browser?: boolean }) => {
       if (opts.dryRun) {
         logger.warn(`[dry-run] Would revoke publish token ${id}.`);
         return;
@@ -181,11 +204,16 @@ export function registerPublishTokenCommand(program: Command): void {
       }
       const apiUrl = getApiUrl();
       try {
-        await keysRequest(
+        await withSession(
           apiUrl,
-          `/v1/me/publish-tokens/${encodeURIComponent(id)}`,
-          { method: "DELETE" },
-          liveDeps(),
+          "publish-tokens",
+          (sessionToken) =>
+            keysRequest(
+              `/v1/me/publish-tokens/${encodeURIComponent(id)}`,
+              { method: "DELETE" },
+              sessionToken,
+            ),
+          { openInBrowser: opts.browser !== false },
         );
       } catch (err) {
         if (err instanceof ApiError && err.status === 404) {

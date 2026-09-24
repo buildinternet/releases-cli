@@ -43,7 +43,7 @@ describe("publish-token requests over the shared session transport", () => {
     globalThis.fetch = originalFetch;
   });
 
-  it("sends the login session token as a Bearer credential on /v1/me/publish-tokens", async () => {
+  it("sends the given session token as a Bearer credential on /v1/me/publish-tokens", async () => {
     let seenAuth = "";
     let seenPath = "";
     globalThis.fetch = (async (url: string, init?: RequestInit) => {
@@ -56,10 +56,9 @@ describe("publish-token requests over the shared session transport", () => {
     }) as unknown as typeof fetch;
 
     await keysRequest<ListPublishTokensResponse>(
-      BASE,
       "/v1/me/publish-tokens",
       { method: "GET" },
-      { getToken: async () => "sess_tok", onReauth: async () => "sess_tok2" },
+      "sess_tok",
     );
     expect(seenAuth).toBe("Bearer sess_tok");
     expect(seenPath).toContain("/v1/me/publish-tokens");
@@ -80,10 +79,9 @@ describe("publish-token requests over the shared session transport", () => {
     let caught: unknown;
     try {
       await keysRequest(
-        BASE,
         "/v1/me/publish-tokens",
         { method: "POST", body: JSON.stringify({ sourceId: "src_x", name: "n" }) },
-        { getToken: async () => "sess_tok", onReauth: async () => "sess_tok2" },
+        "sess_tok",
       );
     } catch (err) {
       caught = err;
@@ -110,10 +108,9 @@ describe("publish-token requests over the shared session transport", () => {
     let caught: unknown;
     try {
       await keysRequest(
-        BASE,
         "/v1/me/publish-tokens",
         { method: "POST", body: JSON.stringify({ sourceId: "src_x", name: "n" }) },
-        { getToken: async () => "sess_tok", onReauth: async () => "sess_tok2" },
+        "sess_tok",
       );
     } catch (err) {
       caught = err;

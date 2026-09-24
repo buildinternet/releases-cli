@@ -10,7 +10,8 @@ import {
   clearCredential,
   type StoredCredential,
 } from "../../lib/credentials.js";
-import { revokeKeyQuietly } from "../../lib/device-auth.js";
+import { revokePresentedKey, type RevokePresentedKeyResult } from "../../lib/device-auth.js";
+import { retireStoredSession } from "../../lib/session.js";
 import { hiddenPromptReader } from "../../lib/prompt-hidden.js";
 import type { PromptReader } from "../../lib/confirm.js";
 import { writeJson } from "../../lib/output.js";
@@ -103,6 +104,52 @@ export async function printAuthStatus(opts: { json?: boolean; verify?: boolean }
   else if (identity) console.log(`${label("Verify")}${chalk.green("✓ live")}`);
 }
 
+export interface LogoutFlowDeps {
+  readCredential?: () => StoredCredential | null;
+  clearCredential?: () => boolean;
+  retireStoredSession?: () => Promise<void>;
+  revokePresentedKey?: (apiUrl: string, key: string) => Promise<RevokePresentedKeyResult>;
+  /** Diagnostic notes only (server-revoke outcome) — never the final status line. */
+  print?: (line: string) => void;
+}
+
+/**
+ * `releases auth logout`: retire any legacy stored session, best-effort
+ * self-revoke the stored `relu_` key server-side (no browser approval
+ * needed — the key can revoke itself via `DELETE /v1/tokens/me`), then
+ * ALWAYS delete the local credential file, regardless of whether the
+ * server-side revoke succeeded. Local logout must never fail.
+ */
+export async function runLogoutFlow(deps: LogoutFlowDeps = {}): Promise<{ removed: boolean }> {
+  const {
+    readCredential: readCred = readCredential,
+    clearCredential: clearCred = clearCredential,
+    retireStoredSession: retire = () => retireStoredSession(),
+    revokePresentedKey: revoke = revokePresentedKey,
+    print = (l: string) => console.error(l),
+  } = deps;
+
+  // Retire any legacy session token left over from a credential saved before
+  // session tokens stopped being persisted (best-effort sign-out).
+  await retire();
+
+  // Best-effort server-side revoke of the presented key itself. That route
+  // only accepts a `relu_` key (400 otherwise), so skip it for a
+  // manually-pasted `auth login` token of a different kind.
+  const stored = readCred();
+  if (stored?.token?.startsWith("relu_")) {
+    const result = await revoke(stored.apiUrl, stored.token);
+    if (!result.ok) {
+      print(chalk.dim(`Could not revoke the stored key server-side: ${result.error}`));
+    } else if (result.alreadyRevoked) {
+      print(chalk.dim("Stored key was already revoked server-side."));
+    }
+  }
+
+  const removed = clearCred();
+  return { removed };
+}
+
 export function registerAuthCommand(parent: Command): void {
   const auth = parent.command("auth").description("Manage CLI authentication");
 
@@ -150,17 +197,7 @@ export function registerAuthCommand(parent: Command): void {
     .command("logout")
     .description("Remove the stored API token")
     .action(async () => {
-      // Best-effort server-side revoke of the key `releases login` minted —
-      // only possible when we know its id and still hold a session token to
-      // act with. Never fatal: local logout must always succeed.
-      const stored = readCredential();
-      if (stored?.keyId && stored.sessionToken) {
-        const failure = await revokeKeyQuietly(stored.apiUrl, stored.sessionToken, stored.keyId);
-        if (failure) {
-          console.error(chalk.dim(`Could not revoke the stored key server-side: ${failure}`));
-        }
-      }
-      const removed = clearCredential();
+      const { removed } = await runLogoutFlow();
       if (legacyEnv("RELEASES_API_KEY", "RELEASED_API_KEY")) {
         console.log(
           chalk.yellow(

@@ -6,7 +6,7 @@ import type {
   ListUserApiKeysResponse,
 } from "@buildinternet/releases-api-types";
 import { getApiUrl } from "../../lib/mode.js";
-import { getSessionToken, clearSessionToken } from "../../lib/session.js";
+import { withSession } from "../../lib/session.js";
 import { newIdempotencyKey } from "../../lib/idempotency.js";
 import { ApiError } from "../../lib/errors.js";
 import { apiFetch } from "../../api/core.js";
@@ -30,64 +30,31 @@ export function parseExpiresInDays(raw: string): number {
   return n;
 }
 
-export interface KeysRequestDeps {
-  getToken: (apiUrl: string) => Promise<string>;
-  onReauth: (apiUrl: string) => Promise<string>;
-}
-
 /**
- * Session-authed request to the /v1/api-keys management surface, routed
- * through the shared `apiFetch` transport. Sends the stored session token as
- * a Bearer credential — `skipDefaultAuth` stops `apiFetch` from overwriting
- * it with the static admin/API key when one happens to be configured too —
- * and on a 401 re-auths ONCE (forcing the device flow) and retries, then
- * surfaces whatever comes back (or throws, on a non-401 failure).
+ * Session-authed request to the /v1/api-keys (or /v1/me/publish-tokens)
+ * management surface, routed through the shared `apiFetch` transport. Sends
+ * the given (freshly established, one-shot) session token as a Bearer
+ * credential — `skipDefaultAuth` stops `apiFetch` from overwriting it with
+ * the static admin/API key when one happens to be configured too. There is
+ * no stale token to retry past here: the caller wraps its whole body in one
+ * `withSession(...)`, which hands this a session that was just minted for
+ * this exact call.
  */
 export async function keysRequest<T>(
-  apiUrl: string,
   path: string,
   init: RequestInit,
-  deps: KeysRequestDeps,
+  sessionToken: string,
 ): Promise<T> {
-  // One key per logical call, generated up front so the 401 reauth retry
-  // below resends it unchanged — a mint that's retried after a stale session
-  // token replays the first attempt's response instead of minting twice.
   const idempotencyKey = init.method === "POST" ? newIdempotencyKey() : undefined;
-  const attempt = (token: string) =>
-    apiFetch<T>(path, {
-      ...init,
-      headers: {
-        ...init.headers,
-        authorization: `Bearer ${token}`,
-        ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
-      },
-      skipDefaultAuth: true,
-    });
-
-  try {
-    return await attempt(await deps.getToken(apiUrl));
-  } catch (err) {
-    if (err instanceof ApiError && err.status === 401) {
-      return await attempt(await deps.onReauth(apiUrl));
-    }
-    throw err;
-  }
-}
-
-/**
- * Production deps: stored token, and a re-auth that clears the stale one
- * first. Generic over any `/v1/me/*` session-authed surface — exported so
- * other session-authed commands (e.g. `publish-token`) reuse the exact same
- * device-flow session acquisition instead of reimplementing it.
- */
-export function liveDeps(): KeysRequestDeps {
-  return {
-    getToken: (apiUrl) => getSessionToken(apiUrl),
-    onReauth: async (apiUrl) => {
-      clearSessionToken();
-      return getSessionToken(apiUrl);
+  return apiFetch<T>(path, {
+    ...init,
+    headers: {
+      ...init.headers,
+      authorization: `Bearer ${sessionToken}`,
+      ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
     },
-  };
+    skipDefaultAuth: true,
+  });
 }
 
 /** apiFetch/ApiError already resolve the standardized error envelope (and the
@@ -111,8 +78,15 @@ export function registerKeysCommand(program: Command): void {
     .option("--expires-in-days <n>", "Expiry in days (1-365)", parseExpiresInDays)
     .option("--json", "Output as JSON")
     .option("--dry-run", "Show what would be created without minting a key")
+    .option("--no-browser", "Print the device-approval URL instead of opening a browser")
     .action(
-      async (opts: { name: string; expiresInDays?: number; json?: boolean; dryRun?: boolean }) => {
+      async (opts: {
+        name: string;
+        expiresInDays?: number;
+        json?: boolean;
+        dryRun?: boolean;
+        browser?: boolean;
+      }) => {
         const apiUrl = getApiUrl();
         const body: Record<string, unknown> = { name: opts.name, scope: "read" };
         // parseExpiresInDays guarantees a valid integer or commander exits before
@@ -133,11 +107,16 @@ export function registerKeysCommand(program: Command): void {
         }
         let created: CreatedUserApiKey;
         try {
-          created = await keysRequest<CreatedUserApiKey>(
+          created = await withSession(
             apiUrl,
-            "/v1/api-keys",
-            { method: "POST", body: JSON.stringify(body) },
-            liveDeps(),
+            "keys",
+            (sessionToken) =>
+              keysRequest<CreatedUserApiKey>(
+                "/v1/api-keys",
+                { method: "POST", body: JSON.stringify(body) },
+                sessionToken,
+              ),
+            { openInBrowser: opts.browser !== false },
           );
         } catch (err) {
           console.error(chalk.red(keysErrorMessage(err)));
@@ -159,15 +138,21 @@ export function registerKeysCommand(program: Command): void {
     .command("list")
     .description("List your API keys")
     .option("--json", "Output as JSON")
-    .action(async (opts: { json?: boolean }) => {
+    .option("--no-browser", "Print the device-approval URL instead of opening a browser")
+    .action(async (opts: { json?: boolean; browser?: boolean }) => {
       const apiUrl = getApiUrl();
       let data: ListUserApiKeysResponse | null;
       try {
-        data = await keysRequest<ListUserApiKeysResponse | null>(
+        data = await withSession(
           apiUrl,
-          "/v1/api-keys",
-          { method: "GET" },
-          liveDeps(),
+          "keys",
+          (sessionToken) =>
+            keysRequest<ListUserApiKeysResponse | null>(
+              "/v1/api-keys",
+              { method: "GET" },
+              sessionToken,
+            ),
+          { openInBrowser: opts.browser !== false },
         );
       } catch (err) {
         console.error(chalk.red(keysErrorMessage(err)));
@@ -214,7 +199,8 @@ export function registerKeysCommand(program: Command): void {
     .description("Revoke (delete) an API key by id")
     .option("--yes", "Skip the confirmation prompt")
     .option("--dry-run", "Show what would be revoked without deleting")
-    .action(async (id: string, opts: { yes?: boolean; dryRun?: boolean }) => {
+    .option("--no-browser", "Print the device-approval URL instead of opening a browser")
+    .action(async (id: string, opts: { yes?: boolean; dryRun?: boolean; browser?: boolean }) => {
       if (opts.dryRun) {
         logger.warn(`[dry-run] Would revoke API key ${id}.`);
         return;
@@ -232,11 +218,16 @@ export function registerKeysCommand(program: Command): void {
       }
       const apiUrl = getApiUrl();
       try {
-        await keysRequest(
+        await withSession(
           apiUrl,
-          `/v1/api-keys/${encodeURIComponent(id)}`,
-          { method: "DELETE" },
-          liveDeps(),
+          "keys",
+          (sessionToken) =>
+            keysRequest(
+              `/v1/api-keys/${encodeURIComponent(id)}`,
+              { method: "DELETE" },
+              sessionToken,
+            ),
+          { openInBrowser: opts.browser !== false },
         );
       } catch (err) {
         if (err instanceof ApiError && err.status === 404) {

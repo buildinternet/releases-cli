@@ -1,86 +1,110 @@
-import { hostname } from "node:os";
-import { readCredential, writeCredential } from "./credentials.js";
-import { runDeviceAuth, runDeviceLogin } from "./device-auth.js";
+import chalk from "chalk";
+import {
+  readCredential as readCredentialFromDisk,
+  writeCredential as writeCredentialToDisk,
+  type StoredCredential,
+} from "./credentials.js";
+import { runDeviceAuth, signOutSession, type DevicePurpose } from "./device-auth.js";
 import { openBrowser } from "./open-browser.js";
 
 /**
  * Injectable device-flow entry points (production uses the real RFC 8628 flow;
  * tests inject deterministic stand-ins).
- * - `deviceAuth` establishes a session token WITHOUT minting a key — used when a
- *   durable relu_ key already exists and only the session needs refreshing.
- * - `deviceLogin` mints a read key AND establishes a session — used the first
- *   time, when there is no stored credential to attach a session to (a credential
- *   must always carry a non-empty `token`, so we cannot persist a session alone).
  */
 export interface SessionDeps {
-  deviceAuth?: (apiUrl: string) => Promise<string>;
-  deviceLogin?: (apiUrl: string) => Promise<{
-    token: string;
-    id?: string;
-    sessionToken: string;
-    name?: string;
-    scopes?: string[];
-  }>;
+  /** Runs the device flow for `purpose` and returns a fresh session token. */
+  deviceAuth?: (apiUrl: string, purpose: DevicePurpose) => Promise<string>;
+  /** Best-effort session sign-out; returns the failure message or null. */
+  signOut?: (apiUrl: string, sessionToken: string) => Promise<string | null>;
+  print?: (line: string) => void;
+  readCredential?: () => StoredCredential | null;
+  writeCredential?: (cred: StoredCredential) => void;
+  /**
+   * Whether the DEFAULT device-auth flow should try to launch a real browser
+   * (`releases keys ... --no-browser` etc. thread their flag through here).
+   * Defaults to true. Ignored when `deviceAuth` is overridden — an injected
+   * `deviceAuth` (every test in this repo) never reaches the real opener at
+   * all, since it replaces `defaultDeviceAuth` entirely.
+   */
+  openInBrowser?: boolean;
 }
 
-function defaultDeviceAuth(apiUrl: string): Promise<string> {
+// `withSession` backs commands whose stdout must stay machine-readable
+// (`releases keys create --json`, `releases publish-token create | gh secret
+// set ...`), but the device flow it runs still needs to talk to the human
+// approving it in a browser. Every line that flow prints — the verify URL,
+// user code, "Opening your browser…", "Waiting for authorization…",
+// "Authorized as …", and any sign-out failure note — goes to stderr so it
+// never pollutes a piped or `--json` stdout.
+const defaultPrint = (line: string): void => {
+  process.stderr.write(`${line}\n`);
+};
+
+function defaultDeviceAuth(
+  apiUrl: string,
+  purpose: DevicePurpose,
+  openInBrowser: boolean,
+): Promise<string> {
   return runDeviceAuth({
     apiUrl,
-    openInBrowser: true,
-    deps: { openBrowser, print: (l) => console.log(l) },
+    purpose,
+    openInBrowser,
+    deps: { openBrowser, print: defaultPrint },
   }).then((r) => r.sessionToken);
 }
 
-function defaultDeviceLogin(apiUrl: string) {
-  return runDeviceLogin({
-    apiUrl,
-    openInBrowser: true,
-    deps: { openBrowser, keyName: `releases-cli (${hostname()})`, print: (l) => console.log(l) },
-  });
+function defaultSignOut(apiUrl: string, sessionToken: string): Promise<string | null> {
+  return signOutSession(apiUrl, sessionToken);
 }
 
 /**
- * Return a session token for the /v1/api-keys management endpoints. Uses the
- * stored token if present; otherwise (re)establishes one via the device flow and
- * persists it onto a valid credential (one that always has a non-empty relu_ key).
+ * Run `fn` with a freshly established, one-shot device-flow session for
+ * `purpose`, then sign that session out — even if `fn` throws. Every call to
+ * a session-authed command (`releases keys …`, `releases publish-token …`)
+ * opens exactly one browser approval and closes it out right after, rather
+ * than keeping a signed-in session on disk between commands.
  */
-export async function getSessionToken(apiUrl: string, deps: SessionDeps = {}): Promise<string> {
-  const existing = readCredential();
-  // A stored token is bound to the API URL it was verified against (prod/staging
-  // tokens don't cross DBs), so only reuse or refresh a credential established
-  // against THIS environment. A different (or missing) apiUrl is a non-match — we
-  // fall through to a full login that re-binds the credential to the active URL,
-  // never reusing a foreign session or writing a session onto a foreign credential.
-  const sameEnv = existing?.apiUrl === apiUrl;
+export async function withSession<T>(
+  apiUrl: string,
+  purpose: DevicePurpose,
+  fn: (sessionToken: string) => Promise<T>,
+  deps: SessionDeps = {},
+): Promise<T> {
+  await retireStoredSession(deps);
 
-  if (sameEnv && existing?.sessionToken) return existing.sessionToken;
-
-  if (sameEnv && existing?.token) {
-    // A durable relu_ key for this env already exists — refresh the session only, mint nothing.
-    const sessionToken = await (deps.deviceAuth ?? defaultDeviceAuth)(apiUrl);
-    writeCredential({ ...existing, sessionToken, savedAt: new Date().toISOString() });
-    return sessionToken;
+  const sessionToken = await (
+    deps.deviceAuth ??
+    ((u: string, p: DevicePurpose) => defaultDeviceAuth(u, p, deps.openInBrowser ?? true))
+  )(apiUrl, purpose);
+  try {
+    return await fn(sessionToken);
+  } finally {
+    const print = deps.print ?? defaultPrint;
+    const failure = await (deps.signOut ?? defaultSignOut)(apiUrl, sessionToken);
+    if (failure) print(chalk.dim(`Could not sign out: ${failure}`));
   }
-
-  // No usable same-env credential — full login so a valid credential (key + session),
-  // bound to this apiUrl, lands.
-  const res = await (deps.deviceLogin ?? defaultDeviceLogin)(apiUrl);
-  writeCredential({
-    token: res.token,
-    keyId: res.id,
-    sessionToken: res.sessionToken,
-    name: res.name,
-    scopes: res.scopes,
-    apiUrl,
-    savedAt: new Date().toISOString(),
-  });
-  return res.sessionToken;
 }
 
-/** Clear only the stored session token (e.g. after a 401), keeping the relu_ key. */
-export function clearSessionToken(): void {
+/**
+ * Best-effort retirement of a legacy stored session token (from a credential
+ * file saved before session tokens stopped being persisted). Signs it out
+ * against the credential's own apiUrl and rewrites the credential without it.
+ * Quiet on success — this is invisible cleanup, not something worth
+ * announcing — and prints a dim note only if the sign-out itself fails.
+ * Called at the start of `withSession`, `releases login`, and
+ * `releases auth logout` so a legacy session never lingers.
+ */
+export async function retireStoredSession(deps: SessionDeps = {}): Promise<void> {
+  const readCredential = deps.readCredential ?? readCredentialFromDisk;
+  const writeCredential = deps.writeCredential ?? writeCredentialToDisk;
+
   const existing = readCredential();
-  if (!existing) return;
+  if (!existing?.sessionToken) return;
+
+  const print = deps.print ?? defaultPrint;
+  const failure = await (deps.signOut ?? defaultSignOut)(existing.apiUrl, existing.sessionToken);
+  if (failure) print(chalk.dim(`Could not sign out the previous session: ${failure}`));
+
   const { sessionToken: _drop, ...rest } = existing;
   writeCredential({ ...rest, savedAt: new Date().toISOString() });
 }

@@ -130,9 +130,9 @@ releases login              # opens your browser to approve, then saves the key
 releases login --no-browser # print the URL + code to open yourself (headless / SSH)
 ```
 
-This uses the OAuth 2.0 Device Authorization Grant (RFC 8628): approve a short code at [releases.sh/device](https://releases.sh/device) in a signed-in browser, and a read-only key is saved to `~/.releases/credentials` (`0600`). Manage keys with `releases keys list` / `create` / `revoke`.
+This uses the OAuth 2.0 Device Authorization Grant (RFC 8628): approve a short code at [releases.sh/device](https://releases.sh/device) in a signed-in browser, and a read-only key is saved to `~/.releases/credentials` (`0600`) — **the browser session itself is never saved**, only that key. Manage keys with `releases keys list` / `create` / `revoke`; each of those opens its own fresh browser approval and signs out again once the command finishes, rather than reusing a stored session (add `--no-browser` to print the URL + code instead, same as `login`).
 
-If you've verified ownership of a source's domain, mint a `publish-token` scoped to that one source — used by the [`publish-changelog` GitHub Action](https://releases.sh/docs/integrations/github-actions) as `RELEASES_API_TOKEN`:
+If you've verified ownership of a source's domain, mint a `publish-token` scoped to that one source — used by the [`publish-changelog` GitHub Action](https://releases.sh/docs/integrations/github-actions) as `RELEASES_API_TOKEN`. Like `releases keys`, this opens its own browser approval each time:
 
 ```bash
 releases publish-token create --source src_… | gh secret set RELEASES_API_TOKEN

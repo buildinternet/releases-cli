@@ -41,6 +41,11 @@ function makeFakeFetch(
         headers: { "content-type": "application/json" },
       });
     }
+    if (u.endsWith("/api/auth/sign-out")) {
+      // Not tracked in the `order`/`calls` assertions below — the sign-out
+      // happening (and happening last) is asserted separately via `calls`.
+      return new Response(null, { status: 200 });
+    }
     if (u.includes("/v1/api-keys")) {
       return apiKeys(u, init);
     }
@@ -295,5 +300,180 @@ describe("runLoginFlow", () => {
       }),
     ).rejects.toThrow(/limit reached.*releases keys list.*releases keys revoke <id>/is);
     expect(calls.some((c) => c.method === "DELETE")).toBe(false);
+  });
+
+  it("never persists a session token on the stored credential", async () => {
+    const { fetchImpl } = makeFakeFetch(() =>
+      jsonResponse({ key: "relu_new", id: "ak_new", name: "n", scope: "read" }, 201),
+    );
+    let written: StoredCredential | null = null;
+    const cred = await runLoginFlow({
+      apiUrl: BASE,
+      openInBrowser: false,
+      keyName: "releases-cli (host)",
+      deps: {
+        fetchImpl,
+        sleep: async () => {},
+        print: () => {},
+        readCredential: () => null,
+        writeCredential: (c) => {
+          written = c;
+        },
+      },
+    });
+    expect(cred).not.toHaveProperty("sessionToken");
+    expect(written).not.toHaveProperty("sessionToken");
+  });
+
+  it("signs the session out as the last network call, after mint/write/revoke", async () => {
+    const calls: string[] = [];
+    const fetchImpl = (async (url: string, init?: RequestInit) => {
+      const u = String(url);
+      calls.push(u);
+      if (u.endsWith("/device/code")) {
+        return jsonResponse({
+          device_code: "d",
+          user_code: "U",
+          verification_uri: "https://x/device",
+          expires_in: 900,
+          interval: 0,
+        });
+      }
+      if (u.endsWith("/device/token")) return jsonResponse({ access_token: "sess_tok" });
+      if (u.endsWith("/get-session")) return jsonResponse({ user: { email: "a@example.com" } });
+      if (u.endsWith("/api/auth/sign-out")) return new Response(null, { status: 200 });
+      if (u.includes("/v1/api-keys")) {
+        if (init?.method === "DELETE") return new Response(null, { status: 204 });
+        return jsonResponse({ key: "relu_new", id: "ak_new", name: "n", scope: "read" }, 201);
+      }
+      throw new Error(`unexpected url ${u}`);
+    }) as unknown as typeof fetch;
+
+    const previous: StoredCredential = {
+      token: "relu_old",
+      keyId: "ak_old",
+      apiUrl: BASE,
+      savedAt: "2026-01-01T00:00:00.000Z",
+    };
+
+    await runLoginFlow({
+      apiUrl: BASE,
+      openInBrowser: false,
+      keyName: "releases-cli (host)",
+      deps: {
+        fetchImpl,
+        sleep: async () => {},
+        print: () => {},
+        readCredential: () => previous,
+        writeCredential: () => {},
+      },
+    });
+
+    expect(calls.at(-1)).toBe(`${BASE}/api/auth/sign-out`);
+  });
+
+  it("retires a legacy stored session token before starting the new login", async () => {
+    const { fetchImpl } = makeFakeFetch(() =>
+      jsonResponse({ key: "relu_new", id: "ak_new", name: "n", scope: "read" }, 201),
+    );
+
+    const previous: StoredCredential = {
+      token: "relu_old",
+      sessionToken: "legacy_sess",
+      keyId: "ak_old",
+      apiUrl: BASE,
+      savedAt: "2026-01-01T00:00:00.000Z",
+    };
+
+    let retiredWith: string | null = null;
+    await runLoginFlow({
+      apiUrl: BASE,
+      openInBrowser: false,
+      keyName: "releases-cli (host)",
+      deps: {
+        fetchImpl: (async (url: string, init?: RequestInit) => {
+          if (String(url).endsWith("/api/auth/sign-out")) {
+            const auth = String((init?.headers as Record<string, string>)?.authorization ?? "");
+            if (auth === "Bearer legacy_sess") retiredWith = auth;
+          }
+          return fetchImpl(url as unknown as URL, init);
+        }) as unknown as typeof fetch,
+        sleep: async () => {},
+        print: () => {},
+        readCredential: () => previous,
+        writeCredential: () => {},
+      },
+    });
+
+    expect(retiredWith).toBe("Bearer legacy_sess");
+  });
+
+  it("signs the session out even when minting fails", async () => {
+    const { fetchImpl, calls } = makeFakeFetch(() =>
+      jsonResponse({ error: { code: "internal_error" } }, 500),
+    );
+    await expect(
+      runLoginFlow({
+        apiUrl: BASE,
+        openInBrowser: false,
+        keyName: "releases-cli (host)",
+        deps: {
+          fetchImpl,
+          sleep: async () => {},
+          print: () => {},
+          readCredential: () => null,
+          writeCredential: () => {},
+        },
+      }),
+    ).rejects.toThrow(/HTTP 500/);
+    expect(calls.at(-1)?.url).toBe(`${BASE}/api/auth/sign-out`);
+  });
+
+  it("signs the session out even when storing the key fails", async () => {
+    const { fetchImpl, calls } = makeFakeFetch(() =>
+      jsonResponse({ key: "relu_new", id: "ak_new", name: "n", scope: "read" }, 201),
+    );
+    await expect(
+      runLoginFlow({
+        apiUrl: BASE,
+        openInBrowser: false,
+        keyName: "releases-cli (host)",
+        deps: {
+          fetchImpl,
+          sleep: async () => {},
+          print: () => {},
+          readCredential: () => null,
+          writeCredential: () => {
+            throw new Error("disk full");
+          },
+        },
+      }),
+    ).rejects.toThrow(/disk full/);
+    expect(calls.at(-1)?.url).toBe(`${BASE}/api/auth/sign-out`);
+  });
+
+  it("still succeeds, with a note, when the sign-out itself fails", async () => {
+    const { fetchImpl: inner } = makeFakeFetch(() =>
+      jsonResponse({ key: "relu_new", id: "ak_new", name: "n", scope: "read" }, 201),
+    );
+    const fetchImpl = (async (url: string, init?: RequestInit) =>
+      String(url).endsWith("/api/auth/sign-out")
+        ? new Response(null, { status: 500 })
+        : inner(url, init)) as unknown as typeof fetch;
+    const printed: string[] = [];
+    const cred = await runLoginFlow({
+      apiUrl: BASE,
+      openInBrowser: false,
+      keyName: "releases-cli (host)",
+      deps: {
+        fetchImpl,
+        sleep: async () => {},
+        print: (l) => printed.push(l),
+        readCredential: () => null,
+        writeCredential: () => {},
+      },
+    });
+    expect(cred.token).toBe("relu_new");
+    expect(printed.some((l) => l.includes("Could not sign out"))).toBe(true);
   });
 });

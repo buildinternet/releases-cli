@@ -205,7 +205,7 @@ releases publish-token revoke <id>
 
 `--format slack` and `--format discord` post an unsigned chat card; the webhook URL is the secret (no signing key). `webhook verify` is local (no auth). `--workspace <id-or-slug>` on `list`/`add`/`show`/`edit`/`remove`/`test`/`rotate-secret` targets a shared workspace webhook (org-scoped only) instead of your own; `releases workspace list` finds the id/slug. Only workspace owners/admins can write; members can list/view/test. Admin webhooks (`releases admin webhook …`) are a separate root-key operator surface.
 
-`publish-token create` requires a verified domain ownership claim on the source's org (see the [GitHub Actions integration doc](https://releases.sh/docs/integrations/github-actions)); it mints a `relk_` token scoped to ONE source, printing only the token to stdout (so it pipes straight into `gh secret set`) with setup guidance on stderr.
+`publish-token create` requires a verified domain ownership claim on the source's org (see the [GitHub Actions integration doc](https://releases.sh/docs/integrations/github-actions)); it mints a `relk_` token scoped to ONE source, printing only the token to stdout (so it pipes straight into `gh secret set`) with setup guidance on stderr. Like every `publish-token`/`keys` verb, it opens its own one-time browser approval and signs the session back out once the command finishes — there's no persisted login session to reuse. Pass `--no-browser` (same as `releases login`) in a headless/agent context to print the URL + code instead of trying to launch a browser.
 
 ## Agent self-discovery
 
