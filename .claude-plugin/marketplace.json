@@ -9,7 +9,6 @@
       "name": "releases",
       "source": "./",
       "description": "Search changelogs and look up releases via the hosted Releases.sh registry. Bundles the hosted MCP connection, the /releases lookup command, and auto-triggering skills for release/changelog questions.",
-      "version": "0.2.1",
       "author": {
         "name": "Build Internet"
       },

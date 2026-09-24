@@ -11,6 +11,13 @@ Add the marketplace once, then install the plugin:
 /plugin install releases@releases
 ```
 
+### Updates
+
+The plugin has no pinned version, so every change merged to `main` counts as an update. Claude Code doesn't auto-update third-party marketplaces by default. To pick up new skills and commands:
+
+- Turn on auto-update: `/plugin` → **Marketplaces** → `releases` → enable auto-update.
+- Or update by hand: `/plugin marketplace update releases`.
+
 For local development against a cloned copy:
 
 ```bash
