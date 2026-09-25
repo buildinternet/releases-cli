@@ -28,7 +28,7 @@ The CLI is a thin HTTP client for [releases.sh](https://releases.sh). The backen
    bun run build                    # compile to dist/releases
    ```
 
-The project is a Bun workspace. `@buildinternet/releases-lib` is published from this repo alongside the CLI — it's open for direct contribution here. (Agent skills ship from the repo's `skills/` tree via `npx skills add`, not as an npm package; the retired `@buildinternet/releases-skills` shim is deprecated on npm.)
+The project is a Bun workspace. `@buildinternet/releases-lib` is published from this repo alongside the CLI — it's open for direct contribution here. (Agent skills ship from `plugins/claude/releases/skills/` via `npx skills add`, not as an npm package; the retired `@buildinternet/releases-skills` shim is deprecated on npm.)
 
 A couple of dependencies come from the upstream backend monorepo, [buildinternet/releases](https://github.com/buildinternet/releases):
 

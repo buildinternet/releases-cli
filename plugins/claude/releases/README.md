@@ -21,7 +21,7 @@ The plugin has no pinned version, so every change merged to `main` counts as an 
 For local development against a cloned copy:
 
 ```bash
-claude --plugin-dir <path-to-releases-cli-clone>
+claude --plugin-dir <path-to-releases-cli-clone>/plugins/claude/releases
 ```
 
 ## What you get
