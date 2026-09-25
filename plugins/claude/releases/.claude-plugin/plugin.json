@@ -1,11 +1,21 @@
 {
   "name": "releases",
+  "displayName": "Releases",
   "description": "Search changelogs and look up releases via the hosted Releases.sh registry. Bundles the hosted MCP connection, the /releases lookup command, and auto-triggering skills for release/changelog questions.",
   "author": {
-    "name": "Build Internet"
+    "name": "Build Internet",
+    "url": "https://github.com/buildinternet"
   },
   "homepage": "https://releases.sh",
   "privacyPolicyUrl": "https://releases.sh/privacy",
   "repository": "https://github.com/buildinternet/releases-cli",
-  "license": "MIT"
+  "license": "MIT",
+  "keywords": [
+    "changelog",
+    "release-notes",
+    "releases",
+    "version-updates",
+    "breaking-changes",
+    "mcp"
+  ]
 }
