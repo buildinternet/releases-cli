@@ -5,7 +5,7 @@
     "name": "Build Internet"
   },
   "homepage": "https://releases.sh",
+  "privacyPolicyUrl": "https://releases.sh/privacy",
   "repository": "https://github.com/buildinternet/releases-cli",
-  "license": "MIT",
-  "icon": "./.claude-plugin/icon.svg"
+  "license": "MIT"
 }
