@@ -1,0 +1,11 @@
+{
+  "name": "releases",
+  "description": "Search changelogs and look up releases via the hosted Releases.sh registry. Bundles the hosted MCP connection, the /releases lookup command, and auto-triggering skills for release/changelog questions.",
+  "author": {
+    "name": "Build Internet"
+  },
+  "homepage": "https://releases.sh",
+  "repository": "https://github.com/buildinternet/releases-cli",
+  "license": "MIT",
+  "icon": "./.claude-plugin/icon.svg"
+}

@@ -10,6 +10,9 @@ const FETCH_TIMEOUT_MS = 2000;
 const REPO_OWNER = "buildinternet";
 const REPO_NAME = "releases-cli";
 const REPO_BRANCH = "main";
+// The skills live inside the Claude plugin folder; the tree SHA of this
+// `skills/` entry is what the baseline tracks.
+const SKILLS_PARENT_PATH = "plugins/claude/releases";
 const SKILLS_DIR_NAME = "skills";
 const SKILLS_COORDINATE = `${REPO_OWNER}/${REPO_NAME}`;
 const DISABLE_ENV_VAR = "RELEASES_DISABLE_SKILL_UPDATE_CHECK";
@@ -132,7 +135,7 @@ async function fetchSkillsTreeSha(): Promise<string | null> {
     const t = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     try {
       const res = await fetch(
-        `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/git/trees/${REPO_BRANCH}`,
+        `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/git/trees/${REPO_BRANCH}:${SKILLS_PARENT_PATH}`,
         {
           headers: {
             accept: "application/vnd.github+json",
@@ -194,7 +197,7 @@ export async function checkForSkillsUpdate(): Promise<string | null> {
 }
 
 /**
- * Record the current `skills/` tree SHA as the baseline. Called after a
+ * Record the current `plugins/claude/releases/skills/` tree SHA as the baseline. Called after a
  * successful `releases skills install` so subsequent staleness checks have
  * something to compare against. Fire-and-forget; never throws.
  */
