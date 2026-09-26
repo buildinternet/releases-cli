@@ -1,5 +1,13 @@
 # @buildinternet/releases
 
+## 0.81.1
+
+### Patch Changes
+
+- caf3ae1: Point the Claude plugin at the `agents.releases.sh/mcp` endpoint and add documentation, support and terms links to its manifest.
+- 9eff9b1: Document which Releases.sh services the Claude plugin reaches and what they keep.
+- 0767e87: Move the agent skills into the self-contained Claude plugin folder (`plugins/claude/releases/skills/`) so the plugin passes Claude plugin directory validation. `npx skills add buildinternet/releases-cli` finds them at the new path, and the skills update check now reads that path.
+
 ## 0.81.0
 
 ### Minor Changes
