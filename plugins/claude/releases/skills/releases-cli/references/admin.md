@@ -347,7 +347,7 @@ Run a local stdio MCP bridge that proxies the hosted tools:
 releases admin mcp serve
 ```
 
-Useful for clients that only support stdio transport. For native remote MCP support (Claude Code, Codex), connect directly to `https://mcp.releases.sh/mcp` instead.
+Useful for clients that only support stdio transport. For native remote MCP support (Claude Code, Codex), connect directly to `https://agents.releases.sh/mcp` instead.
 
 ## Recommendations
 

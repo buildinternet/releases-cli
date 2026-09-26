@@ -103,7 +103,7 @@ releases json validate releases.json              # check a releases.json manife
 Point any MCP-compatible agent at the hosted server:
 
 ```bash
-npx mcp-remote https://mcp.releases.sh/mcp
+npx mcp-remote https://agents.releases.sh/mcp
 ```
 
 This repo is also a Claude Code marketplace with the `releases` plugin — hosted MCP tools, a `/releases` lookup command, and auto-trigger skills:

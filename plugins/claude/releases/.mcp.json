@@ -1,6 +1,6 @@
 {
   "releases": {
     "type": "http",
-    "url": "https://mcp.releases.sh/mcp"
+    "url": "https://agents.releases.sh/mcp"
   }
 }
