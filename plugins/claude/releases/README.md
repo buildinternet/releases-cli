@@ -50,6 +50,15 @@ Or run the command directly:
 /releases tailwind v4 breaking changes
 ```
 
+## Data and network access
+
+The plugin runs nothing on your machine. It reaches two Releases.sh services:
+
+- **`agents.releases.sh`**: the hosted MCP server behind the search and lookup tools. It receives your search queries and lookup requests. Signing in is optional; it is only needed to follow products or manage webhooks, and happens through your MCP client's own OAuth flow.
+- **`api.releases.sh`**: the REST API used by the optional `releases` CLI. The `releases-cli` skill only sends requests here if you install the CLI and Claude runs it.
+
+Search queries are kept for 90 days to improve search. See the [privacy policy](https://releases.sh/privacy) for details.
+
 ## Standalone skills (any agent)
 
 If you want only the skill behaviour — no MCP connection, no command — install the bundled skills directly via the [`skills`](https://github.com/vercel-labs/skills) CLI from the open agent-skills ecosystem:
