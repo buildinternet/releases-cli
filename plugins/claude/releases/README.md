@@ -28,7 +28,7 @@ claude --plugin-dir <path-to-releases-cli-clone>/plugins/claude/releases
 
 Everything you need to ask Claude about release notes and changelogs.
 
-- **Hosted MCP connection** to `mcp.releases.sh` — search, lookup, and changelog slicing tools.
+- **Hosted MCP connection** to `agents.releases.sh` — search, lookup, and changelog slicing tools.
 - **`/releases <product> [query]`** for manual lookups.
 - **Auto-triggering skills:**
   - `releases-mcp` — activates on questions about releases, changelogs, breaking changes, or version updates ("what's new in Next.js 15?").
