@@ -29,6 +29,7 @@ function flagSummary(client: OAuthClient): string {
   const flags: string[] = [];
   flags.push(client.public ? chalk.cyan("public/PKCE") : "confidential");
   if (client.trusted) flags.push(chalk.yellow("trusted"));
+  if (client.official) flags.push(chalk.green("official"));
   if (client.disabled) flags.push(chalk.red("disabled"));
   return flags.join(" · ");
 }
@@ -58,6 +59,11 @@ export function registerOauthCommand(program: Command) {
     .requiredOption("--scope <scope>", "Granted scope (repeatable)", collect, [] as string[])
     .option("--name <name>", "Human-readable client name")
     .option("--trusted", "Skip the consent screen (trusted first-party client)")
+    .option(
+      "--official",
+      'Show the "Verified by Releases Index" badge on the consent page (server default when neither flag is given)',
+    )
+    .option("--no-official", "Do not show the verified badge (e.g. a third-party client)")
     .option("--public", "Public/PKCE client with no secret (tokenEndpointAuthMethod=none)")
     .option(
       "--grant-type <type>",
@@ -75,6 +81,7 @@ export function registerOauthCommand(program: Command) {
         scope: string[];
         name?: string;
         trusted?: boolean;
+        official?: boolean;
         public?: boolean;
         grantType: string[];
         pkce: boolean;
@@ -87,6 +94,7 @@ export function registerOauthCommand(program: Command) {
           redirectUris: opts.redirectUri,
           scopes: opts.scope,
           trusted: opts.trusted,
+          official: opts.official,
           tokenEndpointAuthMethod: opts.public ? "none" : undefined,
           grantTypes: opts.grantType.length > 0 ? opts.grantType : undefined,
           requirePKCE: opts.pkce,
@@ -134,8 +142,9 @@ export function registerOauthCommand(program: Command) {
             c.clientId,
             c.name ?? chalk.dim("—"),
             c.public ? "public" : "confidential",
-            [c.trusted ? "trusted" : "", c.disabled ? "disabled" : ""].filter(Boolean).join(",") ||
-              chalk.dim("—"),
+            [c.trusted ? "trusted" : "", c.official ? "official" : "", c.disabled ? "disabled" : ""]
+              .filter(Boolean)
+              .join(",") || chalk.dim("—"),
           ]),
         }),
       );
@@ -157,6 +166,44 @@ export function registerOauthCommand(program: Command) {
       }
       printClient(found);
     });
+
+  client
+    .command("update <clientId>")
+    .description("Update a client's flags (at least one flag required)")
+    .option("--official", 'Show the "Verified by Releases Index" badge on the consent page')
+    .option("--no-official", "Remove the verified badge")
+    .option("--trusted", "Skip the consent screen")
+    .option("--no-trusted", "Require the consent screen again")
+    .option("--disabled", "Disable the client")
+    .option("--no-disabled", "Re-enable the client")
+    .option("--json", "Output JSON")
+    .addHelpText(
+      "after",
+      `
+Examples:
+  releases admin oauth client update <clientId> --official
+  releases admin oauth client update <clientId> --no-official --no-trusted`,
+    )
+    .action(
+      async (
+        clientId: string,
+        opts: { official?: boolean; trusted?: boolean; disabled?: boolean; json?: boolean },
+      ) => {
+        const fields: { official?: boolean; trusted?: boolean; disabled?: boolean } = {};
+        if (opts.official !== undefined) fields.official = opts.official;
+        if (opts.trusted !== undefined) fields.trusted = opts.trusted;
+        if (opts.disabled !== undefined) fields.disabled = opts.disabled;
+        if (Object.keys(fields).length === 0) {
+          logger.error(
+            "Nothing to update: pass at least one of --official/--no-official, --trusted/--no-trusted, --disabled/--no-disabled.",
+          );
+          process.exit(1);
+        }
+        const updated = await updateOAuthClient(clientId, fields);
+        if (opts.json) return writeJson(updated);
+        printClient(updated);
+      },
+    );
 
   client
     .command("disable <clientId>")
