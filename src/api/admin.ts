@@ -75,6 +75,11 @@ export interface OAuthClient {
   scopes: string[];
   /** Maps to skip_consent — a trusted client bypasses the consent screen. */
   trusted: boolean;
+  /**
+   * Operator-set "Verified by Releases Index" consent-page badge. Optional: an
+   * API that predates the flag omits it.
+   */
+  official?: boolean;
   disabled: boolean;
   /** A public (PKCE) client has no secret (`tokenEndpointAuthMethod: "none"`). */
   public: boolean;
@@ -90,6 +95,8 @@ export interface CreateOAuthClientInput {
   redirectUris: string[];
   scopes: string[];
   trusted?: boolean;
+  /** Omit to let the server default apply (`true`). */
+  official?: boolean;
   /** `none` ⇒ secretless public/PKCE client. */
   tokenEndpointAuthMethod?: "none" | "client_secret_basic" | "client_secret_post";
   type?: "web" | "native" | "user-agent-based";
@@ -130,10 +137,10 @@ export async function getOAuthClient(clientId: string): Promise<OAuthClient | nu
   return apiFetch<OAuthClient | null>(`/v1/admin/oauth/clients/${encodeURIComponent(clientId)}`);
 }
 
-/** Atomically update the `disabled` and/or `trusted` flag on a client. */
+/** Atomically update the `disabled`, `trusted` and/or `official` flag on a client. */
 export async function updateOAuthClient(
   clientId: string,
-  fields: { disabled?: boolean; trusted?: boolean },
+  fields: { disabled?: boolean; trusted?: boolean; official?: boolean },
 ): Promise<OAuthClient> {
   return apiFetch<OAuthClient>(`/v1/admin/oauth/clients/${encodeURIComponent(clientId)}`, {
     method: "PATCH",
