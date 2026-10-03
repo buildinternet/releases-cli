@@ -137,6 +137,33 @@ describe("oauth-client client wire contract", () => {
     expect(capturedBody).toEqual({ disabled: true });
   });
 
+  it("updateOAuthClient PATCHes official alone", async () => {
+    responder = () =>
+      new Response(JSON.stringify({ clientId: "c1", official: false }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    const res = await client.updateOAuthClient("c1", { official: false });
+    expect(capturedBody).toEqual({ official: false });
+    expect(res.official).toBe(false);
+  });
+
+  it("createOAuthClient sends official only when set", async () => {
+    responder = () =>
+      new Response(JSON.stringify({ clientId: "c2", official: false, clientSecret: null }), {
+        status: 201,
+        headers: { "Content-Type": "application/json" },
+      });
+    await client.createOAuthClient({ redirectUris: ["https://a/cb"], scopes: ["read"] });
+    expect(capturedBody).not.toHaveProperty("official");
+    await client.createOAuthClient({
+      redirectUris: ["https://a/cb"],
+      scopes: ["read"],
+      official: false,
+    });
+    expect(capturedBody).toMatchObject({ official: false });
+  });
+
   it("rotateOAuthClientSecret POSTs the rotate-secret route", async () => {
     responder = () =>
       new Response(JSON.stringify({ clientId: "c1", clientSecret: "reloc_new" }), {
