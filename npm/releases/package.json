@@ -1,7 +1,7 @@
 {
   "name": "@buildinternet/releases",
   "version": "0.83.0",
-  "description": "The changelog & release-notes registry for developers and AI agents",
+  "description": "CLI for Release Notes Index — the changelog & release-notes registry for developers and AI agents",
   "bin": {
     "releases": "bin/releases"
   },
