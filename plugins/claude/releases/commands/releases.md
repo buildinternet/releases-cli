@@ -5,7 +5,7 @@ argument-hint: <product> [query]
 
 # /releases
 
-Search changelogs and release notes from the Releases.sh registry.
+Search changelogs and release notes from the Release Notes Index.
 
 ## Usage
 

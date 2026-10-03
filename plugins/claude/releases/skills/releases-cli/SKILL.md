@@ -1,6 +1,6 @@
 ---
 name: releases-cli
-description: Use the `releases` CLI to search, browse, and read the Releases.sh changelog registry from the terminal — the keyless, agent-friendly peer of the Releases MCP. Activate when the user mentions "releases CLI", runs a `releases` command, asks how to install it, wants to look up releases, sources, orgs, collections, or changelogs from a shell, or wants to publish a changelog from CI with `releases publish`.
+description: Use the `releases` CLI to search, browse, and read the Release Notes Index from the terminal — the keyless, agent-friendly peer of the Releases MCP. Activate when the user mentions "releases CLI", runs a `releases` command, asks how to install it, wants to look up releases, sources, orgs, collections, or changelogs from a shell, or wants to publish a changelog from CI with `releases publish`.
 ---
 
 # releases CLI
