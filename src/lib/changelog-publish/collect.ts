@@ -17,7 +17,7 @@ import {
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { CliError } from "../errors.js";
-import { gitDiffNameStatus, gitShowFile, isMissingOrZeroSha } from "./git.js";
+import { assertGitCommit, gitDiffNameStatus, gitShowFile, isMissingOrZeroSha } from "./git.js";
 
 const DEFAULT_CHANGELOG_PATH = "CHANGELOG.md";
 
@@ -189,6 +189,10 @@ export async function collectPublishPlan(input: CollectInput): Promise<Collected
     );
   }
   const workdir = input.workingDirectory?.trim() || undefined;
+  const beforeSha = input.beforeSha?.trim() || undefined;
+  if (beforeSha && !isMissingOrZeroSha(beforeSha)) {
+    assertGitCommit(beforeSha, workdir ? resolve(workdir) : undefined);
+  }
   if (glob) return collectDirectory(input, workdir, glob);
   return collectSingleFile(input, workdir, changelogPath);
 }

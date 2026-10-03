@@ -10,8 +10,27 @@
  */
 import { execFileSync } from "node:child_process";
 import { isMissingOrZeroSha } from "@buildinternet/releases-core/changelog-publish";
+import { CliError } from "../errors.js";
 
 export { isMissingOrZeroSha };
+
+/**
+ * Reject a nonzero `--since` that is not a commit in this checkout.
+ * An all-zero or omitted SHA is a first publish and is not checked.
+ * A commit that exists but does not contain the changelog file is valid —
+ * that file is new, and the snapshot is empty.
+ */
+export function assertGitCommit(sha: string, cwd?: string): void {
+  try {
+    execFileSync(
+      "git",
+      ["rev-parse", "--verify", "--quiet", "--end-of-options", `${sha}^{commit}`],
+      { stdio: "ignore", cwd },
+    );
+  } catch {
+    throw new CliError(`--since does not resolve to a commit in this checkout: ${sha}`);
+  }
+}
 
 /** `./<path>` so `git show <rev>:<path>` resolves from `cwd`, not the repo root. */
 function snapshotPath(path: string): string {
@@ -58,11 +77,10 @@ function parseNameStatusLine(line: string): NameStatusEntry | null {
 /**
  * `git diff --name-status -M --relative <before>..HEAD`, filtered to files
  * git touched between the before-push SHA and the current commit. Paths are
- * relative to `cwd` (the resolved working-directory). Returns null when there
- * is nothing to diff against — `before` missing, an all-zero first-push SHA,
- * or git failing (shallow clone, force-pushed-away SHA). Callers treat null as
- * "publish everything", the same way the single-file path does; the batch
- * upsert makes that safe to repeat.
+ * relative to `cwd` (the resolved working-directory). Returns null when
+ * `before` is missing or an all-zero first-push SHA. Callers reject a nonzero
+ * SHA that is not a commit before calling this. A diff that still fails is
+ * treated as "publish everything"; the batch upsert makes a repeat safe.
  */
 export function gitDiffNameStatus(
   before: string | undefined,

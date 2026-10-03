@@ -177,6 +177,107 @@ describe("releases publish", () => {
     }
   });
 
+  it("rejects a --since value that is not a commit", () => {
+    const dir = mkdtempSync(join(tmpdir(), "releases-publish-bad-since-"));
+    try {
+      execFileSync("git", ["init"], { cwd: dir });
+      execFileSync("git", ["config", "user.email", "dev@example.com"], { cwd: dir });
+      execFileSync("git", ["config", "user.name", "Dev"], { cwd: dir });
+      execFileSync("git", ["config", "commit.gpgsign", "false"], { cwd: dir });
+      writeFileSync(join(dir, "CHANGELOG.md"), datedAfter);
+      execFileSync("git", ["add", "CHANGELOG.md"], { cwd: dir });
+      execFileSync("git", ["commit", "-m", "init"], { cwd: dir });
+
+      const { stderr, exitCode } = runCli(
+        [
+          "publish",
+          "--source",
+          "src_test",
+          "--cwd",
+          dir,
+          "--since",
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "--url-template",
+          "https://example.com/updates/{date}",
+          "--dry-run",
+        ],
+        { env: noToken() },
+      );
+      expect(exitCode).toBe(1);
+      expect(stderr).toContain("--since");
+      expect(stderr).toContain("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("publishes every entry for an all-zero --since without requiring that commit", () => {
+    const dir = mkdtempSync(join(tmpdir(), "releases-publish-zero-since-"));
+    try {
+      execFileSync("git", ["init"], { cwd: dir });
+      writeFileSync(join(dir, "CHANGELOG.md"), datedAfter);
+      const { stdout, exitCode } = runCli(
+        [
+          "publish",
+          "--source",
+          "src_test",
+          "--cwd",
+          dir,
+          "--since",
+          "0000000000000000000000000000000000000000",
+          "--url-template",
+          "https://example.com/updates/{date}",
+          "--dry-run",
+          "--json",
+        ],
+        { env: noToken() },
+      );
+      expect(exitCode).toBe(0);
+      const body = JSON.parse(stdout) as { added: string[] };
+      expect(body.added).toEqual(["2026-06-10", "2026-06-09"]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("treats a changelog added after a real commit as all new", () => {
+    const dir = mkdtempSync(join(tmpdir(), "releases-publish-new-file-"));
+    try {
+      execFileSync("git", ["init"], { cwd: dir });
+      execFileSync("git", ["config", "user.email", "dev@example.com"], { cwd: dir });
+      execFileSync("git", ["config", "user.name", "Dev"], { cwd: dir });
+      execFileSync("git", ["config", "commit.gpgsign", "false"], { cwd: dir });
+      writeFileSync(join(dir, "README.md"), "hi\n");
+      execFileSync("git", ["add", "README.md"], { cwd: dir });
+      execFileSync("git", ["commit", "-m", "init"], { cwd: dir });
+      const sha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: dir, encoding: "utf8" }).trim();
+      writeFileSync(join(dir, "CHANGELOG.md"), datedAfter);
+
+      const { stdout, exitCode } = runCli(
+        [
+          "publish",
+          "--source",
+          "src_test",
+          "--cwd",
+          dir,
+          "--since",
+          sha,
+          "--url-template",
+          "https://example.com/updates/{date}",
+          "--dry-run",
+          "--json",
+        ],
+        { env: noToken() },
+      );
+      expect(exitCode).toBe(0);
+      const body = JSON.parse(stdout) as { added: string[]; modified: string[] };
+      expect(body.added).toEqual(["2026-06-10", "2026-06-09"]);
+      expect(body.modified).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("plans directory fixtures the same way as the Action", () => {
     const { stdout, exitCode } = runCli(
       [
