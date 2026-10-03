@@ -207,6 +207,19 @@ releases publish-token revoke <id>
 
 `publish-token create` requires a verified domain ownership claim on the source's org (see the [GitHub Actions integration doc](https://releases.sh/docs/integrations/github-actions)); it mints a `relk_` token scoped to ONE source, printing only the token to stdout (so it pipes straight into `gh secret set`) with setup guidance on stderr. Like every `publish-token`/`keys` verb, it opens its own one-time browser approval and signs the session back out once the command finishes — there's no persisted login session to reuse. Pass `--no-browser` (same as `releases login`) in a headless/agent context to print the URL + code instead of trying to launch a browser.
 
+### Publish a changelog from CI
+
+`releases publish` posts changed changelog entries to `POST /v1/sources/…/releases/batch` (`mode: upsert-content`). It is the GitLab CI / Buildkite / local equivalent of the publish-changelog GitHub Action. Auth is `RELEASES_API_TOKEN` from `publish-token create` — a read-only `RELEASES_API_KEY` is not accepted, and a real publish fails if the token is missing. `--dry-run` prints the batch body with no token and no request.
+
+```bash
+releases publish --source src_… --dry-run
+releases publish --source acme/docs --since "$CI_COMMIT_BEFORE_SHA" \
+  --url-template "https://gitlab.com/acme/app/-/blob/main/CHANGELOG.md#{key}"
+releases publish --source src_… --glob "changelog/**/*.mdx" --cwd docs
+```
+
+Single-file mode (default `--changelog CHANGELOG.md`) parses versioned `##` headings and `## Month D, YYYY` sections. `--glob` is directory mode: one MDX/Markdown file per release, metadata in YAML frontmatter (`draft: true` skipped). `--glob` cannot be combined with a non-default `--changelog`. Omit `--since` to publish every parsed entry; an all-zero SHA (GitLab's first pipeline) does the same. Deleted directory files are reported and left in the index.
+
 ## Agent self-discovery
 
 ```bash

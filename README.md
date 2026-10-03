@@ -132,7 +132,7 @@ releases login --no-browser # print the URL + code to open yourself (headless / 
 
 This uses the OAuth 2.0 Device Authorization Grant (RFC 8628): approve a short code at [releases.sh/device](https://releases.sh/device) in a signed-in browser, and a read-only key is saved to `~/.releases/credentials` (`0600`) — **the browser session itself is never saved**, only that key. Manage keys with `releases keys list` / `create` / `revoke`; each of those opens its own fresh browser approval and signs out again once the command finishes, rather than reusing a stored session (add `--no-browser` to print the URL + code instead, same as `login`).
 
-If you've verified ownership of a source's domain, mint a `publish-token` scoped to that one source — used by the [`publish-changelog` GitHub Action](https://releases.sh/docs/integrations/github-actions) as `RELEASES_API_TOKEN`. Like `releases keys`, this opens its own browser approval each time:
+If you've verified ownership of a source's domain, mint a `publish-token` scoped to that one source. The [`publish-changelog` GitHub Action](https://releases.sh/docs/integrations/github-actions) and `releases publish` both read it as `RELEASES_API_TOKEN`. Like `releases keys`, this opens its own browser approval each time:
 
 ```bash
 releases publish-token create --source src_… | gh secret set RELEASES_API_TOKEN
@@ -142,11 +142,45 @@ releases publish-token revoke <id>
 
 Already issued a token (e.g. a write/admin key during the closed beta)? Store it without the browser flow via `releases auth login` (interactive, `--token <token>`, or `--token -` for stdin); it's verified before being saved. `releases auth status` shows the current state (`whoami` is an alias). `RELEASES_API_KEY` in the environment overrides any stored credential — handy for CI.
 
+## Publish from any CI
+
+`releases publish` pushes changelog updates with `POST /v1/sources/…/releases/batch` (`mode: upsert-content`) — the same request as the [publish-changelog GitHub Action](https://releases.sh/docs/integrations/github-actions), for GitLab CI, Buildkite, or a local docs build.
+
+```bash
+releases publish --source src_… --dry-run
+releases publish --source acme/docs --changelog CHANGELOG.md --since "$CI_COMMIT_BEFORE_SHA" \
+  --url-template "https://gitlab.com/acme/app/-/blob/main/CHANGELOG.md#{key}"
+releases publish --source src_… --glob "changelog/**/*.mdx"
+```
+
+`--dry-run` prints the batch body and does not call the API (no token required). A real publish reads `RELEASES_API_TOKEN` and exits if it is missing. `--since <sha>` limits the plan to entries changed since that commit; omit it, or pass an all-zero first-push SHA, to publish every parsed entry. Repeating a publish is safe: unchanged bodies are not written again.
+
+Single-file mode parses versioned `##` headings (Keep a Changelog, conventional-changelog) and `## Month D, YYYY` sections. `--glob` switches to one MDX or Markdown file per release, with metadata in YAML frontmatter (`draft: true` is skipped). Deleted files are reported and left in the index.
+
+The commit you pass to `--since` has to be in the local clone (`fetch-depth: 0` on GitHub, or GitLab's default full clone). `--url-template` accepts `{key}`, `{version}`, `{date}`, `{path}`, and `{slug}`. When `GITHUB_REPOSITORY` is set and the template is omitted, the URL falls back to the file's GitHub blob URL, same as the Action.
+
+```yaml
+# .gitlab-ci.yml
+publish-changelog:
+  image: node:22
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: [CHANGELOG.md]
+  script:
+    - npm install -g @buildinternet/releases
+    - |
+      releases publish \
+        --source "$RELEASES_SOURCE" \
+        --since "$CI_COMMIT_BEFORE_SHA" \
+        --url-template "https://gitlab.com/${CI_PROJECT_PATH}/-/blob/${CI_COMMIT_REF_NAME}/CHANGELOG.md#{key}"
+```
+
 ## Environment
 
 Reader access requires nothing. Useful overrides:
 
 - `RELEASES_API_KEY` — Bearer token for write endpoints; overrides stored credentials.
+- `RELEASES_API_TOKEN` — write-scoped publish token for `releases publish` (see [Publish from any CI](#publish-from-any-ci)).
 - `RELEASES_API_URL` — override the default `https://api.releases.sh` (e.g. staging).
 - `RELEASES_TELEMETRY_DISABLED=1` — opt out of anonymous usage pings (`DO_NOT_TRACK=1` also honored).
 
