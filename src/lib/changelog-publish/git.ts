@@ -1,24 +1,29 @@
 /**
- * Git helpers for `--since`.
+ * Git I/O for `--since`. Planning itself lives in
+ * `@buildinternet/releases-core/changelog-publish` and takes snapshots plus
+ * name-status rows as inputs.
  *
- * Vendored from buildinternet/releases `actions/publish-changelog/src/git.ts`
- * (SHA 9f6d6ee24899428db02de00f17555ad03bdc3953).
- *
- * TODO(#2377): fold into the shared changelog publish planner package once
- * it is on npm.
+ * `git show <rev>:<path>` resolves `<path>` from the repository root unless it
+ * starts with `./` or `../`, in which case it is relative to `cwd`. Changelog
+ * paths are cwd-relative (`--cwd`, or the process working directory), so a
+ * snapshot is requested as `./<path>`.
  */
 import { execFileSync } from "node:child_process";
+import { isMissingOrZeroSha } from "@buildinternet/releases-core/changelog-publish";
 
-/** True when `sha` is missing or an all-zero first-push SHA. */
-export function isMissingOrZeroSha(sha: string | undefined): boolean {
-  return !sha || /^0+$/.test(sha);
+export { isMissingOrZeroSha };
+
+/** `./<path>` so `git show <rev>:<path>` resolves from `cwd`, not the repo root. */
+function snapshotPath(path: string): string {
+  if (path.startsWith("./") || path.startsWith("../") || path.startsWith("/")) return path;
+  return `./${path}`;
 }
 
 /** Empty string when `sha` is missing, an all-zero first-push SHA, or the path is new. */
 export function gitShowFile(sha: string | undefined, path: string, cwd?: string): string {
   if (isMissingOrZeroSha(sha)) return "";
   try {
-    return execFileSync("git", ["show", `${sha}:${path}`], {
+    return execFileSync("git", ["show", `${sha}:${snapshotPath(path)}`], {
       encoding: "utf8",
       cwd,
     });

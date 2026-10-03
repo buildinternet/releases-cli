@@ -44,6 +44,18 @@ describe("json validate (public CLI integration)", () => {
     expect(stdout).toContain("releases.sh/docs/listing");
   });
 
+  it("accepts a push-publish github locator", () => {
+    const repoManifest = JSON.stringify({
+      version: 2,
+      product: { name: "CLI", slug: "cli" },
+      releases: [{ github: "self", publish: "push", path: "CHANGELOG.md" }],
+    });
+    const { stdout, exitCode } = runCli(["json", "validate", "-"], { input: repoManifest });
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("valid releases.json");
+    expect(stdout).toContain("repo scope");
+  });
+
   it("validates a repo-scope manifest from stdin", () => {
     const repoManifest = JSON.stringify({
       $schema: "https://releases.sh/schemas/releases.json",

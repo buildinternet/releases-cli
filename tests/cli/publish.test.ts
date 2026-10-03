@@ -3,7 +3,7 @@
  * Part of buildinternet/releases#2377.
  */
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "bun:test";
@@ -127,6 +127,51 @@ describe("releases publish", () => {
         "https://example.com/updates/2026-06-09",
       ]);
       expect(body.releases[1]?.content).toContain("A EDITED");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("diffs --since against the changelog under --cwd, not the repo root", () => {
+    const dir = mkdtempSync(join(tmpdir(), "releases-publish-subdir-"));
+    const docs = join(dir, "docs");
+    const rootBefore = "# Changelog\n\n## June 1, 2026\n\n**Added**\n- ROOT\n";
+    try {
+      execFileSync("git", ["init"], { cwd: dir });
+      execFileSync("git", ["config", "user.email", "dev@example.com"], { cwd: dir });
+      execFileSync("git", ["config", "user.name", "Dev"], { cwd: dir });
+      execFileSync("git", ["config", "commit.gpgsign", "false"], { cwd: dir });
+      writeFileSync(join(dir, "CHANGELOG.md"), rootBefore);
+      execFileSync("git", ["add", "CHANGELOG.md"], { cwd: dir });
+      mkdirSync(docs, { recursive: true });
+      writeFileSync(join(docs, "CHANGELOG.md"), datedBefore);
+      execFileSync("git", ["add", "docs/CHANGELOG.md"], { cwd: dir });
+      execFileSync("git", ["commit", "-m", "init"], { cwd: dir });
+      const sha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: dir, encoding: "utf8" }).trim();
+      writeFileSync(join(docs, "CHANGELOG.md"), datedAfter);
+      execFileSync("git", ["add", "docs/CHANGELOG.md"], { cwd: dir });
+      execFileSync("git", ["commit", "-m", "edit docs"], { cwd: dir });
+
+      const { stdout, exitCode } = runCli(
+        [
+          "publish",
+          "--source",
+          "src_test",
+          "--cwd",
+          docs,
+          "--since",
+          sha,
+          "--url-template",
+          "https://example.com/updates/{date}",
+          "--dry-run",
+          "--json",
+        ],
+        { env: noToken() },
+      );
+      expect(exitCode).toBe(0);
+      const body = JSON.parse(stdout) as { added: string[]; modified: string[] };
+      expect(body.added).toEqual(["2026-06-10"]);
+      expect(body.modified).toEqual(["2026-06-09"]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

@@ -1,29 +1,27 @@
 /**
  * Read a changelog (single file or directory glob) and build the batch body
- * the publish-changelog Action would POST.
- *
- * File gathering mirrors `actions/publish-changelog/src/publish.ts`. Parsing
- * stays in the vendored planner (`./plan.ts`).
- *
- * TODO(#2377): call the shared planner package here once it is published.
+ * `releases publish` POSTs. Parsing lives in
+ * `@buildinternet/releases-core/changelog-publish`, shared with the
+ * publish-changelog GitHub Action.
  */
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { CliError } from "../errors.js";
-import { gitDiffNameStatus, gitShowFile, isMissingOrZeroSha } from "./git.js";
 import {
   isUnparsableChangelog,
   planChangelogIngest,
   planDirectoryIngest,
-  toBatchBody,
+  toBatchRequest,
+  type BatchReleaseBody,
   type DirectoryFileInput,
   type IngestFormat,
   type PlannedRelease,
-} from "./plan.js";
+} from "@buildinternet/releases-core/changelog-publish";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { CliError } from "../errors.js";
+import { gitDiffNameStatus, gitShowFile, isMissingOrZeroSha } from "./git.js";
 
 const DEFAULT_CHANGELOG_PATH = "CHANGELOG.md";
 
-export type BatchRelease = ReturnType<typeof toBatchBody>[number];
+export type BatchRelease = BatchReleaseBody;
 
 export type CollectInput = {
   changelogPath?: string;
@@ -134,7 +132,7 @@ function finish(plan: {
     modified: plan.modified,
     deleted: plan.deleted,
     releases: plan.releases,
-    body: { mode: "upsert-content", releases: toBatchBody(plan.releases) },
+    body: toBatchRequest(plan.releases),
   };
 }
 
