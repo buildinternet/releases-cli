@@ -1,6 +1,6 @@
 # Releases plugin for Claude Code
 
-Search changelogs and look up releases in the [Releases.sh](https://releases.sh) registry from inside Claude Code.
+Search changelogs and look up releases in the [Release Notes Index](https://releases.sh) from inside Claude Code.
 
 ## Install
 
@@ -52,7 +52,7 @@ Or run the command directly:
 
 ## Data and network access
 
-The plugin runs nothing on your machine. It reaches two Releases.sh services:
+The plugin runs nothing on your machine. It reaches two Releases Index services:
 
 - **`agents.releases.sh`**: the hosted MCP server behind the search and lookup tools. It receives your search queries and lookup requests. Signing in is optional; it is only needed to follow products or manage webhooks, and happens through your MCP client's own OAuth flow.
 - **`api.releases.sh`**: the REST API used by the optional `releases` CLI. The `releases-cli` skill only sends requests here if you install the CLI and Claude runs it.

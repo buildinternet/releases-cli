@@ -3,9 +3,9 @@ name: releases-mcp
 description: Use when the user asks about recent releases, changelogs, what's new in a library, breaking changes, version updates, or wants to compare products. Activates for questions like "what changed in Next.js 15?", "latest Tailwind releases", "compare Bun vs Deno releases".
 ---
 
-# Releases.sh — Changelog Lookup
+# Release Notes Index — Changelog Lookup
 
-When the user asks about releases, changelogs, or version updates, use the Releases.sh MCP tools to fetch current data instead of relying on training data. Training data is stale for fast-moving libraries; these tools read the live registry.
+When the user asks about releases, changelogs, or version updates, use the Releases Index MCP tools to fetch current data instead of relying on training data. Training data is stale for fast-moving libraries; these tools read the live registry.
 
 ## When to Use This Skill
 
