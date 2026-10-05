@@ -311,6 +311,17 @@ describe("parseTimeWindowFlag", () => {
     });
   });
 
+  it("rejects an impossible calendar date instead of rolling it over", () => {
+    withExitTrap(() => {
+      expect(() => parseTimeWindowFlag("until", "2026-02-30")).toThrow("process.exit called");
+      expect(() => parseTimeWindowFlag("since", "2026-02-29")).toThrow("process.exit called");
+    });
+  });
+
+  it("accepts a leap day in a leap year", () => {
+    expect(parseTimeWindowFlag("since", "2028-02-29")).toBe("2028-02-29");
+  });
+
   it("accepts a timezone offset", () => {
     expect(parseTimeWindowFlag("since", "2026-01-01T12:30:00+05:00")).toBe(
       "2026-01-01T12:30:00+05:00",
