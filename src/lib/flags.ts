@@ -1,5 +1,6 @@
 import chalk from "chalk";
 import { IMPORTANCE_MAX, IMPORTANCE_MIN } from "@buildinternet/releases-core/importance";
+import { isDateKey } from "@buildinternet/releases-core/dates";
 
 /**
  * Parse a positive-integer CLI flag value. Returns `undefined` if the option
@@ -75,15 +76,22 @@ const TIME_WINDOW_ISO_RE =
  * ISO date (`2026-01-01`), a timezone-qualified datetime (`…Z` / `…+05:00`),
  * or relative shorthand (`90d`, `4w`, `6m`, `2y`). Returns `undefined` when the
  * flag was omitted; exits with code 2 on a malformed value (matches the other
- * flag parsers here). A bare number, `2026/01/01`, and a tz-less datetime are
- * rejected so the local check matches the server contract.
+ * flag parsers here). A bare number, `2026/01/01`, a tz-less datetime, and an
+ * impossible bare date (`2026-02-30`) are rejected so the local check matches
+ * the server contract.
  */
 export function parseTimeWindowFlag(label: string, raw: string | undefined): string | undefined {
   if (raw === undefined) return undefined;
   const trimmed = raw.trim();
+  // A bare date must also be a real calendar day: `new Date` rolls overflow
+  // forward (`2026-02-30` → Mar 2) instead of failing, and the server rejects
+  // it with a 400 (core `resolveDateParam`), so fail fast here with exit 2.
+  const isBareDate = /^\d{4}-\d{2}-\d{2}$/.test(trimmed);
   const valid =
     TIME_WINDOW_RELATIVE_RE.test(trimmed) ||
-    (TIME_WINDOW_ISO_RE.test(trimmed) && !Number.isNaN(new Date(trimmed).getTime()));
+    (TIME_WINDOW_ISO_RE.test(trimmed) &&
+      !Number.isNaN(new Date(trimmed).getTime()) &&
+      (!isBareDate || isDateKey(trimmed)));
   if (!valid) {
     console.error(
       chalk.red(
