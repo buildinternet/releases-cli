@@ -5,7 +5,7 @@
 [![Test](https://github.com/buildinternet/releases-cli/actions/workflows/test.yml/badge.svg)](https://github.com/buildinternet/releases-cli/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![Backend](https://img.shields.io/badge/backend-buildinternet%2Freleases-24292e?logo=github)](https://github.com/buildinternet/releases)
-[![skills.sh](https://skills.sh/b/buildinternet/releases-cli)](https://skills.sh/buildinternet/releases-cli)
+[![skills.sh](https://skills.sh/b/buildinternet/releases)](https://skills.sh/buildinternet/releases)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/buildinternet/releases-cli)
 
 **[Release Notes Index](https://releases.sh)** &nbsp;·&nbsp; **[Backend monorepo →](https://github.com/buildinternet/releases)** &nbsp;·&nbsp; [Install](#install) &nbsp;·&nbsp; [Usage](#usage) &nbsp;·&nbsp; [Authentication](#authentication)
@@ -109,7 +109,7 @@ npx mcp-remote https://agents.releases.sh/mcp
 This repo also ships the `releases` plugin (`plugins/claude/releases`) — hosted MCP tools, a `/releases` lookup command, and auto-trigger skills — in the common agent-plugin layout. In Claude Code:
 
 ```bash
-/plugin marketplace add buildinternet/releases-cli
+/plugin marketplace add buildinternet/releases
 /plugin install releases@releases
 ```
 
@@ -120,7 +120,7 @@ Operator/maintainer skills (source onboarding, parsing, playbooks) live with the
 Or install just the skills into any agent (Cursor, Codex, Gemini CLI, Windsurf, …):
 
 ```bash
-releases skills install        # or, without the CLI: npx skills add buildinternet/releases-cli
+releases skills install        # or, without the CLI: npx skills add buildinternet/releases
 ```
 
 ## Authentication

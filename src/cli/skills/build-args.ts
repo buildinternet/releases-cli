@@ -1,4 +1,4 @@
-export const SKILLS_SOURCE = "buildinternet/releases-cli";
+export const SKILLS_SOURCE = "buildinternet/releases";
 
 export interface InstallOptions {
   skills?: string[];
