@@ -106,12 +106,22 @@ describe("getLockSuppressionState", () => {
     expect(getLockSuppressionState(JSON.stringify({ skills: "not an object" }))).toBe("proceed");
   });
 
-  it("proceeds when at least one entry sources from buildinternet/releases-cli", () => {
+  it("proceeds when at least one entry sources from buildinternet/releases", () => {
+    const lock = JSON.stringify({
+      version: 3,
+      skills: {
+        "releases-cli": { source: "buildinternet/releases", skillFolderHash: "abc" },
+        "ai-sdk": { source: "vercel/ai", skillFolderHash: "def" },
+      },
+    });
+    expect(getLockSuppressionState(lock)).toBe("proceed");
+  });
+
+  it("still proceeds for legacy installs sourced from buildinternet/releases-cli", () => {
     const lock = JSON.stringify({
       version: 3,
       skills: {
         "releases-cli": { source: "buildinternet/releases-cli", skillFolderHash: "abc" },
-        "ai-sdk": { source: "vercel/ai", skillFolderHash: "def" },
       },
     });
     expect(getLockSuppressionState(lock)).toBe("proceed");

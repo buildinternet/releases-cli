@@ -8,13 +8,15 @@ const CACHE_FILE = "skills-check.json";
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const FETCH_TIMEOUT_MS = 2000;
 const REPO_OWNER = "buildinternet";
-const REPO_NAME = "releases-cli";
+const REPO_NAME = "releases";
 const REPO_BRANCH = "main";
 // The skills live inside the Claude plugin folder; the tree SHA of this
 // `skills/` entry is what the baseline tracks.
 const SKILLS_PARENT_PATH = "plugins/claude/releases";
 const SKILLS_DIR_NAME = "skills";
 const SKILLS_COORDINATE = `${REPO_OWNER}/${REPO_NAME}`;
+// Installs made before the plugin moved to the monorepo recorded this source.
+const LEGACY_SKILLS_COORDINATES = new Set([`${REPO_OWNER}/releases-cli`]);
 const DISABLE_ENV_VAR = "RELEASES_DISABLE_SKILL_UPDATE_CHECK";
 const SKILL_LOCK_FILE = ".skill-lock.json";
 
@@ -65,8 +67,9 @@ export function buildNagMessage(): string {
  * Inspect the `skills` CLI's lock file to decide whether the nag should fire
  * for this user. Returns:
  *  - `"suppress"` only when the lock file is present AND parses cleanly AND
- *    has zero `buildinternet/releases-cli` entries (user uninstalled or never
- *    installed via `skills`).
+ *    has zero `buildinternet/releases` entries, counting the legacy
+ *    `buildinternet/releases-cli` source (user uninstalled or never installed
+ *    via `skills`).
  *  - `"proceed"` in every other case — including a missing/unreadable lock
  *    file — so manual installers and users on non-standard `skills` state
  *    paths keep the existing behavior of relying on the baseline cache.
@@ -85,7 +88,12 @@ export function getLockSuppressionState(rawLockJson: string | null): "suppress" 
   const skills = parsed?.skills;
   if (!skills || typeof skills !== "object") return "proceed";
   for (const entry of Object.values(skills)) {
-    if (entry && typeof entry === "object" && entry.source === SKILLS_COORDINATE) {
+    if (
+      entry &&
+      typeof entry === "object" &&
+      (entry.source === SKILLS_COORDINATE ||
+        (typeof entry.source === "string" && LEGACY_SKILLS_COORDINATES.has(entry.source)))
+    ) {
       return "proceed";
     }
   }
