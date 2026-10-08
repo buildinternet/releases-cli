@@ -1,4 +1,4 @@
-# Releases Index plugin
+# Release Notes Index plugin
 
 Search changelogs and look up releases in the [Release Notes Index](https://releases.sh) from inside Claude Code or Grok Build.
 
@@ -30,7 +30,7 @@ claude --plugin-dir <path-to-releases-cli-clone>/plugins/claude/releases
 
 ### Grok Build
 
-This plugin is submitted to the [xAI plugin marketplace](https://github.com/xai-org/plugin-marketplace) as `releases-index`. Once listed, run `/plugin` in Grok Build, search for **Releases Index**, and install it. The marketplace pins a commit of this repo, so updates arrive when the catalog entry is bumped.
+This plugin is submitted to the [xAI plugin marketplace](https://github.com/xai-org/plugin-marketplace) as `release-notes-index`. Once listed, run `/plugin` in Grok Build, search for **Release Notes Index**, and install it. The marketplace pins a commit of this repo, so updates arrive when the catalog entry is bumped.
 
 ## What you get
 
@@ -64,7 +64,7 @@ MIT, same as the rest of this repository.
 
 ## Data and network access
 
-The plugin ships no hooks, scripts, or binaries and runs nothing on your machine. It reaches two Releases Index services:
+The plugin ships no hooks, scripts, or binaries and runs nothing on your machine. It reaches two Release Notes Index services:
 
 - **`agents.releases.sh`**: the hosted MCP server behind the search and lookup tools. It receives your search queries and lookup requests. Signing in is optional; it is only needed to follow products or manage webhooks, and happens through your MCP client's own OAuth flow.
 - **`api.releases.sh`**: the REST API used by the optional `releases` CLI. The `releases-cli` skill only sends requests here if you install the CLI and your agent runs it. The skill describes how to install the CLI from npm or Homebrew; the plugin itself never downloads or executes anything.

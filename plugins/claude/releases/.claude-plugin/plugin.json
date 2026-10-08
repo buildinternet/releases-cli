@@ -1,6 +1,6 @@
 {
   "name": "releases",
-  "displayName": "Releases",
+  "displayName": "Release Notes Index",
   "description": "Search changelogs and look up releases via the hosted Release Notes Index. Bundles the hosted MCP connection, the /releases lookup command, and auto-triggering skills for release/changelog questions.",
   "author": {
     "name": "Build Internet",

@@ -1,4 +1,4 @@
-# Releases Index CLI
+# Release Notes Index CLI
 
 [![npm](https://img.shields.io/npm/v/@buildinternet/releases?color=cb3837&label=npm&logo=npm)](https://www.npmjs.com/package/@buildinternet/releases)
 [![Release](https://github.com/buildinternet/releases-cli/actions/workflows/release.yml/badge.svg)](https://github.com/buildinternet/releases-cli/actions/workflows/release.yml)
@@ -113,7 +113,7 @@ This repo also ships the `releases` plugin (`plugins/claude/releases`) — hoste
 /plugin install releases@releases
 ```
 
-In Grok Build, install **Releases Index** from `/plugin` once it is listed in the [xAI plugin marketplace](https://github.com/xai-org/plugin-marketplace). Details in the [plugin README](plugins/claude/releases/README.md).
+In Grok Build, install **Release Notes Index** from `/plugin` once it is listed in the [xAI plugin marketplace](https://github.com/xai-org/plugin-marketplace). Details in the [plugin README](plugins/claude/releases/README.md).
 
 Operator/maintainer skills (source onboarding, parsing, playbooks) live with the backend in the [releases monorepo](https://github.com/buildinternet/releases) — its `.claude/skills/` tree is picked up automatically in a checkout.
 
