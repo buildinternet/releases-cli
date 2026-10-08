@@ -1,6 +1,8 @@
 {
-  "releases": {
-    "type": "http",
-    "url": "https://agents.releases.sh/mcp"
+  "mcpServers": {
+    "releases": {
+      "type": "http",
+      "url": "https://agents.releases.sh/mcp"
+    }
   }
 }
