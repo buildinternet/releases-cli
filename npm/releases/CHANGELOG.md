@@ -1,5 +1,12 @@
 # @buildinternet/releases
 
+## 0.83.1
+
+### Patch Changes
+
+- a69c3d6: Skills and the Claude Code plugin now install from `buildinternet/releases` (the monorepo). `releases skills install` and the update check point there; installs made from `buildinternet/releases-cli` are still recognised.
+- a7598a1: `--since` / `--until` now reject impossible calendar dates like `2026-02-30` locally (exit code 2) instead of sending them to the API, which returns a 400 for them.
+
 ## 0.83.0
 
 ### Minor Changes
