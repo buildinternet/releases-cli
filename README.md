@@ -1,4 +1,4 @@
-# Releases Index CLI
+# Release Notes Index CLI
 
 [![npm](https://img.shields.io/npm/v/@buildinternet/releases?color=cb3837&label=npm&logo=npm)](https://www.npmjs.com/package/@buildinternet/releases)
 [![Release](https://github.com/buildinternet/releases-cli/actions/workflows/release.yml/badge.svg)](https://github.com/buildinternet/releases-cli/actions/workflows/release.yml)
@@ -98,7 +98,7 @@ releases json validate releases.json              # check a releases.json manife
 
 `json validate` is a read-only manifest check: it validates a [`releases.json`](https://releases.sh/docs/listing) v2 file against the published schema (pass a path or `-` for stdin) and adds `--json` for machine-readable output — no network, no submission.
 
-### MCP & Claude Code
+### MCP & agent plugins
 
 Point any MCP-compatible agent at the hosted server:
 
@@ -106,12 +106,14 @@ Point any MCP-compatible agent at the hosted server:
 npx mcp-remote https://agents.releases.sh/mcp
 ```
 
-This repo is also a Claude Code marketplace with the `releases` plugin — hosted MCP tools, a `/releases` lookup command, and auto-trigger skills:
+This repo also ships the `releases` plugin (`plugins/claude/releases`) — hosted MCP tools, a `/releases` lookup command, and auto-trigger skills — in the common agent-plugin layout. In Claude Code:
 
 ```bash
 /plugin marketplace add buildinternet/releases-cli
 /plugin install releases@releases
 ```
+
+Other agent marketplaces (Grok Build via the [xAI plugin marketplace](https://github.com/xai-org/plugin-marketplace), and more as they are listed) install the same folder. Per-agent steps are in the [plugin README](plugins/claude/releases/README.md).
 
 Operator/maintainer skills (source onboarding, parsing, playbooks) live with the backend in the [releases monorepo](https://github.com/buildinternet/releases) — its `.claude/skills/` tree is picked up automatically in a checkout.
 

@@ -1,8 +1,14 @@
-# Releases plugin for Claude Code
+# Release Notes Index plugin
 
-Search changelogs and look up releases in the [Release Notes Index](https://releases.sh) from inside Claude Code.
+Search changelogs and look up releases in the [Release Notes Index](https://releases.sh) from inside your coding agent.
+
+The plugin is one folder (`plugins/claude/releases`) in the common agent-plugin layout: `.claude-plugin/plugin.json` is the manifest, `.mcp.json` declares the hosted MCP server, and `commands/` and `skills/` are discovered by layout. Any agent that reads this layout can install it; the sections below cover the marketplaces it is listed in. Agents without plugin support can still use the hosted MCP server or the standalone skills (see the end of this page).
 
 ## Install
+
+Pick your agent. The same folder serves every listing, so skills and commands are identical everywhere.
+
+### Claude Code
 
 Add the marketplace once, then install the plugin:
 
@@ -24,9 +30,13 @@ For local development against a cloned copy:
 claude --plugin-dir <path-to-releases-cli-clone>/plugins/claude/releases
 ```
 
+### Grok Build
+
+This plugin is submitted to the [xAI plugin marketplace](https://github.com/xai-org/plugin-marketplace) as `release-notes-index`. Once listed, run `/plugin` in Grok Build, search for **Release Notes Index**, and install it. The marketplace pins a commit of this repo, so updates arrive when the catalog entry is bumped.
+
 ## What you get
 
-Everything you need to ask Claude about release notes and changelogs.
+Everything you need to ask your agent about release notes and changelogs.
 
 - **Hosted MCP connection** to `agents.releases.sh` — search, lookup, and changelog slicing tools.
 - **`/releases <product> [query]`** for manual lookups.
@@ -50,18 +60,22 @@ Or run the command directly:
 /releases tailwind v4 breaking changes
 ```
 
+## License
+
+MIT, same as the rest of this repository.
+
 ## Data and network access
 
-The plugin runs nothing on your machine. It reaches two Releases Index services:
+The plugin ships no hooks, scripts, or binaries and runs nothing on your machine. It reaches two Release Notes Index services:
 
 - **`agents.releases.sh`**: the hosted MCP server behind the search and lookup tools. It receives your search queries and lookup requests. Signing in is optional; it is only needed to follow products or manage webhooks, and happens through your MCP client's own OAuth flow.
-- **`api.releases.sh`**: the REST API used by the optional `releases` CLI. The `releases-cli` skill only sends requests here if you install the CLI and Claude runs it.
+- **`api.releases.sh`**: the REST API used by the optional `releases` CLI. The `releases-cli` skill only sends requests here if you install the CLI and your agent runs it. The skill describes how to install the CLI from npm or Homebrew; the plugin itself never downloads or executes anything.
 
 Search queries are kept for 90 days to improve search. See the [privacy policy](https://releases.sh/privacy) for details.
 
 ## Standalone skills (any agent)
 
-If you want only the skill behaviour — no MCP connection, no command — install the bundled skills directly via the [`skills`](https://github.com/vercel-labs/skills) CLI from the open agent-skills ecosystem:
+If you want only the skill behaviour in another agent — no MCP connection, no command — install the bundled skills directly via the [`skills`](https://github.com/vercel-labs/skills) CLI from the open agent-skills ecosystem:
 
 ```bash
 releases skills install                       # requires the `releases` CLI
