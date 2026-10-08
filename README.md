@@ -106,14 +106,14 @@ Point any MCP-compatible agent at the hosted server:
 npx mcp-remote https://agents.releases.sh/mcp
 ```
 
-This repo also ships the `releases` plugin (`plugins/claude/releases`) — hosted MCP tools, a `/releases` lookup command, and auto-trigger skills — for Claude Code and Grok Build. In Claude Code:
+This repo also ships the `releases` plugin (`plugins/claude/releases`) — hosted MCP tools, a `/releases` lookup command, and auto-trigger skills — in the common agent-plugin layout. In Claude Code:
 
 ```bash
 /plugin marketplace add buildinternet/releases-cli
 /plugin install releases@releases
 ```
 
-In Grok Build, install **Release Notes Index** from `/plugin` once it is listed in the [xAI plugin marketplace](https://github.com/xai-org/plugin-marketplace). Details in the [plugin README](plugins/claude/releases/README.md).
+Other agent marketplaces (Grok Build via the [xAI plugin marketplace](https://github.com/xai-org/plugin-marketplace), and more as they are listed) install the same folder. Per-agent steps are in the [plugin README](plugins/claude/releases/README.md).
 
 Operator/maintainer skills (source onboarding, parsing, playbooks) live with the backend in the [releases monorepo](https://github.com/buildinternet/releases) — its `.claude/skills/` tree is picked up automatically in a checkout.
 

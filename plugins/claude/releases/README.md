@@ -1,10 +1,12 @@
 # Release Notes Index plugin
 
-Search changelogs and look up releases in the [Release Notes Index](https://releases.sh) from inside Claude Code or Grok Build.
+Search changelogs and look up releases in the [Release Notes Index](https://releases.sh) from inside your coding agent.
 
-The plugin is one folder (`plugins/claude/releases`) that works in both ecosystems: `.claude-plugin/plugin.json` is the manifest, `.mcp.json` declares the hosted MCP server, and `commands/` and `skills/` are discovered by layout.
+The plugin is one folder (`plugins/claude/releases`) in the common agent-plugin layout: `.claude-plugin/plugin.json` is the manifest, `.mcp.json` declares the hosted MCP server, and `commands/` and `skills/` are discovered by layout. Any agent that reads this layout can install it; the sections below cover the marketplaces it is listed in. Agents without plugin support can still use the hosted MCP server or the standalone skills (see the end of this page).
 
 ## Install
+
+Pick your agent. The same folder serves every listing, so skills and commands are identical everywhere.
 
 ### Claude Code
 
