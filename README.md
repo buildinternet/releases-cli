@@ -1,3 +1,11 @@
+> **This repository is archived.** The `releases` CLI now lives in the
+> [buildinternet/releases](https://github.com/buildinternet/releases) monorepo
+> under [`apps/cli`](https://github.com/buildinternet/releases/tree/main/apps/cli).
+> Install commands are unchanged (`brew install buildinternet/tap/releases`,
+> `npm install -g @buildinternet/releases`). File issues at
+> [buildinternet/releases/issues](https://github.com/buildinternet/releases/issues).
+> Releases v0.83.1 and earlier stay here; v0.83.2 onward are published from the monorepo.
+
 # Release Notes Index CLI
 
 [![npm](https://img.shields.io/npm/v/@buildinternet/releases?color=cb3837&label=npm&logo=npm)](https://www.npmjs.com/package/@buildinternet/releases)
